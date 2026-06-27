@@ -91,6 +91,9 @@
 
     <div id="exerciseListSection" style="display:none;">
       <h5 class="text-center mb-4">แบบฝึกหัดสำหรับอายุ <span id="selectedAgeLabel"></span> ขวบ</h5>
+      <div class="alert alert-warning" id="noDataBanner" style="display:none;">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>ยังไม่พบคลังคำในระบบ — เว็บไซต์นี้ยังไม่ได้เชื่อมต่อฐานข้อมูล Supabase กรุณาตั้งค่าตามขั้นตอนใน <code>README.md</code> (รัน schema.sql, นำเข้า data/words.csv, แก้ <code>js/config.js</code> ให้เป็น URL/anon key จริง) แล้วลองใหม่
+      </div>
       <div class="row g-3" id="exerciseList"></div>
     </div>
 
@@ -194,6 +197,8 @@
     document.getElementById("selectedAgeLabel").textContent = age;
     const words = await WordsApi.fetchWordsForAge(age);
     exercisesByAge = WordsApi.groupByExercise(words);
+
+    document.getElementById("noDataBanner").style.display = exercisesByAge.length ? "none" : "block";
 
     const list = document.getElementById("exerciseList");
     list.innerHTML = "";

@@ -52,6 +52,9 @@
       <p class="text-secondary small">ใช้ปุ่มลูกศร หรือ W A S D เพื่อเดิน 4 ทิศทาง</p>
     </div>
 
+    <div class="alert alert-warning mx-auto" style="max-width:800px; display:none;" id="noDataBanner">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>ยังไม่พบคลังคำในระบบ — เว็บไซต์นี้ยังไม่ได้เชื่อมต่อฐานข้อมูล Supabase เกมจะยังเดินเล่นได้ แต่ของวิเศษจะยังไม่มีคำให้ฝึกออกเสียงจนกว่าจะตั้งค่าตามขั้นตอนใน <code>README.md</code>
+    </div>
     <div id="phaserGame" class="mx-auto" style="max-width:800px; border-radius:24px; overflow:hidden; box-shadow:var(--shadow-soft);"></div>
   </div>
 </main>
@@ -134,6 +137,7 @@
     } catch (e) {
       console.error("fetchAllWords failed:", e);
     }
+    document.getElementById("noDataBanner").style.display = words.length ? "none" : "block";
     startPronunciationGame(words, onGameItemCollide);
 
     document.getElementById("btnGameListen").addEventListener("click", function () {
