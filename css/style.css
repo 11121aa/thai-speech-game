@@ -129,6 +129,10 @@ a {
   background-color: var(--color-secondary-dark);
   color: #fff !important;
 }
+.nav-user-info {
+  align-items: center;
+  gap: 0.5rem;
+}
 
 /* ============ Footer ============ */
 .site-footer {
@@ -314,6 +318,13 @@ a {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--color-text-soft);
+}
+.age-pick-btn.active-age {
+  background: var(--color-primary);
+  color: #fff;
+}
+.age-pick-btn.active-age small {
+  color: #fff;
 }
 
 .menu-screen {

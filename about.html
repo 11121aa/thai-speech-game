@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>เกี่ยวกับเรา | ระบบเรียนรู้การออกเสียงด้วย AI</title>
 <meta name="description" content="ความสำคัญของการฝึกออกเสียงสำหรับเด็กที่มีปัญหาทางการออกเสียง (Speech Sound Disorders) พร้อมงานวิจัยอ้างอิง">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -27,9 +28,16 @@
       <div class="collapse navbar-collapse" id="navMain">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
           <li class="nav-item"><a class="nav-link" data-page="index.html" href="index.html">หน้าหลัก</a></li>
-          <li class="nav-item"><a class="nav-link" data-page="about.html" href="about.html">เกี่ยวกับเรา</a></li>
+          <li class="nav-item"><a class="nav-link active" data-page="about.html" href="about.html">เกี่ยวกับเรา</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="app.html" href="app.html">ฝึกออกเสียง</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="game.html" href="game.html">เกม</a></li>
           <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
-          <li class="nav-item"><a class="nav-link nav-cta" data-page="app.html" href="app.html">เริ่มฝึกเลย 🎮</a></li>
+          <li class="nav-item" id="navManagement" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">การจัดการ</a></li>
+          <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
+          <li class="nav-item nav-user-info" id="navUser" style="display:none;">
+            <span class="nav-link mb-0" id="navUserEmail"></span>
+            <button class="btn btn-sm btn-outline-primary" id="btnLogout">ออกจากระบบ</button>
+          </li>
         </ul>
       </div>
     </div>
@@ -127,8 +135,11 @@
   <section class="section-pad bg-soft-pink">
     <div class="container text-center">
       <h2 class="section-title">เว็บไซต์นี้ช่วยน้องๆได้อย่างไร</h2>
-      <p class="hero-lead mx-auto mb-4" style="max-width:680px;">เราออกแบบเกมฝึกออกเสียงที่ทำให้การฝึกซ้ำๆ ไม่น่าเบื่อ ด้วยภารกิจวิ่งผ่านด่าน คลังคำกว่า 300 คำที่จัดกลุ่มตามเสียงที่ฝึกยาก และระบบฟังเสียงให้คะแนนทันที เพื่อให้น้องได้ฝึกฝนอย่างสนุกและสม่ำเสมอ</p>
-      <a href="app.html" class="btn btn-warning btn-lg btn-bouncy"><i class="bi bi-controller me-2"></i>ลองเล่นเกมฝึกออกเสียง</a>
+      <p class="hero-lead mx-auto mb-4" style="max-width:680px;">เราออกแบบแบบฝึกหัดและเกมฝึกออกเสียงที่ทำให้การฝึกซ้ำๆ ไม่น่าเบื่อ พร้อมคลังคำที่จัดกลุ่มตามเสียงที่ฝึกยาก และทีมผู้เชี่ยวชาญที่ช่วยให้คะแนนความถูกต้อง เพื่อให้น้องได้ฝึกฝนอย่างสนุกและสม่ำเสมอ</p>
+      <div class="d-flex gap-3 justify-content-center flex-wrap">
+        <a href="app.html" class="btn btn-warning btn-lg btn-bouncy"><i class="bi bi-mic-fill me-2"></i>ไปฝึกออกเสียง</a>
+        <a href="game.html" class="btn btn-outline-primary btn-lg btn-bouncy"><i class="bi bi-controller me-2"></i>ลองเล่นเกม</a>
+      </div>
     </div>
   </section>
 </main>
@@ -145,7 +156,8 @@
         <ul class="list-unstyled">
           <li><a href="index.html">หน้าหลัก</a></li>
           <li><a href="about.html">เกี่ยวกับเรา</a></li>
-          <li><a href="app.html">เริ่มฝึกเลย</a></li>
+          <li><a href="app.html">ฝึกออกเสียง</a></li>
+          <li><a href="game.html">เกม</a></li>
           <li><a href="contact.html">ติดต่อเรา</a></li>
         </ul>
       </div>
@@ -161,6 +173,13 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/main.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () { Auth.initNav(); });
+</script>
 </body>
 </html>

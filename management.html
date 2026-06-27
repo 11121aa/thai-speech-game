@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>การจัดการ | ระบบเรียนรู้การออกเสียงด้วย AI</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar navbar-expand-lg app-nav">
+    <div class="container">
+      <a class="navbar-brand app-brand" href="index.html">
+        <span class="brand-emoji">🗣️</span>
+        <span>ระบบเรียนรู้การออกเสียงด้วย AI</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="เปิดเมนู">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMain">
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
+          <li class="nav-item"><a class="nav-link" data-page="index.html" href="index.html">หน้าหลัก</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="about.html" href="about.html">เกี่ยวกับเรา</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="app.html" href="app.html">ฝึกออกเสียง</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="game.html" href="game.html">เกม</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
+          <li class="nav-item" id="navManagement" style="display:none;"><a class="nav-link active" data-page="management.html" href="management.html">การจัดการ</a></li>
+          <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
+          <li class="nav-item nav-user-info" id="navUser" style="display:none;">
+            <span class="nav-link mb-0" id="navUserEmail"></span>
+            <button class="btn btn-sm btn-outline-primary" id="btnLogout">ออกจากระบบ</button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main class="py-4">
+  <div class="container">
+
+    <div id="loadingState" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="text-secondary mt-3">กำลังโหลดข้อมูล...</p>
+    </div>
+
+    <!-- ============== USER VIEW ============== -->
+    <div id="userView" style="display:none;">
+      <h1 class="h3 mb-4">📊 รายงานการฝึกของฉัน</h1>
+
+      <div class="soft-card mb-4">
+        <h5 class="mb-3">สรุปจำนวนแบบฝึกหัดต่อวัน</h5>
+        <div class="table-responsive">
+          <table class="table table-borderless align-middle">
+            <thead><tr><th>วันที่</th><th>จำนวนแบบฝึกหัดที่ทำ</th></tr></thead>
+            <tbody id="dailySummaryBody"><tr><td colspan="2" class="text-secondary">ยังไม่มีข้อมูล</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="soft-card">
+        <h5 class="mb-3">ประวัติการฝึกล่าสุด</h5>
+        <div class="table-responsive">
+          <table class="table table-borderless align-middle">
+            <thead><tr><th>คำ</th><th>วันที่/เวลา</th><th>คะแนนจากผู้เชี่ยวชาญ</th></tr></thead>
+            <tbody id="historyBody"><tr><td colspan="3" class="text-secondary">ยังไม่มีข้อมูล</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== SPECIALIST VIEW ============== -->
+    <div id="specialistView" style="display:none;">
+      <h1 class="h3 mb-4">🩺 การจัดการสำหรับผู้เชี่ยวชาญ</h1>
+
+      <ul class="nav nav-pills mb-4 gap-2">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabWords" type="button">จัดการคลังคำ</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabScoring" type="button">ให้คะแนนไฟล์เสียง</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- CRUD words -->
+        <div class="tab-pane fade show active" id="tabWords">
+          <div class="soft-card mb-4">
+            <h5 class="mb-3" id="wordFormTitle">เพิ่มคำฝึกออกเสียง</h5>
+            <form id="wordForm" class="row g-3">
+              <input type="hidden" id="wordId">
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">รหัสแบบฝึกหัด (exercise_code)</label>
+                <input type="text" class="form-control" id="wordExerciseCode" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">หมวดตัวอักษร</label>
+                <input type="text" class="form-control" id="wordLetterCategory" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">คำฝึกออกเสียง</label>
+                <input type="text" class="form-control" id="wordWord" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">คำอ่าน</label>
+                <input type="text" class="form-control" id="wordReading" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">Emoji</label>
+                <input type="text" class="form-control" id="wordEmoji">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">ระดับอายุ</label>
+                <select class="form-select" id="wordAgeLevel" required>
+                  <option value="4">4 ขวบ</option>
+                  <option value="5">5 ขวบ</option>
+                  <option value="6">6 ขวบ</option>
+                  <option value="7">7 ขวบ</option>
+                </select>
+              </div>
+              <div class="col-md-6 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-warning btn-bouncy" id="wordSubmitBtn">เพิ่มคำ</button>
+                <button type="button" class="btn btn-outline-secondary" id="wordCancelEditBtn" style="display:none;">ยกเลิกการแก้ไข</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="soft-card">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <h5 class="mb-0">คลังคำทั้งหมด</h5>
+              <input type="text" class="form-control" style="max-width:280px;" id="wordSearchInput" placeholder="ค้นหาคำ/หมวด/รหัสแบบฝึกหัด">
+            </div>
+            <div class="table-responsive" style="max-height:480px; overflow-y:auto;">
+              <table class="table table-hover align-middle">
+                <thead><tr><th>คำ</th><th>คำอ่าน</th><th>หมวด</th><th>รหัส</th><th>อายุ</th><th>Emoji</th><th></th></tr></thead>
+                <tbody id="wordsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scoring -->
+        <div class="tab-pane fade" id="tabScoring">
+          <div class="soft-card mb-4">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <label class="fw-semibold mb-0">กรองตามผู้ฝึกออกเสียง</label>
+              <select class="form-select" style="max-width:320px;" id="filterUserSelect">
+                <option value="">ทุกคน</option>
+              </select>
+            </div>
+          </div>
+          <div class="soft-card">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead><tr><th>คำ</th><th>ผู้ฝึกออกเสียง</th><th>วันที่/เวลา</th><th>ไฟล์เสียง</th><th>คะแนน</th><th></th></tr></thead>
+                <tbody id="practiceTableBody"><tr><td colspan="6" class="text-secondary">ยังไม่มีข้อมูล</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row gy-4">
+      <div class="col-lg-4">
+        <h5>🗣️ ระบบเรียนรู้การออกเสียงด้วย AI</h5>
+        <p>เกมฝึกออกเสียงภาษาไทยสำหรับเด็ก ช่วยให้เด็กกล้าพูด ออกเสียงชัด มั่นใจมากขึ้นทุกวัน</p>
+      </div>
+      <div class="col-lg-4">
+        <h5>เมนู</h5>
+        <ul class="list-unstyled">
+          <li><a href="index.html">หน้าหลัก</a></li>
+          <li><a href="about.html">เกี่ยวกับเรา</a></li>
+          <li><a href="app.html">ฝึกออกเสียง</a></li>
+          <li><a href="game.html">เกม</a></li>
+          <li><a href="contact.html">ติดต่อเรา</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-4">
+        <h5>ติดต่อเรา</h5>
+        <p>มีคำแนะนำหรือข้อเสนอแนะ ติดต่อได้ที่หน้า "ติดต่อเรา"</p>
+      </div>
+    </div>
+    <div class="footer-disclaimer text-center">
+      เว็บไซต์นี้จัดทำขึ้นเพื่อการศึกษาและฝึกฝนเบื้องต้นเท่านั้น ไม่ใช่เครื่องมือวินิจฉัยหรือทดแทนการรักษาทางการแพทย์ หากบุตรหลานของท่านมีปัญหาด้านการพูดที่น่าเป็นกังวล ควรปรึกษานักแก้ไขการพูด (Speech-Language Pathologist) หรือแพทย์ผู้เชี่ยวชาญ
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+  let currentSession = null;
+  let allWords = [];
+  let userEmailMap = {};
+
+  document.addEventListener("DOMContentLoaded", async function () {
+    const session = await Auth.requireLogin("management.html");
+    if (!session) return;
+    currentSession = session;
+    await Auth.initNav();
+
+    const role = await Auth.getRole(session.user.id);
+    document.getElementById("loadingState").style.display = "none";
+
+    if (role === "specialist") {
+      document.getElementById("specialistView").style.display = "block";
+      await initSpecialistView();
+    } else {
+      document.getElementById("userView").style.display = "block";
+      await initUserView();
+    }
+  });
+
+  /* ================= USER VIEW ================= */
+
+  async function initUserView() {
+    const { data, error } = await sb
+      .from("practice")
+      .select("practiced_at, score, words(word)")
+      .eq("user_id", currentSession.user.id)
+      .order("practiced_at", { ascending: false });
+
+    if (error || !data || !data.length) return;
+
+    const dailyCounts = {};
+    data.forEach(function (row) {
+      const day = new Date(row.practiced_at).toLocaleDateString("th-TH");
+      dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+    });
+
+    const summaryBody = document.getElementById("dailySummaryBody");
+    summaryBody.innerHTML = "";
+    Object.keys(dailyCounts).forEach(function (day) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + day + "</td><td>" + dailyCounts[day] + "</td>";
+      summaryBody.appendChild(tr);
+    });
+
+    const historyBody = document.getElementById("historyBody");
+    historyBody.innerHTML = "";
+    data.slice(0, 30).forEach(function (row) {
+      const tr = document.createElement("tr");
+      const time = new Date(row.practiced_at).toLocaleString("th-TH");
+      const scoreText = row.score === null ? "รอผลคะแนน" : row.score;
+      tr.innerHTML =
+        "<td>" + (row.words ? row.words.word : "-") + "</td><td>" + time + "</td><td>" + scoreText + "</td>";
+      historyBody.appendChild(tr);
+    });
+  }
+
+  /* ================= SPECIALIST VIEW ================= */
+
+  async function initSpecialistView() {
+    await loadUserMap();
+    await loadWords();
+    await loadPractice("");
+
+    document.getElementById("wordForm").addEventListener("submit", onWordFormSubmit);
+    document.getElementById("wordCancelEditBtn").addEventListener("click", resetWordForm);
+    document.getElementById("wordSearchInput").addEventListener("input", renderWordsTable);
+    document.getElementById("filterUserSelect").addEventListener("change", function (e) {
+      loadPractice(e.target.value);
+    });
+  }
+
+  async function loadUserMap() {
+    const { data, error } = await sb.rpc("list_users_for_specialist");
+    if (error || !data) return;
+    userEmailMap = {};
+    const select = document.getElementById("filterUserSelect");
+    data.forEach(function (u) {
+      userEmailMap[u.user_id] = u.email;
+      const opt = document.createElement("option");
+      opt.value = u.user_id;
+      opt.textContent = u.email;
+      select.appendChild(opt);
+    });
+  }
+
+  async function loadWords() {
+    const { data, error } = await sb.from("words").select("*").order("exercise_code", { ascending: true });
+    if (error) return;
+    allWords = data || [];
+    renderWordsTable();
+  }
+
+  function renderWordsTable() {
+    const query = document.getElementById("wordSearchInput").value.trim().toLowerCase();
+    const filtered = !query
+      ? allWords
+      : allWords.filter(function (w) {
+          return (
+            w.word.toLowerCase().indexOf(query) !== -1 ||
+            w.letter_category.toLowerCase().indexOf(query) !== -1 ||
+            w.exercise_code.toLowerCase().indexOf(query) !== -1
+          );
+        });
+
+    const body = document.getElementById("wordsTableBody");
+    body.innerHTML = "";
+    filtered.forEach(function (w) {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + w.word + "</td>" +
+        "<td>" + w.reading + "</td>" +
+        "<td>" + w.letter_category + "</td>" +
+        "<td>" + w.exercise_code + "</td>" +
+        "<td>" + w.age_level + "</td>" +
+        "<td>" + (w.emoji || "") + "</td>" +
+        '<td class="text-end"><button class="btn btn-sm btn-outline-primary me-1 btn-edit-word">แก้ไข</button><button class="btn btn-sm btn-outline-danger btn-delete-word">ลบ</button></td>';
+      tr.querySelector(".btn-edit-word").addEventListener("click", function () { fillWordForm(w); });
+      tr.querySelector(".btn-delete-word").addEventListener("click", function () { deleteWord(w.id); });
+      body.appendChild(tr);
+    });
+  }
+
+  function fillWordForm(w) {
+    document.getElementById("wordId").value = w.id;
+    document.getElementById("wordExerciseCode").value = w.exercise_code;
+    document.getElementById("wordLetterCategory").value = w.letter_category;
+    document.getElementById("wordWord").value = w.word;
+    document.getElementById("wordReading").value = w.reading;
+    document.getElementById("wordEmoji").value = w.emoji || "";
+    document.getElementById("wordAgeLevel").value = w.age_level;
+    document.getElementById("wordFormTitle").textContent = "แก้ไขคำฝึกออกเสียง";
+    document.getElementById("wordSubmitBtn").textContent = "บันทึกการแก้ไข";
+    document.getElementById("wordCancelEditBtn").style.display = "inline-block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetWordForm() {
+    document.getElementById("wordForm").reset();
+    document.getElementById("wordId").value = "";
+    document.getElementById("wordFormTitle").textContent = "เพิ่มคำฝึกออกเสียง";
+    document.getElementById("wordSubmitBtn").textContent = "เพิ่มคำ";
+    document.getElementById("wordCancelEditBtn").style.display = "none";
+  }
+
+  async function onWordFormSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById("wordId").value;
+    const payload = {
+      exercise_code: document.getElementById("wordExerciseCode").value.trim(),
+      letter_category: document.getElementById("wordLetterCategory").value.trim(),
+      word: document.getElementById("wordWord").value.trim(),
+      reading: document.getElementById("wordReading").value.trim(),
+      emoji: document.getElementById("wordEmoji").value.trim(),
+      age_level: parseInt(document.getElementById("wordAgeLevel").value, 10)
+    };
+
+    if (id) {
+      await sb.from("words").update(payload).eq("id", id);
+    } else {
+      await sb.from("words").insert(payload);
+    }
+    resetWordForm();
+    await loadWords();
+  }
+
+  async function deleteWord(id) {
+    if (!confirm("ต้องการลบคำนี้ใช่หรือไม่?")) return;
+    await sb.from("words").delete().eq("id", id);
+    await loadWords();
+  }
+
+  async function loadPractice(filterUserId) {
+    let query = sb
+      .from("practice")
+      .select("id, score, practiced_at, file_path, user_id, words(word, reading, letter_category)")
+      .order("practiced_at", { ascending: false });
+    if (filterUserId) query = query.eq("user_id", filterUserId);
+
+    const { data, error } = await query;
+    const body = document.getElementById("practiceTableBody");
+    body.innerHTML = "";
+    if (error || !data || !data.length) {
+      body.innerHTML = '<tr><td colspan="6" class="text-secondary">ยังไม่มีข้อมูล</td></tr>';
+      return;
+    }
+
+    for (const row of data) {
+      const tr = document.createElement("tr");
+      const time = new Date(row.practiced_at).toLocaleString("th-TH");
+      const email = userEmailMap[row.user_id] || row.user_id;
+      const wordText = row.words ? row.words.word + " (" + row.words.reading + ")" : "-";
+
+      const { data: signedData } = await sb.storage.from("practice-audio").createSignedUrl(row.file_path, 3600);
+      const audioSrc = signedData ? signedData.signedUrl : "";
+
+      tr.innerHTML =
+        "<td>" + wordText + "</td>" +
+        "<td>" + email + "</td>" +
+        "<td>" + time + "</td>" +
+        '<td>' + (audioSrc ? '<audio controls src="' + audioSrc + '" style="max-width:200px;"></audio>' : "ไม่พบไฟล์") + "</td>" +
+        '<td><input type="number" min="0" max="100" step="1" class="form-control form-control-sm" style="width:90px;" value="' + (row.score === null ? "" : row.score) + '"></td>' +
+        '<td><button class="btn btn-sm btn-warning btn-save-score">บันทึก</button></td>';
+
+      tr.querySelector(".btn-save-score").addEventListener("click", function () {
+        const input = tr.querySelector("input");
+        saveScore(row.id, input.value);
+      });
+      body.appendChild(tr);
+    }
+  }
+
+  async function saveScore(practiceId, scoreValue) {
+    const score = scoreValue === "" ? null : parseFloat(scoreValue);
+    await sb.from("practice").update({ score: score }).eq("id", practiceId);
+    alert("บันทึกคะแนนเรียบร้อย");
+  }
+</script>
+</body>
+</html>

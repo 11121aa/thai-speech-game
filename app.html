@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>เริ่มฝึกเลย | ระบบเรียนรู้การออกเสียงด้วย AI</title>
-<meta name="description" content="เกมฝึกออกเสียงภาษาไทย วิ่งผ่านด่านและพูดคำให้ถูกต้อง">
+<title>ฝึกออกเสียง | ระบบเรียนรู้การออกเสียงด้วย AI</title>
+<meta name="description" content="แบบฝึกหัดฝึกออกเสียงภาษาไทย แยกตามอายุและหมวดตัวอักษร">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -28,8 +29,15 @@
         <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
           <li class="nav-item"><a class="nav-link" data-page="index.html" href="index.html">หน้าหลัก</a></li>
           <li class="nav-item"><a class="nav-link" data-page="about.html" href="about.html">เกี่ยวกับเรา</a></li>
+          <li class="nav-item"><a class="nav-link active" data-page="app.html" href="app.html">ฝึกออกเสียง</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="game.html" href="game.html">เกม</a></li>
           <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
-          <li class="nav-item"><a class="nav-link nav-cta" data-page="app.html" href="app.html">เริ่มฝึกเลย 🎮</a></li>
+          <li class="nav-item" id="navManagement" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">การจัดการ</a></li>
+          <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
+          <li class="nav-item nav-user-info" id="navUser" style="display:none;">
+            <span class="nav-link mb-0" id="navUserEmail"></span>
+            <button class="btn btn-sm btn-outline-primary" id="btnLogout">ออกจากระบบ</button>
+          </li>
         </ul>
       </div>
     </div>
@@ -37,24 +45,43 @@
 </header>
 
 <main class="py-4">
-  <div class="container app-shell">
+  <div class="container">
 
-    <div id="browserWarning" class="alert alert-warning rounded-4" style="display:none;">
-      <i class="bi bi-info-circle-fill me-2"></i>เบราว์เซอร์นี้ไม่รองรับการตรวจจับเสียงพูดอัตโนมัติเต็มรูปแบบ ยังเล่นได้ตามปกติ แต่แนะนำให้ใช้ <strong>Google Chrome</strong> หรือ <strong>Microsoft Edge</strong> เพื่อให้ระบบวัดผลความแม่นยำได้ดีที่สุด
+    <div class="text-center mb-5">
+      <h1 class="hero-title" style="font-size:2.4rem;">🎙️ แบบฝึกหัดฝึกออกเสียง</h1>
+      <p class="hero-lead">เลือกอายุ เลือกแบบฝึกหัด แล้วฝึกออกเสียงคำง่ายๆ ไปด้วยกัน</p>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-      <h1 class="h3 mb-0">🎮 ด่านฝึกออกเสียง</h1>
-      <div class="d-flex gap-2">
-        <button id="btnChangeAge" class="btn btn-outline-primary btn-sm">เปลี่ยนอายุ</button>
-        <button id="btnShowHistory" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#historyModal">ประวัติของฉัน</button>
+    <div class="row g-3 mb-5">
+      <div class="col-md-3">
+        <div class="soft-card text-center h-100">
+          <div class="feature-icon bg-soft-pink mx-auto">1️⃣</div>
+          <h6 class="mt-2 mb-0">เลือกอายุของน้อง</h6>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="soft-card text-center h-100">
+          <div class="feature-icon bg-soft-yellow mx-auto">2️⃣</div>
+          <h6 class="mt-2 mb-0">เลือกแบบฝึกหัด</h6>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="soft-card text-center h-100">
+          <div class="feature-icon bg-soft-purple mx-auto">3️⃣</div>
+          <h6 class="mt-2 mb-0">ฟังตัวอย่าง แล้วลองพูดตาม</h6>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="soft-card text-center h-100">
+          <div class="feature-icon mx-auto" style="background:#e3f6e5;">4️⃣</div>
+          <h6 class="mt-2 mb-0">กดฝึกออกเสียงเพื่อบันทึกเสียง</h6>
+        </div>
       </div>
     </div>
 
-    <div id="ageScreen" class="menu-screen">
-      <h2 class="mb-2">น้องอายุกี่ขวบ?</h2>
-      <p class="text-secondary mb-4">เลือกอายุเพื่อปรับความยากของคำให้พอดีกับน้องนะ</p>
-      <div class="d-flex gap-3 flex-wrap justify-content-center">
+    <div class="text-center mb-4">
+      <h5 class="mb-3">เลือกอายุของน้อง</h5>
+      <div class="d-flex gap-3 justify-content-center flex-wrap">
         <button class="age-pick-btn" data-age="4">4<small>ขวบ</small></button>
         <button class="age-pick-btn" data-age="5">5<small>ขวบ</small></button>
         <button class="age-pick-btn" data-age="6">6<small>ขวบ</small></button>
@@ -62,99 +89,32 @@
       </div>
     </div>
 
-    <div id="worldMap">
-      <div class="text-center mb-4">
-        <h2 class="section-title mb-1">แผนที่ด่าน</h2>
-        <p class="text-secondary">เลือกเลเวลที่ต้องการฝึก ผ่านด่านก่อนหน้าเพื่อปลดล็อกด่านถัดไปนะ</p>
-      </div>
-      <div class="level-track" id="levelTrack"></div>
+    <div id="exerciseListSection" style="display:none;">
+      <h5 class="text-center mb-4">แบบฝึกหัดสำหรับอายุ <span id="selectedAgeLabel"></span> ขวบ</h5>
+      <div class="row g-3" id="exerciseList"></div>
     </div>
 
-    <div id="gameStage">
-
-      <canvas id="gameCanvas" width="900" height="420"></canvas>
-
-      <div class="game-hud" id="gameHud" style="display:none;">
-        <div class="hud-pill" id="hudLevelLabel">เลเวล บ</div>
-        <div class="hud-hearts" id="hudHearts">❤️❤️❤️</div>
-        <div class="hud-pill" id="hudProgress">0%</div>
-      </div>
-
-      <div class="touch-controls" id="touchControls" style="display:none;">
-        <div class="move-btns">
-          <button class="touch-btn" id="btnLeft" aria-label="เดินซ้าย"><i class="bi bi-arrow-left"></i></button>
-          <button class="touch-btn" id="btnRight" aria-label="เดินขวา"><i class="bi bi-arrow-right"></i></button>
-        </div>
-        <button class="touch-btn" id="btnJump" aria-label="กระโดด"><i class="bi bi-arrow-up"></i></button>
-      </div>
-
-      <div id="challengeOverlay">
-        <div class="challenge-card">
-          <p class="text-secondary mb-1">ลองออกเสียงคำนี้ดูสิ!</p>
-          <div class="challenge-word" id="challengeWord">บ้าน</div>
-          <button class="btn btn-outline-primary btn-sm mb-3" id="btnListenSample"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>
-          <canvas id="waveCanvas" width="400" height="70"></canvas>
-          <div>
-            <button class="mic-btn mt-3" id="btnMic" aria-label="กดเพื่อพูด"><i class="bi bi-mic-fill"></i></button>
-          </div>
-          <p class="small text-secondary mb-1" id="micHint">กดปุ่มไมค์แล้วพูดคำด้านบนดังๆ</p>
-          <div id="resultArea" class="mt-2" style="display:none;">
-            <div class="result-badge" id="resultBadge"></div>
-            <p class="mt-2 mb-0" id="resultMessage"></p>
-            <button class="btn btn-warning mt-3" id="btnRetryWord" style="display:none;">ลองอีกครั้ง</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="levelCompleteScreen" class="game-overlay-screen">
-        <h2 class="mb-2">🎉 เก่งมาก! ผ่านด่านแล้ว</h2>
-        <div id="starsDisplay" style="font-size:2.5rem;" class="mb-3"></div>
-        <p class="text-secondary mb-4" id="levelCompleteSummary"></p>
-        <div class="d-flex gap-3 flex-wrap justify-content-center">
-          <button class="btn btn-warning btn-lg btn-bouncy" id="btnNextLevel">เลเวลถัดไป</button>
-          <button class="btn btn-outline-primary btn-lg btn-bouncy" id="btnBackToMapFromComplete">กลับแผนที่</button>
-        </div>
-      </div>
-
-      <div id="tryAgainScreen" class="game-overlay-screen">
-        <h2 class="mb-2">ไม่เป็นไรนะ ลองอีกครั้ง!</h2>
-        <p class="text-secondary mb-4">หัวใจหมดแล้ว แต่ไม่ต้องเสียใจไป ลองใหม่ได้เสมอนะ 💪</p>
-        <div class="d-flex gap-3 flex-wrap justify-content-center">
-          <button class="btn btn-warning btn-lg btn-bouncy" id="btnRetryLevel">ลองอีกครั้ง</button>
-          <button class="btn btn-outline-primary btn-lg btn-bouncy" id="btnBackToMapFromRetry">กลับแผนที่</button>
-        </div>
-      </div>
-
+    <div id="wordListSection" style="display:none;" class="mt-5">
+      <button class="btn btn-outline-primary btn-sm mb-3" id="btnBackToExercises"><i class="bi bi-arrow-left me-1"></i>กลับไปเลือกแบบฝึกหัด</button>
+      <h5 class="mb-3">แบบฝึกหัด: <span id="exerciseTitleLabel"></span></h5>
+      <div id="wordRows" class="d-flex flex-column gap-2"></div>
     </div>
+
   </div>
 </main>
 
-<div class="modal fade" id="levelStartModal" tabindex="-1">
+<div class="modal fade" id="recordModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border-radius:24px;">
       <div class="modal-body text-center p-4">
-        <h4 id="levelStartTitle" class="mb-3">เลเวล บ</h4>
-        <p class="text-secondary mb-4">เลือกความยากที่ต้องการฝึก</p>
-        <div class="d-flex gap-3 justify-content-center">
-          <button class="btn btn-primary btn-lg btn-bouncy" id="btnStartEasy">ง่าย 😊</button>
-          <button class="btn btn-warning btn-lg btn-bouncy" id="btnStartHard">ยาก 💪</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="historyModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="border-radius:24px;">
-      <div class="modal-header">
-        <h5 class="modal-title">ประวัติของฉัน</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
-      </div>
-      <div class="modal-body">
-        <div class="d-flex justify-content-around text-center mb-3" id="historyStats"></div>
-        <div id="historyList"></div>
-        <p class="text-secondary text-center mb-0" id="historyEmptyMsg" style="display:none;">ยังไม่มีประวัติการฝึก ลองเล่นเกมดูสิ!</p>
+        <p class="text-secondary mb-1">ฝึกออกเสียงคำ</p>
+        <div class="challenge-word" id="recordWord">บ้าน</div>
+        <p class="text-secondary" id="recordReading"></p>
+        <canvas id="recordWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px;"></canvas>
+        <button class="mic-btn mt-3" id="btnRecordMic" aria-label="กดเพื่ออัดเสียง"><i class="bi bi-mic-fill"></i></button>
+        <p class="small text-secondary" id="recordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก</p>
+        <div class="alert alert-success" id="recordSuccessMsg" style="display:none;">บันทึกเสียงเรียบร้อย! ผู้เชี่ยวชาญจะให้คะแนนภายหลัง ดูผลได้ที่หน้า "การจัดการ"</div>
+        <div class="alert alert-danger" id="recordErrorMsg" style="display:none;"></div>
       </div>
     </div>
   </div>
@@ -172,7 +132,8 @@
         <ul class="list-unstyled">
           <li><a href="index.html">หน้าหลัก</a></li>
           <li><a href="about.html">เกี่ยวกับเรา</a></li>
-          <li><a href="app.html">เริ่มฝึกเลย</a></li>
+          <li><a href="app.html">ฝึกออกเสียง</a></li>
+          <li><a href="game.html">เกม</a></li>
           <li><a href="contact.html">ติดต่อเรา</a></li>
         </ul>
       </div>
@@ -188,15 +149,154 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="js/words-data.js"></script>
-<script src="js/history.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
-<script src="js/game.js"></script>
+<script src="js/recorder.js"></script>
 <script src="js/main.js"></script>
 <script>
+  let exercisesByAge = [];
+  let currentWord = null;
+  let recordController = null;
+  let isRecording = false;
+  let recordModal = null;
+
   document.addEventListener("DOMContentLoaded", function () {
-    AppGame.init();
+    Auth.initNav();
+    recordModal = new bootstrap.Modal(document.getElementById("recordModal"));
+
+    document.querySelectorAll(".age-pick-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll(".age-pick-btn").forEach(function (b) { b.classList.remove("active-age"); });
+        btn.classList.add("active-age");
+        loadExercises(parseInt(btn.getAttribute("data-age"), 10));
+      });
+    });
+
+    document.getElementById("btnBackToExercises").addEventListener("click", function () {
+      document.getElementById("wordListSection").style.display = "none";
+      document.getElementById("exerciseListSection").style.display = "block";
+    });
+
+    document.getElementById("btnRecordMic").addEventListener("click", onRecordMicClick);
+
+    document.getElementById("recordModal").addEventListener("hidden.bs.modal", function () {
+      if (recordController) { recordController.cancel(); recordController = null; }
+      isRecording = false;
+      resetRecordMicButton();
+    });
   });
+
+  async function loadExercises(age) {
+    document.getElementById("selectedAgeLabel").textContent = age;
+    const words = await WordsApi.fetchWordsForAge(age);
+    exercisesByAge = WordsApi.groupByExercise(words);
+
+    const list = document.getElementById("exerciseList");
+    list.innerHTML = "";
+    exercisesByAge.forEach(function (ex, idx) {
+      const col = document.createElement("div");
+      col.className = "col-md-4 col-lg-3";
+      col.innerHTML =
+        '<div class="feature-card text-center h-100" style="cursor:pointer;">' +
+        '<div class="feature-icon bg-soft-purple mx-auto" style="font-size:1.6rem;">' + ex.letter_category + '</div>' +
+        '<h6 class="mt-2 mb-1">หมวด ' + ex.letter_category + '</h6>' +
+        '<p class="text-secondary small mb-0">' + ex.words.length + ' คำ</p>' +
+        '</div>';
+      col.addEventListener("click", function () { openExercise(idx); });
+      list.appendChild(col);
+    });
+
+    document.getElementById("exerciseListSection").style.display = "block";
+    document.getElementById("wordListSection").style.display = "none";
+    document.getElementById("exerciseListSection").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function openExercise(idx) {
+    const exercise = exercisesByAge[idx];
+    document.getElementById("exerciseTitleLabel").textContent = "หมวด " + exercise.letter_category;
+
+    const rows = document.getElementById("wordRows");
+    rows.innerHTML = "";
+    exercise.words.forEach(function (w) {
+      const row = document.createElement("div");
+      row.className = "soft-card d-flex justify-content-between align-items-center flex-wrap gap-2";
+      row.innerHTML =
+        '<div><span style="font-size:1.6rem;">' + (w.emoji || "🔸") + "</span> " +
+        '<strong style="font-size:1.3rem;">' + w.word + "</strong> " +
+        '<span class="text-secondary">' + w.reading + "</span></div>" +
+        '<div class="d-flex gap-2">' +
+        '<button class="btn btn-outline-primary btn-sm btn-listen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>' +
+        '<button class="btn btn-warning btn-sm btn-practice"><i class="bi bi-mic-fill me-1"></i>ฝึกออกเสียง</button>' +
+        "</div>";
+      row.querySelector(".btn-listen").addEventListener("click", function () { SpeechTool.speak(w.word); });
+      row.querySelector(".btn-practice").addEventListener("click", function () { openRecordModal(w); });
+      rows.appendChild(row);
+    });
+
+    document.getElementById("exerciseListSection").style.display = "none";
+    document.getElementById("wordListSection").style.display = "block";
+  }
+
+  async function openRecordModal(word) {
+    const session = await Auth.getSession();
+    if (!session) {
+      location.href = "login.html?redirect=app.html";
+      return;
+    }
+    currentWord = word;
+    document.getElementById("recordWord").textContent = word.word;
+    document.getElementById("recordReading").textContent = word.reading;
+    document.getElementById("recordSuccessMsg").style.display = "none";
+    document.getElementById("recordErrorMsg").style.display = "none";
+    resetRecordMicButton();
+    recordModal.show();
+  }
+
+  function resetRecordMicButton() {
+    isRecording = false;
+    const btn = document.getElementById("btnRecordMic");
+    btn.classList.remove("recording");
+    btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+    document.getElementById("recordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
+  }
+
+  function onRecordMicClick() {
+    if (!isRecording) {
+      isRecording = true;
+      const btn = document.getElementById("btnRecordMic");
+      btn.classList.add("recording");
+      btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
+      document.getElementById("recordHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเพื่อหยุด";
+      document.getElementById("recordSuccessMsg").style.display = "none";
+      document.getElementById("recordErrorMsg").style.display = "none";
+
+      recordController = Recorder.startRecording(
+        document.getElementById("recordWaveCanvas"),
+        async function (blob) {
+          try {
+            const session = await Auth.getSession();
+            await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id);
+            document.getElementById("recordSuccessMsg").style.display = "block";
+          } catch (err) {
+            document.getElementById("recordErrorMsg").textContent = "เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่";
+            document.getElementById("recordErrorMsg").style.display = "block";
+          }
+          resetRecordMicButton();
+        },
+        function (err) {
+          document.getElementById("recordErrorMsg").textContent = "ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน";
+          document.getElementById("recordErrorMsg").style.display = "block";
+          resetRecordMicButton();
+        }
+      );
+    } else {
+      if (recordController) recordController.stop();
+    }
+  }
 </script>
 </body>
 </html>
