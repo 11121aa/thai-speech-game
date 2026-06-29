@@ -55,27 +55,46 @@
     <div class="alert alert-warning mx-auto" style="max-width:800px; display:none;" id="noDataBanner">
       <i class="bi bi-exclamation-triangle-fill me-2"></i>ยังไม่พบคลังคำในระบบ — เว็บไซต์นี้ยังไม่ได้เชื่อมต่อฐานข้อมูล Supabase เกมจะยังเดินเล่นได้ แต่ของวิเศษจะยังไม่มีคำให้ฝึกออกเสียงจนกว่าจะตั้งค่าตามขั้นตอนใน <code>README.md</code>
     </div>
-    <div id="phaserGame" class="mx-auto" style="max-width:800px; border-radius:24px; overflow:hidden; box-shadow:var(--shadow-soft);"></div>
+    <div class="position-relative mx-auto" style="max-width:800px;">
+      <div id="phaserGame" style="border-radius:24px; overflow:hidden; box-shadow:var(--shadow-soft);"></div>
+      <div class="points-hud"><i class="bi bi-star-fill me-1"></i><span id="pointsCount">0</span> แต้ม</div>
+    </div>
   </div>
 </main>
 
-<div class="modal fade" id="gameWordModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="practiceModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content" style="border-radius:24px;">
       <div class="modal-body text-center p-4">
         <p class="text-secondary mb-1">เจอของวิเศษ! ลองออกเสียงคำนี้ดูสิ</p>
-        <div style="font-size:3rem;" id="gameWordEmoji">🔸</div>
-        <div class="challenge-word" id="gameWordText">บ้าน</div>
-        <p class="text-secondary" id="gameWordReading"></p>
-        <canvas id="gameWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px;"></canvas>
-        <button class="btn btn-outline-primary btn-sm mt-3" id="btnGameListen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>
-        <div>
-          <button class="mic-btn mt-3" id="btnGameMic" aria-label="กดเพื่ออัดเสียง"><i class="bi bi-mic-fill"></i></button>
+        <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
+        <div class="challenge-word" id="ppWord">บ้าน</div>
+        <p class="text-secondary" id="ppReading"></p>
+
+        <div class="practice-stage">
+          <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
+          <div class="camera-mirror" id="ppCameraWrap">
+            <video id="ppCameraVideo" autoplay muted playsinline></video>
+          </div>
         </div>
-        <p class="small text-secondary" id="gameRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก</p>
-        <div class="alert alert-success" id="gameSuccessMsg" style="display:none;">บันทึกเสียงเรียบร้อย! ไปต่อกันเลย</div>
-        <div class="alert alert-danger" id="gameErrorMsg" style="display:none;"></div>
-        <button class="btn btn-warning btn-lg btn-bouncy mt-2" id="btnGameContinue">ไปต่อ</button>
+
+        <button class="btn btn-outline-primary btn-sm" id="ppBtnListen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>
+
+        <canvas id="ppWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px; margin-top:0.75rem;"></canvas>
+        <button class="mic-btn mt-3" id="ppBtnMic" aria-label="กดเพื่ออัดเสียง"><i class="bi bi-mic-fill"></i></button>
+        <p class="small text-secondary" id="ppRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก</p>
+
+        <div class="alert alert-danger" id="ppErrorMsg" style="display:none;"></div>
+
+        <div id="ppPlaybackArea" style="display:none;">
+          <audio id="ppPlaybackAudio" controls style="width:100%;"></audio>
+          <p class="playback-label">ลองฟังเสียงตัวเองอีกครั้ง แล้วให้ผู้ปกครองช่วยฟังว่าออกเสียงถูกไหม</p>
+          <div class="alert alert-success" id="ppCorrectMsg" style="display:none;">เยี่ยมมาก! ได้แต้มเพิ่มแล้ว 🎉</div>
+          <div class="judge-buttons">
+            <button class="btn judge-btn-correct" id="ppBtnCorrect" disabled><i class="bi bi-check-circle-fill me-1"></i>ออกเสียงถูกแล้ว</button>
+            <button class="btn judge-btn-retry" id="ppBtnRetry"><i class="bi bi-arrow-counterclockwise me-1"></i>ลองอีกครั้ง</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -117,19 +136,16 @@
 <script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/recorder.js"></script>
+<script src="js/practice-panel.js"></script>
 <script src="js/main.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
 <script src="js/game-phaser.js"></script>
 <script>
-  let gameWordModal = null;
   let currentGameItem = null;
-  let currentGameWord = null;
-  let gameRecordController = null;
-  let gameIsRecording = false;
+  let points = 0;
 
   document.addEventListener("DOMContentLoaded", async function () {
     Auth.initNav().catch(function (e) { console.error("initNav failed:", e); });
-    gameWordModal = new bootstrap.Modal(document.getElementById("gameWordModal"));
 
     let words = [];
     try {
@@ -139,86 +155,24 @@
     }
     document.getElementById("noDataBanner").style.display = words.length ? "none" : "block";
     startPronunciationGame(words, onGameItemCollide);
-
-    document.getElementById("btnGameListen").addEventListener("click", function () {
-      if (currentGameWord) SpeechTool.speak(currentGameWord.word);
-    });
-    document.getElementById("btnGameMic").addEventListener("click", onGameMicClick);
-    document.getElementById("btnGameContinue").addEventListener("click", function () {
-      gameWordModal.hide();
-    });
-
-    document.getElementById("gameWordModal").addEventListener("hidden.bs.modal", function () {
-      if (gameRecordController) { gameRecordController.cancel(); gameRecordController = null; }
-      resetGameMicButton();
-      resumePronunciationGame(currentGameItem);
-      currentGameItem = null;
-      currentGameWord = null;
-    });
   });
 
   function onGameItemCollide(word, item) {
     currentGameItem = item;
-    currentGameWord = word;
-    document.getElementById("gameSuccessMsg").style.display = "none";
-    document.getElementById("gameErrorMsg").style.display = "none";
-    resetGameMicButton();
-
-    if (word) {
-      document.getElementById("gameWordEmoji").textContent = word.emoji || "🔸";
-      document.getElementById("gameWordText").textContent = word.word;
-      document.getElementById("gameWordReading").textContent = word.reading;
-    } else {
-      document.getElementById("gameWordEmoji").textContent = "🔸";
-      document.getElementById("gameWordText").textContent = "ยังไม่มีคำในระบบ";
-      document.getElementById("gameWordReading").textContent = "กรุณาตั้งค่า Supabase และนำเข้าคลังคำก่อน";
+    if (!word) {
+      resumePronunciationGame(item);
+      return;
     }
-    gameWordModal.show();
-  }
-
-  function resetGameMicButton() {
-    gameIsRecording = false;
-    const btn = document.getElementById("btnGameMic");
-    btn.classList.remove("recording");
-    btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
-    document.getElementById("gameRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
-  }
-
-  async function onGameMicClick() {
-    if (!currentGameWord) return;
-    if (!gameIsRecording) {
-      const session = await Auth.getSession();
-      if (!session) {
-        location.href = "login.html?redirect=game.html";
-        return;
+    PracticePanel.open(word, {
+      onCorrect: function () {
+        points += 1;
+        document.getElementById("pointsCount").textContent = points;
+      },
+      onClosed: function () {
+        resumePronunciationGame(currentGameItem);
+        currentGameItem = null;
       }
-      gameIsRecording = true;
-      const btn = document.getElementById("btnGameMic");
-      btn.classList.add("recording");
-      btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-      document.getElementById("gameRecordHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเพื่อหยุด";
-
-      gameRecordController = Recorder.startRecording(
-        document.getElementById("gameWaveCanvas"),
-        async function (blob) {
-          try {
-            await Recorder.uploadAndSavePractice(blob, currentGameWord.id, session.user.id);
-            document.getElementById("gameSuccessMsg").style.display = "block";
-          } catch (err) {
-            document.getElementById("gameErrorMsg").textContent = "เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่";
-            document.getElementById("gameErrorMsg").style.display = "block";
-          }
-          resetGameMicButton();
-        },
-        function (err) {
-          document.getElementById("gameErrorMsg").textContent = "ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน";
-          document.getElementById("gameErrorMsg").style.display = "block";
-          resetGameMicButton();
-        }
-      );
-    } else {
-      if (gameRecordController) gameRecordController.stop();
-    }
+    });
   }
 </script>
 </body>

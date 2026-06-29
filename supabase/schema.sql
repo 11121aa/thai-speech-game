@@ -43,6 +43,10 @@ create table if not exists public.practice (
 create index if not exists idx_practice_user_id on public.practice (user_id);
 create index if not exists idx_practice_word_id on public.practice (word_id);
 
+-- parent_marked_correct: the parent/practicing user's own in-the-moment
+-- judgment, kept separate from `score` (which only a specialist sets).
+alter table public.practice add column if not exists parent_marked_correct boolean;
+
 create table if not exists public.activity (
   id bigserial primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -168,6 +172,37 @@ create policy "practice_update_specialist" on public.practice
 drop policy if exists "practice_delete_specialist" on public.practice;
 create policy "practice_delete_specialist" on public.practice
   for delete using (public.is_specialist(auth.uid()));
+
+-- The practicing user/parent may also update their OWN row (to set
+-- parent_marked_correct). A trigger (below) clamps every other column
+-- back to its old value when the caller isn't a specialist, so this
+-- can never be used to touch `score` or other specialist-only fields.
+drop policy if exists "practice_update_own" on public.practice;
+create policy "practice_update_own" on public.practice
+  for update using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create or replace function public.enforce_practice_update_rules()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if not public.is_specialist(auth.uid()) then
+    new.score := old.score;
+    new.word_id := old.word_id;
+    new.user_id := old.user_id;
+    new.file_path := old.file_path;
+    new.practiced_at := old.practiced_at;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_practice_update_rules on public.practice;
+create trigger trg_practice_update_rules
+  before update on public.practice
+  for each row execute function public.enforce_practice_update_rules();
 
 -- ------------------------------------------------------------
 -- 7. Policies: activity

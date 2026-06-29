@@ -106,18 +106,39 @@
   </div>
 </main>
 
-<div class="modal fade" id="recordModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="practiceModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content" style="border-radius:24px;">
       <div class="modal-body text-center p-4">
         <p class="text-secondary mb-1">ฝึกออกเสียงคำ</p>
-        <div class="challenge-word" id="recordWord">บ้าน</div>
-        <p class="text-secondary" id="recordReading"></p>
-        <canvas id="recordWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px;"></canvas>
-        <button class="mic-btn mt-3" id="btnRecordMic" aria-label="กดเพื่ออัดเสียง"><i class="bi bi-mic-fill"></i></button>
-        <p class="small text-secondary" id="recordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก</p>
-        <div class="alert alert-success" id="recordSuccessMsg" style="display:none;">บันทึกเสียงเรียบร้อย! ผู้เชี่ยวชาญจะให้คะแนนภายหลัง ดูผลได้ที่หน้า "การจัดการ"</div>
-        <div class="alert alert-danger" id="recordErrorMsg" style="display:none;"></div>
+        <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
+        <div class="challenge-word" id="ppWord">บ้าน</div>
+        <p class="text-secondary" id="ppReading"></p>
+
+        <div class="practice-stage">
+          <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
+          <div class="camera-mirror" id="ppCameraWrap">
+            <video id="ppCameraVideo" autoplay muted playsinline></video>
+          </div>
+        </div>
+
+        <button class="btn btn-outline-primary btn-sm" id="ppBtnListen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>
+
+        <canvas id="ppWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px; margin-top:0.75rem;"></canvas>
+        <button class="mic-btn mt-3" id="ppBtnMic" aria-label="กดเพื่ออัดเสียง"><i class="bi bi-mic-fill"></i></button>
+        <p class="small text-secondary" id="ppRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก</p>
+
+        <div class="alert alert-danger" id="ppErrorMsg" style="display:none;"></div>
+
+        <div id="ppPlaybackArea" style="display:none;">
+          <audio id="ppPlaybackAudio" controls style="width:100%;"></audio>
+          <p class="playback-label">ลองฟังเสียงตัวเองอีกครั้ง แล้วให้ผู้ปกครองช่วยฟังว่าออกเสียงถูกไหม</p>
+          <div class="alert alert-success" id="ppCorrectMsg" style="display:none;">เยี่ยมมาก! บันทึกผลแล้ว 🎉</div>
+          <div class="judge-buttons">
+            <button class="btn judge-btn-correct" id="ppBtnCorrect" disabled><i class="bi bi-check-circle-fill me-1"></i>ออกเสียงถูกแล้ว</button>
+            <button class="btn judge-btn-retry" id="ppBtnRetry"><i class="bi bi-arrow-counterclockwise me-1"></i>ลองอีกครั้ง</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -159,17 +180,13 @@
 <script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/recorder.js"></script>
+<script src="js/practice-panel.js"></script>
 <script src="js/main.js"></script>
 <script>
   let exercisesByAge = [];
-  let currentWord = null;
-  let recordController = null;
-  let isRecording = false;
-  let recordModal = null;
 
   document.addEventListener("DOMContentLoaded", function () {
     Auth.initNav();
-    recordModal = new bootstrap.Modal(document.getElementById("recordModal"));
 
     document.querySelectorAll(".age-pick-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -182,14 +199,6 @@
     document.getElementById("btnBackToExercises").addEventListener("click", function () {
       document.getElementById("wordListSection").style.display = "none";
       document.getElementById("exerciseListSection").style.display = "block";
-    });
-
-    document.getElementById("btnRecordMic").addEventListener("click", onRecordMicClick);
-
-    document.getElementById("recordModal").addEventListener("hidden.bs.modal", function () {
-      if (recordController) { recordController.cancel(); recordController = null; }
-      isRecording = false;
-      resetRecordMicButton();
     });
   });
 
@@ -238,69 +247,12 @@
         '<button class="btn btn-warning btn-sm btn-practice"><i class="bi bi-mic-fill me-1"></i>ฝึกออกเสียง</button>' +
         "</div>";
       row.querySelector(".btn-listen").addEventListener("click", function () { SpeechTool.speak(w.word); });
-      row.querySelector(".btn-practice").addEventListener("click", function () { openRecordModal(w); });
+      row.querySelector(".btn-practice").addEventListener("click", function () { PracticePanel.open(w); });
       rows.appendChild(row);
     });
 
     document.getElementById("exerciseListSection").style.display = "none";
     document.getElementById("wordListSection").style.display = "block";
-  }
-
-  async function openRecordModal(word) {
-    const session = await Auth.getSession();
-    if (!session) {
-      location.href = "login.html?redirect=app.html";
-      return;
-    }
-    currentWord = word;
-    document.getElementById("recordWord").textContent = word.word;
-    document.getElementById("recordReading").textContent = word.reading;
-    document.getElementById("recordSuccessMsg").style.display = "none";
-    document.getElementById("recordErrorMsg").style.display = "none";
-    resetRecordMicButton();
-    recordModal.show();
-  }
-
-  function resetRecordMicButton() {
-    isRecording = false;
-    const btn = document.getElementById("btnRecordMic");
-    btn.classList.remove("recording");
-    btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
-    document.getElementById("recordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
-  }
-
-  function onRecordMicClick() {
-    if (!isRecording) {
-      isRecording = true;
-      const btn = document.getElementById("btnRecordMic");
-      btn.classList.add("recording");
-      btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-      document.getElementById("recordHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเพื่อหยุด";
-      document.getElementById("recordSuccessMsg").style.display = "none";
-      document.getElementById("recordErrorMsg").style.display = "none";
-
-      recordController = Recorder.startRecording(
-        document.getElementById("recordWaveCanvas"),
-        async function (blob) {
-          try {
-            const session = await Auth.getSession();
-            await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id);
-            document.getElementById("recordSuccessMsg").style.display = "block";
-          } catch (err) {
-            document.getElementById("recordErrorMsg").textContent = "เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่";
-            document.getElementById("recordErrorMsg").style.display = "block";
-          }
-          resetRecordMicButton();
-        },
-        function (err) {
-          document.getElementById("recordErrorMsg").textContent = "ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน";
-          document.getElementById("recordErrorMsg").style.display = "block";
-          resetRecordMicButton();
-        }
-      );
-    } else {
-      if (recordController) recordController.stop();
-    }
   }
 </script>
 </body>

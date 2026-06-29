@@ -583,3 +583,90 @@ a {
   .challenge-word { font-size: 2.2rem; }
   .level-node { width: 90px; height: 90px; font-size: 1.5rem; }
 }
+
+/* ============ Practice panel (mouth diagram, camera mirror, gated continue) ============ */
+.practice-stage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.mouth-diagram-box {
+  width: 150px;
+  height: 150px;
+  border: 2px dashed var(--color-accent-purple);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+}
+.mouth-diagram-box .mouth-diagram-icon {
+  font-size: 2.4rem;
+  margin-bottom: 0.2rem;
+}
+
+.camera-mirror {
+  width: 150px;
+  height: 150px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-text);
+  box-shadow: var(--shadow-soft);
+  display: none;
+}
+.camera-mirror video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.judge-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.judge-btn-correct {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: #fff;
+}
+.judge-btn-correct:hover:not([disabled]) { background: #3d8b40; border-color: #3d8b40; color: #fff; }
+.judge-btn-correct[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.judge-btn-retry {
+  background: #fff;
+  border: 2px solid var(--color-secondary);
+  color: var(--color-secondary-dark);
+}
+.judge-btn-retry:hover { background: var(--color-secondary); color: #fff; }
+
+.playback-label {
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+  margin-top: 0.4rem;
+}
+
+.points-hud {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 999px;
+  padding: 0.4rem 1.1rem;
+  font-weight: 700;
+  color: var(--color-secondary-dark);
+  box-shadow: var(--shadow-soft);
+  z-index: 5;
+}
