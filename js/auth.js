@@ -53,27 +53,15 @@ const Auth = (function () {
   async function initNav() {
     const session = await getSession();
     const navGuest = document.getElementById("navGuest");
-    const navUser = document.getElementById("navUser");
-    const navUserEmail = document.getElementById("navUserEmail");
-    const navManagement = document.getElementById("navManagement");
-    const btnLogout = document.getElementById("btnLogout");
+    const navSelf = document.getElementById("navSelf");
 
     if (session) {
       if (navGuest) navGuest.style.display = "none";
-      if (navUser) navUser.style.display = "flex";
-      if (navUserEmail) navUserEmail.textContent = session.user.email;
-      if (navManagement) navManagement.style.display = "list-item";
-      if (btnLogout) {
-        btnLogout.addEventListener("click", function (e) {
-          e.preventDefault();
-          logout();
-        });
-      }
+      if (navSelf) navSelf.style.display = "list-item";
       await logActivity("page_view", pageNameFromPath());
     } else {
       if (navGuest) navGuest.style.display = "list-item";
-      if (navUser) navUser.style.display = "none";
-      if (navManagement) navManagement.style.display = "none";
+      if (navSelf) navSelf.style.display = "none";
     }
     return session;
   }

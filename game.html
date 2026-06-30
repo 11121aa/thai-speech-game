@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>เกมฝึกออกเสียง | ระบบเรียนรู้การออกเสียงด้วย AI</title>
-<meta name="description" content="เกมผจญภัยชนบทฝึกออกเสียงภาษาไทยสำหรับเด็ก">
+<title>เกม | ระบบเรียนรู้การออกเสียงด้วย AI</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,22 +21,16 @@
         <span class="brand-emoji">🗣️</span>
         <span>ระบบเรียนรู้การออกเสียงด้วย AI</span>
       </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="เปิดเมนู">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navMain">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
           <li class="nav-item"><a class="nav-link" data-page="index.html" href="index.html">หน้าหลัก</a></li>
-          <li class="nav-item"><a class="nav-link" data-page="about.html" href="about.html">เกี่ยวกับเรา</a></li>
-          <li class="nav-item"><a class="nav-link" data-page="app.html" href="app.html">ฝึกออกเสียง</a></li>
           <li class="nav-item"><a class="nav-link active" data-page="game.html" href="game.html">เกม</a></li>
           <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
-          <li class="nav-item" id="navManagement" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">การจัดการ</a></li>
           <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
-          <li class="nav-item nav-user-info" id="navUser" style="display:none;">
-            <span class="nav-link mb-0" id="navUserEmail"></span>
-            <button class="btn btn-sm btn-outline-primary" id="btnLogout">ออกจากระบบ</button>
-          </li>
+          <li class="nav-item" id="navSelf" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">ของฉัน</a></li>
         </ul>
       </div>
     </div>
@@ -45,50 +38,128 @@
 </header>
 
 <main class="py-4">
-  <div class="container app-shell">
-    <div class="text-center mb-4">
-      <h1 class="hero-title" style="font-size:2.4rem;">🌾 เกมผจญภัยฝึกออกเสียง</h1>
-      <p class="hero-lead">บังคับตัวละครเดินสำรวจหมู่บ้าน ชนของวิเศษเพื่อฝึกออกเสียงคำใหม่ๆ!</p>
-      <p class="text-secondary small">ใช้ปุ่มลูกศร หรือ W A S D เพื่อเดิน 4 ทิศทาง</p>
+  <div class="container">
+
+    <!-- Mode Selection -->
+    <div id="screenMode">
+      <div class="text-center mb-4">
+        <h1 class="hero-title" style="font-size:2.4rem;">🎮 เลือกเกม</h1>
+        <p class="hero-lead">เลือกประเภทเกมที่ชอบแล้วเริ่มฝึกออกเสียงได้เลย!</p>
+      </div>
+      <div class="game-mode-hub">
+        <div class="game-mode-card" id="cardMatching">
+          <span class="mode-icon">🃏</span>
+          <span class="mode-title">จับคู่ภาพ</span>
+          <span class="mode-desc">จับคู่คำกับภาพที่ตรงกัน</span>
+        </div>
+        <div class="game-mode-card" id="cardShooting">
+          <span class="mode-icon">🍄</span>
+          <span class="mode-title">ยิงเป้า</span>
+          <span class="mode-desc">คลิกเป้าแล้วฝึกออกเสียงคำ</span>
+        </div>
+        <div class="game-mode-card" id="cardAirplane">
+          <span class="mode-icon">✈️</span>
+          <span class="mode-title">ขับเครื่องบิน</span>
+          <span class="mode-desc">เก็บลูกโป่งคำศัพท์บนท้องฟ้า</span>
+        </div>
+      </div>
     </div>
 
-    <div class="alert alert-warning mx-auto" style="max-width:800px; display:none;" id="noDataBanner">
-      <i class="bi bi-exclamation-triangle-fill me-2"></i>ยังไม่พบคลังคำในระบบ — เว็บไซต์นี้ยังไม่ได้เชื่อมต่อฐานข้อมูล Supabase เกมจะยังเดินเล่นได้ แต่ของวิเศษจะยังไม่มีคำให้ฝึกออกเสียงจนกว่าจะตั้งค่าตามขั้นตอนใน <code>README.md</code>
+    <!-- Active Game Screen -->
+    <div id="screenGame" style="display:none;">
+      <div class="game-hud-bar">
+        <button class="btn-quit" id="btnQuitGame">← ออก</button>
+        <strong id="hudModeName" style="color:var(--color-primary-dark);font-size:1rem;"></strong>
+        <div class="game-hud-pills">
+          <span class="hud-pill">⭐ <span id="hudPoints">0</span></span>
+          <span class="hud-pill">⏱ <span id="hudTimer">60</span>s</span>
+        </div>
+      </div>
+      <div id="matchingGame" style="display:none;">
+        <div id="matchGrid" class="match-grid"></div>
+      </div>
+      <div id="shootingGame" style="display:none;">
+        <div class="game-canvas-wrap">
+          <canvas id="shootCanvas" width="800" height="450"></canvas>
+        </div>
+      </div>
+      <div id="airplaneGame" style="display:none;">
+        <div class="game-canvas-wrap">
+          <canvas id="airCanvas" width="800" height="380"></canvas>
+        </div>
+      </div>
     </div>
-    <div class="position-relative mx-auto" style="max-width:800px;">
-      <div id="phaserGame" style="border-radius:24px; overflow:hidden; box-shadow:var(--shadow-soft);"></div>
-      <div class="points-hud"><i class="bi bi-star-fill me-1"></i><span id="pointsCount">0</span> แต้ม</div>
+
+    <!-- Finish Screen -->
+    <div id="screenFinish" style="display:none;">
+      <div class="finish-screen">
+        <div class="finish-card">
+          <div class="finish-emoji">🎉</div>
+          <h2 class="mt-2 mb-1">จบแล้ว!</h2>
+          <div class="finish-score">⭐ <span id="finalPoints">0</span> แต้ม</div>
+          <p class="finish-high text-secondary">สูงสุด: <strong id="highScore">0</strong></p>
+          <div class="finish-btns">
+            <button class="btn btn-outline-primary btn-bouncy" id="btnReturnMode">กลับเมนูเกม</button>
+            <button class="btn btn-warning btn-bouncy" id="btnPlayAgain">เล่นอีกครั้ง</button>
+          </div>
+        </div>
+      </div>
     </div>
+
   </div>
 </main>
 
+<!-- Pre-game Setup Overlay -->
+<div id="screenSetup" class="setup-overlay" style="display:none;">
+  <div class="setup-panel">
+    <h4 class="mb-3">⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
+    <div class="setup-row">
+      <label>ความยาก</label>
+      <div class="diff-btns">
+        <button class="diff-btn active" data-diff="easy">ง่าย</button>
+        <button class="diff-btn" data-diff="hard">ยาก</button>
+      </div>
+    </div>
+    <div class="setup-row">
+      <label>ดูตัวเองก่อนเริ่ม</label>
+      <div class="camera-preview-setup" id="setupCameraWrap" style="display:none;">
+        <video id="setupCameraVideo" autoplay muted playsinline></video>
+      </div>
+    </div>
+    <div class="setup-row">
+      <label>ชุดคำที่ต้องการฝึก</label>
+      <div class="word-set-list" id="wordSetList"></div>
+    </div>
+    <div class="setup-footer">
+      <button class="btn btn-outline-secondary btn-bouncy" id="btnSetupCancel">ยกเลิก</button>
+      <button class="btn btn-warning btn-bouncy" id="btnSetupStart">เริ่มเกม! 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shared Practice Modal -->
 <div class="modal fade" id="practiceModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content" style="border-radius:24px;">
       <div class="modal-body text-center p-4">
-        <p class="text-secondary mb-1">เจอของวิเศษ! ลองออกเสียงคำนี้ดูสิ</p>
+        <p class="text-secondary mb-1">ลองออกเสียงคำนี้ดูสิ</p>
         <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
         <div class="challenge-word" id="ppWord">บ้าน</div>
         <p class="text-secondary" id="ppReading"></p>
-
         <div class="practice-stage">
           <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
           <div class="camera-mirror" id="ppCameraWrap">
             <video id="ppCameraVideo" autoplay muted playsinline></video>
           </div>
         </div>
-
         <button class="btn btn-outline-primary btn-sm" id="ppBtnListen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>
-
         <canvas id="ppWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px; margin-top:0.75rem;"></canvas>
-        <button class="mic-btn mt-3" id="ppBtnMic" aria-label="กดเพื่ออัดเสียง"><i class="bi bi-mic-fill"></i></button>
-        <p class="small text-secondary" id="ppRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก</p>
-
+        <button class="mic-btn mt-3" id="ppBtnMic"><i class="bi bi-mic-fill"></i></button>
+        <p class="small text-secondary" id="ppRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด</p>
         <div class="alert alert-danger" id="ppErrorMsg" style="display:none;"></div>
-
         <div id="ppPlaybackArea" style="display:none;">
           <audio id="ppPlaybackAudio" controls style="width:100%;"></audio>
-          <p class="playback-label">ลองฟังเสียงตัวเองอีกครั้ง แล้วให้ผู้ปกครองช่วยฟังว่าออกเสียงถูกไหม</p>
+          <p class="playback-label">ฟังเสียงตัวเองแล้วให้ผู้ปกครองช่วยตัดสิน</p>
           <div class="alert alert-success" id="ppCorrectMsg" style="display:none;">เยี่ยมมาก! ได้แต้มเพิ่มแล้ว 🎉</div>
           <div class="judge-buttons">
             <button class="btn judge-btn-correct" id="ppBtnCorrect" disabled><i class="bi bi-check-circle-fill me-1"></i>ออกเสียงถูกแล้ว</button>
@@ -111,8 +182,6 @@
         <h5>เมนู</h5>
         <ul class="list-unstyled">
           <li><a href="index.html">หน้าหลัก</a></li>
-          <li><a href="about.html">เกี่ยวกับเรา</a></li>
-          <li><a href="app.html">ฝึกออกเสียง</a></li>
           <li><a href="game.html">เกม</a></li>
           <li><a href="contact.html">ติดต่อเรา</a></li>
         </ul>
@@ -123,7 +192,7 @@
       </div>
     </div>
     <div class="footer-disclaimer text-center">
-      เว็บไซต์นี้จัดทำขึ้นเพื่อการศึกษาและฝึกฝนเบื้องต้นเท่านั้น ไม่ใช่เครื่องมือวินิจฉัยหรือทดแทนการรักษาทางการแพทย์ หากบุตรหลานของท่านมีปัญหาด้านการพูดที่น่าเป็นกังวล ควรปรึกษานักแก้ไขการพูด (Speech-Language Pathologist) หรือแพทย์ผู้เชี่ยวชาญ
+      เว็บไซต์นี้จัดทำขึ้นเพื่อการศึกษาและฝึกฝนเบื้องต้นเท่านั้น ไม่ใช่เครื่องมือวินิจฉัยหรือทดแทนการรักษาทางการแพทย์
     </div>
   </div>
 </footer>
@@ -138,42 +207,404 @@
 <script src="js/recorder.js"></script>
 <script src="js/practice-panel.js"></script>
 <script src="js/main.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-<script src="js/game-phaser.js"></script>
 <script>
-  let currentGameItem = null;
-  let points = 0;
+/* ===== Global game-session state (reset each time a game starts) ===== */
+var G = {
+  mode: null, words: [], pts: 0, timeLeft: 60,
+  paused: false, timerHandle: null,
+  highScores: JSON.parse(localStorage.getItem('ghsv2') || '{}')
+};
 
-  document.addEventListener("DOMContentLoaded", async function () {
-    Auth.initNav().catch(function (e) { console.error("initNav failed:", e); });
-
-    let words = [];
-    try {
-      words = await WordsApi.fetchAllWords();
-    } catch (e) {
-      console.error("fetchAllWords failed:", e);
-    }
-    document.getElementById("noDataBanner").style.display = words.length ? "none" : "block";
-    startPronunciationGame(words, onGameItemCollide);
+/* ===== Shared utilities ===== */
+function showScreen(id) {
+  ['screenMode','screenGame','screenFinish'].forEach(function (s) {
+    document.getElementById(s).style.display = s === id ? 'block' : 'none';
   });
+}
 
-  function onGameItemCollide(word, item) {
-    currentGameItem = item;
-    if (!word) {
-      resumePronunciationGame(item);
-      return;
-    }
-    PracticePanel.open(word, {
-      onCorrect: function () {
-        points += 1;
-        document.getElementById("pointsCount").textContent = points;
-      },
-      onClosed: function () {
-        resumePronunciationGame(currentGameItem);
-        currentGameItem = null;
-      }
+function addPts(n) {
+  G.pts += n;
+  document.getElementById('hudPoints').textContent = G.pts;
+}
+
+function openPractice(word, onCorrect, onClosed) {
+  G.paused = true;
+  PracticePanel.open(word, {
+    onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
+    onClosed: function () { G.paused = false; if (onClosed) onClosed(); }
+  });
+}
+
+function finishGame() {
+  G.paused = true;
+  clearInterval(G.timerHandle);
+  MatchingGame.stop();
+  ShootingGame.stop();
+  AirplaneGame.stop();
+  var hs = G.highScores[G.mode] || 0;
+  if (G.pts > hs) { G.highScores[G.mode] = G.pts; localStorage.setItem('ghsv2', JSON.stringify(G.highScores)); }
+  document.getElementById('finalPoints').textContent = G.pts;
+  document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
+  showScreen('screenFinish');
+}
+
+function startTimer(limit) {
+  G.timeLeft = limit;
+  document.getElementById('hudTimer').textContent = limit;
+  clearInterval(G.timerHandle);
+  G.timerHandle = setInterval(function () {
+    if (G.paused) return;
+    G.timeLeft--;
+    document.getElementById('hudTimer').textContent = G.timeLeft;
+    if (G.timeLeft <= 0) finishGame();
+  }, 1000);
+}
+
+/* ===== Matching Game ===== */
+var MatchingGame = (function () {
+  var cards, flipped, matchedPairs, totalPairs, locked;
+  function init(words) {
+    var n = Math.min(8, words.length);
+    var pool = words.slice(0, n);
+    totalPairs = pool.length; matchedPairs = 0; flipped = []; locked = false;
+    var deck = [];
+    pool.forEach(function (w) {
+      deck.push({ type: 'word', w: w });
+      deck.push({ type: 'emoji', w: w });
+    });
+    deck.sort(function () { return Math.random() - 0.5; });
+    cards = deck;
+    var cols = n <= 6 ? 4 : 4;
+    var grid = document.getElementById('matchGrid');
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    grid.innerHTML = '';
+    deck.forEach(function (card, i) {
+      var el = document.createElement('div');
+      el.className = 'match-card';
+      el.dataset.idx = i;
+      var front = card.type === 'emoji'
+        ? '<span class="card-emoji">' + (card.w.emoji || '🔸') + '</span>'
+        : '<span class="card-word">' + card.w.word + '</span>';
+      el.innerHTML = '<div class="match-card-inner"><div class="match-card-face match-card-back-face">❓</div><div class="match-card-face match-card-front-face">' + front + '</div></div>';
+      el.addEventListener('click', function () { onCard(i, el); });
+      grid.appendChild(el);
     });
   }
+  function onCard(i, el) {
+    if (locked || G.paused || el.classList.contains('flipped') || el.classList.contains('matched')) return;
+    el.classList.add('flipped');
+    flipped.push({ i: i, el: el });
+    if (flipped.length < 2) return;
+    locked = true;
+    var a = flipped[0], b = flipped[1];
+    if (cards[a.i].w.id === cards[b.i].w.id && cards[a.i].type !== cards[b.i].type) {
+      a.el.classList.add('matched'); b.el.classList.add('matched');
+      matchedPairs++;
+      flipped = [];
+      openPractice(cards[a.i].w, null, function () {
+        locked = false;
+        if (matchedPairs >= totalPairs) setTimeout(finishGame, 400);
+      });
+    } else {
+      setTimeout(function () {
+        a.el.classList.remove('flipped'); b.el.classList.remove('flipped');
+        flipped = []; locked = false;
+      }, 900);
+    }
+  }
+  function stop() {}
+  return { init: init, stop: stop };
+})();
+
+/* ===== Shooting Game ===== */
+var ShootingGame = (function () {
+  var ctx, words, wIdx, targets, pops, animId;
+  var W = 800, H = 450, GROUND = H - 80;
+  var CAPS = ['#e74c3c','#e67e22','#9b59b6','#2980b9','#27ae60'];
+  function start(ws) {
+    words = ws; wIdx = 0; targets = []; pops = [];
+    var canvas = document.getElementById('shootCanvas');
+    ctx = canvas.getContext('2d');
+    canvas.onclick = click; canvas.ontouchend = touch;
+    for (var i = 0; i < 4; i++) spawn();
+    loop();
+  }
+  function spawn() {
+    var w = words[wIdx++ % words.length];
+    var x, t = 0;
+    do { x = 70 + Math.random() * (W - 140); t++; } while (t < 20 && targets.some(function (u) { return Math.abs(u.x - x) < 120; }));
+    targets.push({ x: x, y: GROUND, w: w, color: CAPS[Math.floor(Math.random() * CAPS.length)], s: 0, hit: false });
+  }
+  function click(e) {
+    if (G.paused) return;
+    var c = document.getElementById('shootCanvas'), r = c.getBoundingClientRect();
+    var mx = (e.clientX - r.left) * (W / r.width), my = (e.clientY - r.top) * (H / r.height);
+    hitTest(mx, my);
+  }
+  function touch(e) {
+    e.preventDefault();
+    if (G.paused) return;
+    var c = document.getElementById('shootCanvas'), r = c.getBoundingClientRect(), t = e.changedTouches[0];
+    hitTest((t.clientX - r.left) * (W / r.width), (t.clientY - r.top) * (H / r.height));
+  }
+  function hitTest(mx, my) {
+    for (var i = targets.length - 1; i >= 0; i--) {
+      var t = targets[i];
+      if (t.hit) continue;
+      var dx = mx - t.x, dy = my - (t.y - 60 * t.s);
+      if (Math.abs(dx) < 50 * t.s && Math.abs(dy) < 70 * t.s) {
+        t.hit = true;
+        pops.push({ x: t.x, y: t.y - 80, text: '+10', life: 1 });
+        addPts(10);
+        var tw = t.w;
+        openPractice(tw, null, function () {
+          targets = targets.filter(function (u) { return u.w.id !== tw.id || !u.hit; });
+          spawn();
+        });
+        return;
+      }
+    }
+  }
+  function loop() {
+    if (!ctx) return;
+    drawBg();
+    targets.forEach(function (t) {
+      if (!t.hit) t.s = Math.min(1, t.s + 0.06);
+      else t.s = Math.max(0, t.s - 0.12);
+      if (t.s > 0) drawMush(t);
+    });
+    pops.forEach(function (p) {
+      ctx.globalAlpha = p.life; ctx.font = 'bold 20px Prompt, sans-serif'; ctx.fillStyle = '#ff9f1c'; ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y - (1 - p.life) * 30); ctx.globalAlpha = 1; p.life -= 0.04;
+    });
+    pops = pops.filter(function (p) { return p.life > 0; });
+    animId = requestAnimationFrame(loop);
+  }
+  function drawBg() {
+    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#87ceeb'); g.addColorStop(0.7, '#b8dff5');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#5dba5d'; ctx.fillRect(0, GROUND, W, H - GROUND);
+    ctx.fillStyle = '#4caf50'; ctx.fillRect(0, GROUND, W, 10);
+  }
+  function drawMush(t) {
+    ctx.save(); ctx.translate(t.x, t.y); ctx.scale(t.s, t.s);
+    ctx.fillStyle = '#c8a26b'; ctx.fillRect(-18, -55, 36, 55);
+    ctx.beginPath(); ctx.arc(0, -55, 46, Math.PI, 0); ctx.closePath(); ctx.fillStyle = t.color; ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    [[-20,-74],[20,-74],[0,-62]].forEach(function (d) { ctx.beginPath(); ctx.arc(d[0], d[1], 7, 0, Math.PI * 2); ctx.fill(); });
+    ctx.font = 'bold 14px Prompt, sans-serif'; ctx.textAlign = 'center';
+    var bw = Math.max(56, ctx.measureText(t.w.word).width + 16);
+    ctx.fillStyle = '#fff';
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(-bw / 2, -115, bw, 26, 5); ctx.fill(); }
+    else { ctx.fillRect(-bw / 2, -115, bw, 26); }
+    ctx.fillStyle = '#2b2438'; ctx.fillText(t.w.word, 0, -96);
+    if (t.w.emoji) { ctx.font = '20px serif'; ctx.fillText(t.w.emoji, 0, -126); }
+    ctx.restore();
+  }
+  function stop() { cancelAnimationFrame(animId); animId = null; ctx = null; var c = document.getElementById('shootCanvas'); if (c) { c.onclick = null; c.ontouchend = null; } }
+  return { start: start, stop: stop };
+})();
+
+/* ===== Airplane Game ===== */
+var AirplaneGame = (function () {
+  var ctx, words, wIdx, bubbles, clouds, planeY, animId, progress, scrollT;
+  var W = 800, H = 380, GROUND = H - 50, TOTAL = 2400;
+  function start(ws) {
+    words = ws; wIdx = 0; bubbles = []; progress = 0; scrollT = 0;
+    planeY = 160; clouds = [];
+    for (var i = 0; i < 5; i++) clouds.push({ x: 60 + Math.random() * W * 1.8, y: 30 + Math.random() * 100, rw: 70 + Math.random() * 70, spd: 0.7 + Math.random() * 0.8 });
+    var canvas = document.getElementById('airCanvas');
+    ctx = canvas.getContext('2d');
+    canvas.onclick = click; canvas.ontouchend = touch;
+    spawnBubble();
+    loop();
+  }
+  function spawnBubble() {
+    if (!words.length) return;
+    bubbles.push({ x: W + 50, y: 80 + Math.random() * (GROUND - 160), w: words[wIdx++ % words.length], hit: false });
+  }
+  function click(e) {
+    if (G.paused) return;
+    var c = document.getElementById('airCanvas'), r = c.getBoundingClientRect();
+    hitTest((e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height));
+  }
+  function touch(e) {
+    e.preventDefault(); if (G.paused) return;
+    var c = document.getElementById('airCanvas'), r = c.getBoundingClientRect(), t = e.changedTouches[0];
+    hitTest((t.clientX - r.left) * (W / r.width), (t.clientY - r.top) * (H / r.height));
+  }
+  function hitTest(mx, my) {
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var b = bubbles[i]; if (b.hit) continue;
+      var dx = mx - b.x, dy = my - b.y;
+      if (dx * dx + dy * dy < 45 * 45) {
+        b.hit = true; addPts(10);
+        var bw = b.w;
+        openPractice(bw, null, function () {
+          bubbles = bubbles.filter(function (u) { return !u.hit; });
+          if (bubbles.length < 3) spawnBubble();
+        });
+        return;
+      }
+    }
+  }
+  function loop() {
+    if (!ctx) return;
+    if (!G.paused) {
+      scrollT++;
+      progress = Math.min(TOTAL, progress + 2);
+      planeY += Math.sin(scrollT * 0.03) * 0.6;
+      planeY = Math.max(60, Math.min(GROUND - 80, planeY));
+      clouds.forEach(function (c) { c.x -= c.spd; if (c.x < -c.rw - 50) c.x = W + c.rw; });
+      bubbles.forEach(function (b) { if (!b.hit) b.x -= 1.6; });
+      bubbles = bubbles.filter(function (b) { return b.x > -80; });
+      if (scrollT % 100 === 0 && bubbles.length < 4) spawnBubble();
+      if (progress >= TOTAL) { finishGame(); return; }
+    }
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+  function draw() {
+    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#87ceeb'); g.addColorStop(1, '#c5e8f7');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    clouds.forEach(function (c) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rw, 25, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x - c.rw * 0.35, c.y + 10, c.rw * 0.55, 20, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x + c.rw * 0.3, c.y + 8, c.rw * 0.5, 18, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.fillStyle = '#5dba5d'; ctx.fillRect(0, GROUND, W, H - GROUND);
+    var pw = (progress / TOTAL) * (W - 40);
+    ctx.fillStyle = '#ddd'; ctx.fillRect(20, H - 15, W - 40, 7);
+    ctx.fillStyle = '#2ec4b6'; ctx.fillRect(20, H - 15, pw, 7);
+    ctx.font = '16px serif'; ctx.fillText('🏁', 18 + pw, H - 6);
+    drawPlane(120, planeY);
+    bubbles.forEach(drawBubble);
+  }
+  function drawPlane(x, y) {
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, 42, 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2ec4b6';
+    ctx.beginPath(); ctx.moveTo(5, -2); ctx.lineTo(-12, -26); ctx.lineTo(22, -2); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-30, 2); ctx.lineTo(-42, -12); ctx.lineTo(-26, 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#87ceeb'; ctx.beginPath(); ctx.ellipse(12, -4, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff9f1c'; ctx.beginPath(); ctx.moveTo(42, 0); ctx.lineTo(54, -3); ctx.lineTo(42, -8); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function drawBubble(b) {
+    ctx.save(); ctx.translate(b.x, b.y);
+    ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.strokeStyle = '#2ec4b6'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, 44, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.fillText(b.w.emoji || '🔸', 0, -7);
+    ctx.font = 'bold 13px Prompt, sans-serif'; ctx.fillStyle = '#2b2438'; ctx.fillText(b.w.word, 0, 16);
+    ctx.restore();
+  }
+  function stop() { cancelAnimationFrame(animId); animId = null; ctx = null; scrollT = 0; var c = document.getElementById('airCanvas'); if (c) { c.onclick = null; c.ontouchend = null; } }
+  return { start: start, stop: stop };
+})();
+
+/* ===== Setup overlay helpers ===== */
+var _allWords = [], _setupMode = null, _setupCam = null;
+
+function openSetup(mode) {
+  _setupMode = mode;
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️' };
+  document.getElementById('setupModeName').textContent = names[mode];
+  populateWordSets('easy');
+  startSetupCam();
+  document.getElementById('screenSetup').style.display = 'flex';
+}
+
+function populateWordSets(diff) {
+  var pool = _allWords.filter(function (w) { return diff === 'hard' || w.age_level <= 5; });
+  var groups = WordsApi.groupByExercise(pool);
+  var list = document.getElementById('wordSetList');
+  list.innerHTML = '';
+  groups.forEach(function (g) {
+    var id = 'chk_' + g.exercise_code;
+    var item = document.createElement('div');
+    item.className = 'word-set-item';
+    item.innerHTML = '<input type="checkbox" id="' + id + '" checked><label for="' + id + '">' + g.letter_category + ' <span class="text-secondary">(' + g.words.length + ' คำ)</span></label>';
+    list.appendChild(item);
+  });
+}
+
+function startSetupCam() {
+  var vid = document.getElementById('setupCameraVideo'), wrap = document.getElementById('setupCameraWrap');
+  navigator.mediaDevices && navigator.mediaDevices.getUserMedia({ video: true })
+    .then(function (s) { _setupCam = s; vid.srcObject = s; wrap.style.display = 'block'; })
+    .catch(function () { wrap.style.display = 'none'; });
+}
+
+function stopSetupCam() {
+  if (_setupCam) { _setupCam.getTracks().forEach(function (t) { t.stop(); }); _setupCam = null; }
+}
+
+function launchGame() {
+  var diff = document.querySelector('.diff-btn.active').getAttribute('data-diff');
+  var checked = new Set();
+  document.querySelectorAll('#wordSetList input[type="checkbox"]:checked').forEach(function (cb) { checked.add(cb.id.replace('chk_', '')); });
+  var pool = _allWords.filter(function (w) { return checked.has(w.exercise_code) && (diff === 'hard' || w.age_level <= 5); });
+  if (!pool.length) { alert('กรุณาเลือกชุดคำอย่างน้อย 1 หมวด'); return; }
+  pool.sort(function () { return Math.random() - 0.5; });
+  stopSetupCam();
+  document.getElementById('screenSetup').style.display = 'none';
+
+  G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false;
+  document.getElementById('hudPoints').textContent = 0;
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️' };
+  document.getElementById('hudModeName').textContent = names[G.mode];
+
+  ['matchingGame','shootingGame','airplaneGame'].forEach(function (id) { document.getElementById(id).style.display = 'none'; });
+  showScreen('screenGame');
+
+  var limit = G.mode === 'matching' ? 120 : 60;
+  startTimer(limit);
+
+  if (G.mode === 'matching') { document.getElementById('matchingGame').style.display = 'block'; MatchingGame.init(pool); }
+  else if (G.mode === 'shooting') { document.getElementById('shootingGame').style.display = 'block'; ShootingGame.start(pool); }
+  else { document.getElementById('airplaneGame').style.display = 'block'; AirplaneGame.start(pool); }
+}
+
+function startTimer(limit) {
+  clearInterval(G.timerHandle);
+  G.timeLeft = limit;
+  document.getElementById('hudTimer').textContent = limit;
+  G.timerHandle = setInterval(function () {
+    if (G.paused) return;
+    G.timeLeft--;
+    document.getElementById('hudTimer').textContent = G.timeLeft;
+    if (G.timeLeft <= 0) finishGame();
+  }, 1000);
+}
+
+/* ===== Page init ===== */
+document.addEventListener('DOMContentLoaded', async function () {
+  Auth.initNav();
+  _allWords = await WordsApi.fetchAllWords();
+
+  document.getElementById('cardMatching').addEventListener('click', function () { openSetup('matching'); });
+  document.getElementById('cardShooting').addEventListener('click', function () { openSetup('shooting'); });
+  document.getElementById('cardAirplane').addEventListener('click', function () { openSetup('airplane'); });
+
+  document.querySelectorAll('.diff-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      populateWordSets(btn.getAttribute('data-diff'));
+    });
+  });
+
+  document.getElementById('btnSetupCancel').addEventListener('click', function () { stopSetupCam(); document.getElementById('screenSetup').style.display = 'none'; });
+  document.getElementById('btnSetupStart').addEventListener('click', launchGame);
+  document.getElementById('btnQuitGame').addEventListener('click', function () {
+    G.paused = true; clearInterval(G.timerHandle);
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop();
+    showScreen('screenMode');
+  });
+  document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });
+  document.getElementById('btnPlayAgain').addEventListener('click', function () { openSetup(G.mode); });
+});
 </script>
 </body>
 </html>

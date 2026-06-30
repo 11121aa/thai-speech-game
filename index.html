@@ -26,18 +26,12 @@
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navMain">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
-          <li class="nav-item"><a class="nav-link active" data-page="index.html" href="index.html">หน้าหลัก</a></li>
-          <li class="nav-item"><a class="nav-link" data-page="about.html" href="about.html">เกี่ยวกับเรา</a></li>
-          <li class="nav-item"><a class="nav-link" data-page="app.html" href="app.html">ฝึกออกเสียง</a></li>
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
+          <li class="nav-item"><a class="nav-link" data-page="index.html" href="index.html">หน้าหลัก</a></li>
           <li class="nav-item"><a class="nav-link" data-page="game.html" href="game.html">เกม</a></li>
           <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
-          <li class="nav-item" id="navManagement" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">การจัดการ</a></li>
           <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
-          <li class="nav-item nav-user-info" id="navUser" style="display:none;">
-            <span class="nav-link mb-0" id="navUserEmail"></span>
-            <button class="btn btn-sm btn-outline-primary" id="btnLogout">ออกจากระบบ</button>
-          </li>
+          <li class="nav-item" id="navSelf" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">ของฉัน</a></li>
         </ul>
       </div>
     </div>
@@ -171,12 +165,30 @@
     </div>
   </section>
 
+  <section class="section-pad bg-soft-yellow">
+    <div class="container">
+      <div class="text-center mb-4">
+        <div class="section-kicker">กระบวนการทำงาน</div>
+        <h2 class="section-title">ใช้งานร่วมกับนักบำบัด</h2>
+      </div>
+      <div class="process-flow">
+        <div class="process-step"><span class="step-icon">👩‍⚕️</span><span class="step-label">นักบำบัด<br>มอบหมายคำ</span></div>
+        <span class="process-arrow">→</span>
+        <div class="process-step"><span class="step-icon">🎮</span><span class="step-label">เด็กฝึกออกเสียง<br>ผ่านเกม</span></div>
+        <span class="process-arrow">→</span>
+        <div class="process-step"><span class="step-icon">🎤</span><span class="step-label">บันทึกเสียง<br>อัตโนมัติ</span></div>
+        <span class="process-arrow">→</span>
+        <div class="process-step"><span class="step-icon">📊</span><span class="step-label">รายงาน<br>ส่งนักบำบัด</span></div>
+      </div>
+    </div>
+  </section>
+
   <section class="section-pad">
     <div class="container">
       <div class="soft-card text-center bg-soft-pink">
         <h2 class="section-title">พร้อมให้น้องๆฝึกออกเสียงหรือยัง?</h2>
         <p class="hero-lead mb-4">ไม่ต้องติดตั้งแอป เล่นได้ทันทีผ่านเบราว์เซอร์</p>
-        <a href="app.html" class="btn btn-warning btn-lg btn-bouncy"><i class="bi bi-play-circle me-2"></i>เริ่มเล่นเลย</a>
+        <a href="game.html" class="btn btn-warning btn-lg btn-bouncy"><i class="bi bi-controller me-2"></i>เริ่มเล่นเกม</a>
       </div>
     </div>
   </section>
@@ -191,10 +203,8 @@
       </div>
       <div class="col-lg-4">
         <h5>เมนู</h5>
-        <ul class="list-unstyled">
+                <ul class="list-unstyled">
           <li><a href="index.html">หน้าหลัก</a></li>
-          <li><a href="about.html">เกี่ยวกับเรา</a></li>
-          <li><a href="app.html">ฝึกออกเสียง</a></li>
           <li><a href="game.html">เกม</a></li>
           <li><a href="contact.html">ติดต่อเรา</a></li>
         </ul>
