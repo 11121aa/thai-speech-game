@@ -43,11 +43,11 @@ const PracticePanel = (function () {
   }
 
   function mouthInfoFor(word) {
+    if (word.mouth_image_url) {
+      return { imageUrl: word.mouth_image_url };
+    }
     return (
-      MOUTH_PLACEHOLDERS[word.exercise_code] || {
-        icon: "👄",
-        label: 'ภาพ/วิดีโอสาธิตปากสำหรับเสียง "' + word.letter_category + '" (จะเพิ่มเร็วๆนี้)'
-      }
+      MOUTH_PLACEHOLDERS[word.exercise_code] || null
     );
   }
 
@@ -66,8 +66,16 @@ const PracticePanel = (function () {
     el("ppWord").textContent = word.word;
     el("ppReading").textContent = word.reading;
     const mouth = mouthInfoFor(word);
-    el("ppMouthDiagram").innerHTML =
-      '<div class="mouth-diagram-icon">' + mouth.icon + "</div><div>" + mouth.label + "</div>";
+    const diag = el("ppMouthDiagram");
+    if (!mouth) {
+      diag.style.display = "none";
+    } else if (mouth.imageUrl) {
+      diag.style.display = "flex";
+      diag.innerHTML = '<img src="' + mouth.imageUrl + '" alt="ภาพปาก" style="width:100%;height:100%;object-fit:contain;border-radius:12px;" onerror="this.parentNode.style.display=\'none\'">';
+    } else {
+      diag.style.display = "flex";
+      diag.innerHTML = '<div class="mouth-diagram-icon">' + mouth.icon + "</div><div>" + mouth.label + "</div>";
+    }
 
     resetPanelState();
     modal.show();

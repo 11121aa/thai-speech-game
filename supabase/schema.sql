@@ -22,6 +22,10 @@ create table if not exists public.words (
 create index if not exists idx_words_age_level on public.words (age_level);
 create index if not exists idx_words_exercise_code on public.words (exercise_code);
 
+-- URL of a mouth-diagram image showing how to pronounce this word's
+-- target consonant. NULL = no image yet; the app shows a placeholder.
+alter table public.words add column if not exists mouth_image_url text;
+
 create table if not exists public.role (
   id bigserial primary key,
   user_id uuid not null unique references auth.users (id) on delete cascade,
