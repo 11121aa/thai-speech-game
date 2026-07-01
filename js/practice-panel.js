@@ -153,7 +153,13 @@ const PracticePanel = (function () {
           resetMicButton();
           const btn = el("ppBtnMic");
           btn.disabled = true;
-          el("ppRecordHint").textContent = "กำลังบันทึกเสียง...";
+          el("ppRecordHint").textContent = "รอสักครู่...";
+          setTimeout(function () {
+            btn.disabled = false;
+            if (el("ppPlaybackArea").style.display === "none") {
+              el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
+            }
+          }, 1000);
           try {
             const session = await Auth.getSession();
             const result = await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id);
@@ -162,12 +168,6 @@ const PracticePanel = (function () {
           } catch (err) {
             showError("เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่");
           }
-          setTimeout(function () {
-            btn.disabled = false;
-            if (!el("ppPlaybackArea").style.display || el("ppPlaybackArea").style.display === "none") {
-              el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
-            }
-          }, 1000);
         },
         function () {
           resetMicButton();
