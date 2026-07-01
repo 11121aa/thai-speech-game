@@ -43,12 +43,9 @@ const PracticePanel = (function () {
   }
 
   function mouthInfoFor(word) {
-    if (word.mouth_image_url) {
-      return { imageUrl: word.mouth_image_url };
-    }
-    return (
-      MOUTH_PLACEHOLDERS[word.exercise_code] || null
-    );
+    const imageUrl = word.sounds && word.sounds.mouth_image_url;
+    if (imageUrl) return { imageUrl: imageUrl };
+    return MOUTH_PLACEHOLDERS[word.exercise_code] || null;
   }
 
   async function open(word, cbs) {

@@ -3,7 +3,7 @@ const WordsApi = (function () {
     if (!sb) return [];
     const { data, error } = await sb
       .from("words")
-      .select("*")
+      .select("*, sounds(id, exercise_code, letter_category, mouth_image_url)")
       .lte("age_level", age)
       .order("exercise_code", { ascending: true });
     if (error) {
@@ -34,7 +34,9 @@ const WordsApi = (function () {
 
   async function fetchAllWords() {
     if (!sb) return [];
-    const { data, error } = await sb.from("words").select("*");
+    const { data, error } = await sb
+      .from("words")
+      .select("*, sounds(id, exercise_code, letter_category, mouth_image_url)");
     if (error) {
       console.error(error);
       return [];

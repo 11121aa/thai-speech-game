@@ -107,6 +107,7 @@
 
       <ul class="nav nav-pills mb-4 gap-2">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabWords" type="button">จัดการคลังคำ</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabSounds" type="button">รูปปากตามเสียง</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabScoring" type="button">ให้คะแนนเสียง</button></li>
       </ul>
 
@@ -137,6 +138,19 @@
               <table class="table table-hover align-middle">
                 <thead><tr><th>คำ</th><th>คำอ่าน</th><th>หมวด</th><th>รหัส</th><th>อายุ</th><th>Emoji</th><th></th></tr></thead>
                 <tbody id="wordsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sounds: mouth diagram URLs per consonant group -->
+        <div class="tab-pane fade" id="tabSounds">
+          <div class="soft-card">
+            <p class="text-secondary mb-3">ตั้งค่า URL รูปภาพปากสำหรับแต่ละหมวดเสียง — คำทุกคำในหมวดเดียวกันจะใช้รูปเดียวกันโดยอัตโนมัติ</p>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead><tr><th>รหัสเสียง</th><th>หมวด</th><th>URL รูปปาก (ว่าง = ยังไม่มีรูป)</th><th>ตัวอย่าง</th><th></th></tr></thead>
+                <tbody id="soundsTableBody"><tr><td colspan="5" class="text-secondary">กำลังโหลด...</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -309,6 +323,7 @@ function drawPie(canvasId, data) {
 async function initSpecialist() {
   await loadUserMap();
   await loadWords();
+  await loadSounds();
   await loadPractice('');
 
   document.getElementById('wordForm').addEventListener('submit', onWordSubmit);
@@ -316,6 +331,30 @@ async function initSpecialist() {
   document.getElementById('wordSearchInput').addEventListener('input', renderWordsTable);
   document.getElementById('filterUserSelect').addEventListener('change', function (e) { loadPractice(e.target.value); });
   document.getElementById('btnLogoutSpec').addEventListener('click', Auth.logout.bind(Auth));
+}
+
+async function loadSounds() {
+  var { data } = await sb.from('sounds').select('*').order('exercise_code', { ascending: true });
+  var body = document.getElementById('soundsTableBody');
+  body.innerHTML = '';
+  if (!data || !data.length) { body.innerHTML = '<tr><td colspan="5" class="text-secondary">ยังไม่มีข้อมูล — กรุณารัน schema.sql อีกครั้ง</td></tr>'; return; }
+  data.forEach(function (s) {
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><code>' + s.exercise_code + '</code></td>' +
+      '<td>' + s.letter_category + '</td>' +
+      '<td><input type="url" class="form-control form-control-sm sound-url-input" placeholder="https://..." value="' + (s.mouth_image_url || '') + '" data-id="' + s.id + '"></td>' +
+      '<td>' + (s.mouth_image_url ? '<img src="' + s.mouth_image_url + '" style="height:40px;border-radius:6px;" onerror="this.style.display=\'none\'">' : '<span class="text-secondary small">ยังไม่มีรูป</span>') + '</td>' +
+      '<td><button class="btn btn-sm btn-warning btn-save-sound">บันทึก</button></td>';
+    var soundId = s.id;
+    tr.querySelector('.btn-save-sound').addEventListener('click', function () {
+      var url = tr.querySelector('.sound-url-input').value.trim() || null;
+      sb.from('sounds').update({ mouth_image_url: url }).eq('id', soundId).then(function () {
+        loadSounds();
+      });
+    });
+    body.appendChild(tr);
+  });
 }
 
 async function loadUserMap() {

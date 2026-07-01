@@ -22,9 +22,35 @@ create table if not exists public.words (
 create index if not exists idx_words_age_level on public.words (age_level);
 create index if not exists idx_words_exercise_code on public.words (exercise_code);
 
--- URL of a mouth-diagram image showing how to pronounce this word's
--- target consonant. NULL = no image yet; the app shows a placeholder.
-alter table public.words add column if not exists mouth_image_url text;
+-- Normalised sounds table: one row per Thai consonant/cluster group.
+-- Many words share one sound, so the mouth diagram lives here once.
+create table if not exists public.sounds (
+  id bigserial primary key,
+  exercise_code text not null unique,
+  letter_category text not null,
+  mouth_image_url text,
+  description text,
+  created_at timestamptz not null default now()
+);
+
+-- FK from words → sounds (many-to-one).
+alter table public.words add column if not exists sound_id bigint references public.sounds(id);
+-- Clean up the word-level column if it was created by an earlier migration.
+alter table public.words drop column if exists mouth_image_url;
+
+-- Populate sounds from the distinct exercise_codes already in words.
+insert into public.sounds (exercise_code, letter_category)
+select distinct on (exercise_code) exercise_code, letter_category
+from public.words
+order by exercise_code
+on conflict (exercise_code) do nothing;
+
+-- Link existing words to their sound row.
+update public.words w
+set sound_id = s.id
+from public.sounds s
+where w.exercise_code = s.exercise_code
+  and w.sound_id is null;
 
 create table if not exists public.role (
   id bigserial primary key,
@@ -103,10 +129,29 @@ $$;
 -- 3. Enable RLS
 -- ------------------------------------------------------------
 
+alter table public.sounds enable row level security;
 alter table public.words enable row level security;
 alter table public.role enable row level security;
 alter table public.practice enable row level security;
 alter table public.activity enable row level security;
+
+-- ------------------------------------------------------------
+-- 3b. Policies: sounds  (same pattern as words — public read, specialist write)
+-- ------------------------------------------------------------
+
+drop policy if exists "sounds_select_all" on public.sounds;
+create policy "sounds_select_all" on public.sounds for select using (true);
+
+drop policy if exists "sounds_insert_specialist" on public.sounds;
+create policy "sounds_insert_specialist" on public.sounds for insert with check (public.is_specialist(auth.uid()));
+
+drop policy if exists "sounds_update_specialist" on public.sounds;
+create policy "sounds_update_specialist" on public.sounds
+  for update using (public.is_specialist(auth.uid()))
+  with check (public.is_specialist(auth.uid()));
+
+drop policy if exists "sounds_delete_specialist" on public.sounds;
+create policy "sounds_delete_specialist" on public.sounds for delete using (public.is_specialist(auth.uid()));
 
 -- ------------------------------------------------------------
 -- 4. Policies: words
