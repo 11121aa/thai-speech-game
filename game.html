@@ -328,19 +328,22 @@ var ShootingGame = (function () {
     var canvas = document.getElementById('shootCanvas');
     ctx = canvas.getContext('2d');
     canvas.onclick = click; canvas.ontouchend = touch;
-    for (var i = 0; i < 4; i++) spawn();
+    spawn();
+    setTimeout(function(){ if(ctx) spawn(); }, 900);
+    setTimeout(function(){ if(ctx) spawn(); }, 1800);
+    setTimeout(function(){ if(ctx) spawn(); }, 2700);
     loop();
   }
 
   function spawn() {
+    if (!words.length) return;
     var w = words[wIdx++ % words.length];
     var bx, t = 0;
     do { bx = 80 + Math.random() * (W - 160); t++; }
     while (t < 20 && targets.some(function (u) { return Math.abs(u.baseX - bx) < 130; }));
     targets.push({
       x: bx, baseX: bx, y: GROUND, w: w,
-      color: CAPS[Math.floor(Math.random() * CAPS.length)],
-      s: 0, hit: false, expired: false,
+      s: 0, hit: false, done: false, expired: false,
       born: Date.now(),
       oscPhase: Math.random() * Math.PI * 2,
       oscSpeed: 1.2 + Math.random() * 1.4,
@@ -363,12 +366,16 @@ var ShootingGame = (function () {
     for (var i = targets.length - 1; i >= 0; i--) {
       var t = targets[i];
       if (t.hit || t.expired) continue;
-      var dx = mx - t.x, dy = my - (t.y - 60 * t.s);
-      if (Math.abs(dx) < 52 * t.s && Math.abs(dy) < 72 * t.s) {
+      var dx = mx - t.x, dy = my - (t.y - 90 * t.s);
+      if (dx * dx + dy * dy < (52 * t.s) * (52 * t.s)) {
         t.hit = true;
-        pops.push({ x: t.x, y: t.y - 80, text: '+10', life: 1 });
+        pops.push({ x: t.x, y: t.y - 150, text: '+10', life: 1 });
         addPts(10);
-        openPractice(t.w, null, null);
+        var tRef = t;
+        openPractice(t.w, null, function () {
+          tRef.done = true;
+          spawn();
+        });
         return;
       }
     }
@@ -384,24 +391,23 @@ var ShootingGame = (function () {
       if (!t.hit && !t.expired) {
         t.s = Math.min(1, t.s + 0.06);
         var elapsed = now - t.born;
-        // Move horizontally with sinusoidal oscillation
         t.x = t.baseX + Math.sin(t.oscPhase + elapsed * 0.001 * t.oscSpeed) * t.oscAmp;
-        // 5-second timeout
         if (!G.paused && elapsed >= TIMEOUT_MS) {
           t.expired = true;
-          pops.push({ x: t.x, y: t.y - 90, text: '⌛', life: 1 });
+          pops.push({ x: t.x, y: t.y - 150, text: '⌛', life: 1 });
         }
-      } else {
+      } else if (t.done || t.expired) {
         t.s = Math.max(0, t.s - 0.13);
       }
-      if (t.s > 0) drawMush(t, now);
-      else if (t.hit || t.expired) toRemove.push(t);
+      // hit but not done → stay at full size while practice panel is open
+      if (t.s > 0) drawTarget(t, now);
+      else if (t.done || t.expired) toRemove.push(t);
     });
 
-    // Remove scaled-down targets and spawn replacements
     toRemove.forEach(function (t) {
       targets = targets.filter(function (u) { return u !== t; });
-      spawn();
+      if (t.expired) spawn(); // expired timeout: spawn replacement now
+      // done (practice finished): replacement already spawned in practice callback
     });
 
     pops.forEach(function (p) {
@@ -424,38 +430,44 @@ var ShootingGame = (function () {
     ctx.fillStyle = '#4caf50'; ctx.fillRect(0, GROUND, W, 10);
   }
 
-  function drawMush(t, now) {
+  function drawTarget(t, now) {
     var elapsed = now - t.born;
-    var timeLeft = Math.max(0, TIMEOUT_MS - elapsed) / 1000;
+    var timeLeft = t.hit ? 5 : Math.max(0, TIMEOUT_MS - elapsed) / 1000;
     var shakeX = (timeLeft < 1 && !t.hit && !t.expired) ? Math.sin(now * 0.03) * 5 : 0;
     ctx.save();
+    if (t.hit && !t.done) ctx.globalAlpha = 0.5;
     ctx.translate(t.x + shakeX, t.y);
     ctx.scale(t.s, t.s);
-    ctx.fillStyle = '#c8a26b'; ctx.fillRect(-18, -55, 36, 55);
-    ctx.beginPath(); ctx.arc(0, -55, 46, Math.PI, 0); ctx.closePath();
-    ctx.fillStyle = t.color; ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    [[-20,-74],[20,-74],[0,-62]].forEach(function (d) {
-      ctx.beginPath(); ctx.arc(d[0], d[1], 7, 0, Math.PI * 2); ctx.fill();
+    // Pole
+    ctx.fillStyle = '#7d6b5a'; ctx.fillRect(-5, -90, 10, 90);
+    // Concentric rings (outer → inner)
+    [{ r:46,c:'#e74c3c'},{r:37,c:'#fff'},{r:27,c:'#2980b9'},{r:18,c:'#fff'},{r:10,c:'#f1c40f'}].forEach(function(rg){
+      ctx.beginPath(); ctx.arc(0,-90,rg.r,0,Math.PI*2);
+      ctx.fillStyle=rg.c; ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.1)'; ctx.lineWidth=1; ctx.stroke();
     });
-    ctx.font = 'bold 14px Prompt, sans-serif'; ctx.textAlign = 'center';
-    var bw = Math.max(56, ctx.measureText(t.w.word).width + 16);
-    ctx.fillStyle = '#fff';
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(-bw/2, -115, bw, 26, 5); ctx.fill(); }
-    else { ctx.fillRect(-bw/2, -115, bw, 26); }
-    ctx.fillStyle = '#2b2438'; ctx.fillText(t.w.word, 0, -96);
-    if (t.w.emoji) { ctx.font = '20px serif'; ctx.fillText(t.w.emoji, 0, -126); }
-
-    // Countdown ring around cap
-    if (!t.hit && !t.expired) {
-      var frac = timeLeft / 5;
-      ctx.strokeStyle = frac > 0.5 ? '#27ae60' : frac > 0.25 ? '#f39c12' : '#e74c3c';
-      ctx.lineWidth = 5; ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.arc(0, -55, 60, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-      ctx.stroke();
+    // Crosshair
+    ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(-46,-90); ctx.lineTo(46,-90); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-136); ctx.lineTo(0,-44); ctx.stroke();
+    // Word bubble
+    ctx.font='bold 14px Prompt,sans-serif'; ctx.textAlign='center';
+    var bw=Math.max(60,ctx.measureText(t.w.word).width+18);
+    ctx.fillStyle=t.hit?'#ddd':'#fff';
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(-bw/2,-158,bw,28,6);ctx.fill();}
+    else{ctx.fillRect(-bw/2,-158,bw,28);}
+    ctx.fillStyle='#2b2438'; ctx.fillText(t.w.word,0,-137);
+    if(t.w.emoji){ctx.font='20px serif';ctx.fillText(t.w.emoji,0,-170);}
+    // Countdown ring
+    if(!t.hit&&!t.expired){
+      var frac=timeLeft/5;
+      ctx.strokeStyle=frac>0.5?'#27ae60':frac>0.25?'#f39c12':'#e74c3c';
+      ctx.lineWidth=5; ctx.lineCap='round';
+      ctx.beginPath(); ctx.arc(0,-90,60,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
     }
-    ctx.restore();
+    // Mic icon while being practiced
+    if(t.hit&&!t.done){ctx.font='26px serif';ctx.fillText('🎤',0,-82);}
+    ctx.globalAlpha=1; ctx.restore();
   }
 
   function stop() {
@@ -466,101 +478,118 @@ var ShootingGame = (function () {
   return { start: start, stop: stop };
 })();
 
-/* ===== Airplane Game ===== */
+/* ===== Airplane Game — Flappy Bird style ===== */
 var AirplaneGame = (function () {
-  var ctx, words, wIdx, bubbles, clouds, planeY, animId, progress, scrollT;
+  var ctx, words, wIdx, bubbles, clouds, planeY, planeVY, animId, scrollT, progress;
   var W = 800, H = 380, GROUND = H - 50, TOTAL = 2400;
+  var PLANE_X = 130, GRAVITY = 0.32, FLAP = -9;
+
   function start(ws) {
-    words = ws; wIdx = 0; bubbles = []; progress = 0; scrollT = 0;
-    planeY = 160; clouds = [];
-    for (var i = 0; i < 5; i++) clouds.push({ x: 60 + Math.random() * W * 1.8, y: 30 + Math.random() * 100, rw: 70 + Math.random() * 70, spd: 0.7 + Math.random() * 0.8 });
+    words = ws; wIdx = 0; bubbles = []; scrollT = 0; progress = 0;
+    planeY = H / 2; planeVY = 0;
+    clouds = [];
+    for (var i = 0; i < 5; i++) clouds.push({ x: 60 + Math.random() * W * 1.8, y: 25 + Math.random() * 110, rw: 65 + Math.random() * 70, spd: 0.6 + Math.random() * 0.7 });
     var canvas = document.getElementById('airCanvas');
     ctx = canvas.getContext('2d');
-    canvas.onclick = click; canvas.ontouchend = touch;
-    spawnBubble();
+    canvas.onclick = flap; canvas.ontouchend = function(e){ e.preventDefault(); flap(); };
+    spawnBubble(); spawnBubble();
     loop();
   }
+
+  function flap() { if (!G.paused) { planeVY = FLAP; } }
+
   function spawnBubble() {
     if (!words.length) return;
-    bubbles.push({ x: W + 50, y: 80 + Math.random() * (GROUND - 160), w: words[wIdx++ % words.length], hit: false });
+    bubbles.push({ x: W + 60 + bubbles.length * 120, y: 70 + Math.random() * (GROUND - 150), w: words[wIdx++ % words.length], hit: false });
   }
-  function click(e) {
-    if (G.paused) return;
-    var c = document.getElementById('airCanvas'), r = c.getBoundingClientRect();
-    hitTest((e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height));
-  }
-  function touch(e) {
-    e.preventDefault(); if (G.paused) return;
-    var c = document.getElementById('airCanvas'), r = c.getBoundingClientRect(), t = e.changedTouches[0];
-    hitTest((t.clientX - r.left) * (W / r.width), (t.clientY - r.top) * (H / r.height));
-  }
-  function hitTest(mx, my) {
-    for (var i = bubbles.length - 1; i >= 0; i--) {
-      var b = bubbles[i]; if (b.hit) continue;
-      var dx = mx - b.x, dy = my - b.y;
-      if (dx * dx + dy * dy < 45 * 45) {
-        b.hit = true; addPts(10);
-        var bw = b.w;
-        openPractice(bw, null, function () {
-          bubbles = bubbles.filter(function (u) { return !u.hit; });
-          if (bubbles.length < 3) spawnBubble();
-        });
-        return;
-      }
-    }
-  }
+
   function loop() {
     if (!ctx) return;
     if (!G.paused) {
       scrollT++;
       progress = Math.min(TOTAL, progress + 2);
-      planeY += Math.sin(scrollT * 0.03) * 0.6;
-      planeY = Math.max(60, Math.min(GROUND - 80, planeY));
-      clouds.forEach(function (c) { c.x -= c.spd; if (c.x < -c.rw - 50) c.x = W + c.rw; });
-      bubbles.forEach(function (b) { if (!b.hit) b.x -= 1.6; });
-      bubbles = bubbles.filter(function (b) { return b.x > -80; });
-      if (scrollT % 100 === 0 && bubbles.length < 4) spawnBubble();
+      // Gravity physics
+      planeVY += GRAVITY;
+      planeY += planeVY;
+      if (planeY >= GROUND - 28) { planeY = GROUND - 28; planeVY = 0; }
+      if (planeY < 18) { planeY = 18; planeVY = 0; }
+      // Move clouds and bubbles
+      clouds.forEach(function(c){ c.x -= c.spd; if(c.x < -c.rw-40) c.x = W + c.rw; });
+      bubbles.forEach(function(b){ if(!b.hit) b.x -= 2.2; });
+      bubbles = bubbles.filter(function(b){ return b.x > -80; });
+      // Auto-collide with bubbles (plane hits bubble = practice opens)
+      for (var i = bubbles.length - 1; i >= 0; i--) {
+        var b = bubbles[i];
+        if (b.hit) continue;
+        var dx = PLANE_X - b.x, dy = planeY - b.y;
+        if (dx*dx + dy*dy < 62*62) {
+          b.hit = true;
+          openPractice(b.w, null, function(){
+            bubbles = bubbles.filter(function(u){ return !u.hit; });
+            spawnBubble();
+          });
+          break;
+        }
+      }
+      if (scrollT % 130 === 0 && bubbles.length < 4) spawnBubble();
       if (progress >= TOTAL) { finishGame(); return; }
     }
     draw();
     animId = requestAnimationFrame(loop);
   }
+
   function draw() {
-    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#87ceeb'); g.addColorStop(1, '#c5e8f7');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    clouds.forEach(function (c) {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rw, 25, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x - c.rw * 0.35, c.y + 10, c.rw * 0.55, 20, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x + c.rw * 0.3, c.y + 8, c.rw * 0.5, 18, 0, 0, Math.PI * 2); ctx.fill();
+    var g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#87ceeb'); g.addColorStop(1,'#c5e8f7');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    clouds.forEach(function(c){
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.ellipse(c.x,c.y,c.rw,25,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x-c.rw*0.35,c.y+10,c.rw*0.55,20,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x+c.rw*0.3,c.y+8,c.rw*0.5,18,0,0,Math.PI*2); ctx.fill();
     });
-    ctx.fillStyle = '#5dba5d'; ctx.fillRect(0, GROUND, W, H - GROUND);
-    var pw = (progress / TOTAL) * (W - 40);
-    ctx.fillStyle = '#ddd'; ctx.fillRect(20, H - 15, W - 40, 7);
-    ctx.fillStyle = '#2ec4b6'; ctx.fillRect(20, H - 15, pw, 7);
-    ctx.font = '16px serif'; ctx.fillText('🏁', 18 + pw, H - 6);
-    drawPlane(120, planeY);
+    ctx.fillStyle='#5dba5d'; ctx.fillRect(0,GROUND,W,H-GROUND);
+    var pw=(progress/TOTAL)*(W-40);
+    ctx.fillStyle='#ddd'; ctx.fillRect(20,H-15,W-40,7);
+    ctx.fillStyle='#2ec4b6'; ctx.fillRect(20,H-15,pw,7);
+    ctx.font='16px serif'; ctx.fillText('🏁',18+pw,H-6);
     bubbles.forEach(drawBubble);
+    drawPlane(PLANE_X, planeY, planeVY);
+    // Tap hint at start
+    if (scrollT < 80) {
+      ctx.fillStyle='rgba(43,36,56,0.55)';
+      ctx.font='bold 18px Prompt,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('แตะหน้าจอเพื่อบินขึ้น! ✈️', W/2, 45);
+    }
   }
-  function drawPlane(x, y) {
+
+  function drawPlane(x, y, vy) {
     ctx.save(); ctx.translate(x, y);
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, 42, 14, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2ec4b6';
-    ctx.beginPath(); ctx.moveTo(5, -2); ctx.lineTo(-12, -26); ctx.lineTo(22, -2); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-30, 2); ctx.lineTo(-42, -12); ctx.lineTo(-26, 2); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#87ceeb'; ctx.beginPath(); ctx.ellipse(12, -4, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff9f1c'; ctx.beginPath(); ctx.moveTo(42, 0); ctx.lineTo(54, -3); ctx.lineTo(42, -8); ctx.closePath(); ctx.fill();
+    var tilt = Math.max(-0.45, Math.min(0.45, vy * 0.05));
+    ctx.rotate(tilt);
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(0,0,42,14,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#2ec4b6';
+    ctx.beginPath(); ctx.moveTo(5,-2); ctx.lineTo(-12,-26); ctx.lineTo(22,-2); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-30,2); ctx.lineTo(-42,-12); ctx.lineTo(-26,2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#87ceeb'; ctx.beginPath(); ctx.ellipse(12,-4,8,6,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff9f1c'; ctx.beginPath(); ctx.moveTo(42,0); ctx.lineTo(54,-3); ctx.lineTo(42,-8); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
+
   function drawBubble(b) {
     ctx.save(); ctx.translate(b.x, b.y);
-    ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.strokeStyle = '#2ec4b6'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(0, 0, 44, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.fillText(b.w.emoji || '🔸', 0, -7);
-    ctx.font = 'bold 13px Prompt, sans-serif'; ctx.fillStyle = '#2b2438'; ctx.fillText(b.w.word, 0, 16);
+    ctx.fillStyle='rgba(255,255,255,0.93)'; ctx.strokeStyle='#2ec4b6'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(0,0,44,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.font='22px serif'; ctx.textAlign='center'; ctx.fillText(b.w.emoji||'🔸',0,-7);
+    ctx.font='bold 13px Prompt,sans-serif'; ctx.fillStyle='#2b2438'; ctx.fillText(b.w.word,0,16);
     ctx.restore();
   }
-  function stop() { cancelAnimationFrame(animId); animId = null; ctx = null; scrollT = 0; var c = document.getElementById('airCanvas'); if (c) { c.onclick = null; c.ontouchend = null; } }
+
+  function stop() {
+    cancelAnimationFrame(animId); animId = null; ctx = null; scrollT = 0;
+    var c = document.getElementById('airCanvas');
+    if (c) { c.onclick = null; c.ontouchend = null; }
+  }
   return { start: start, stop: stop };
 })();
 
