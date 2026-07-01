@@ -96,6 +96,25 @@
         </div>
 
       </div>
+
+      <!-- Daily activity chart -->
+      <div class="soft-card mt-4">
+        <h6 class="mb-3 fw-bold">
+          <i class="bi bi-calendar3 me-1" style="color:var(--color-primary-dark);"></i>
+          กิจกรรมการฝึก 14 วันล่าสุด
+        </h6>
+        <canvas id="dailyChart" width="900" height="170" style="width:100%;"></canvas>
+      </div>
+
+      <!-- High scores per game -->
+      <div class="mt-4 mb-2">
+        <h6 class="mb-3 fw-bold">
+          <i class="bi bi-trophy-fill me-1" style="color:var(--color-secondary-dark);"></i>
+          คะแนนสูงสุดในเกม (บนอุปกรณ์นี้)
+        </h6>
+        <div class="d-flex gap-3 flex-wrap" id="highScoreCards"></div>
+      </div>
+
     </div>
 
     <!-- ── Specialist View ── -->
@@ -245,10 +264,105 @@ async function initUserProfile(session) {
     .eq('user_id', session.user.id)
     .order('practiced_at', { ascending: false });
 
+  renderHighScores();
+
   if (!data || !data.length) return;
 
   renderRecordings(data.slice(0, 15));
   renderStats(data);
+  drawDailyChart(data);
+}
+
+function renderHighScores() {
+  var hs = JSON.parse(localStorage.getItem('ghsv2') || '{}');
+  var games = [
+    { key: 'matching', name: 'จับคู่ภาพ', icon: '🃏', color: 'var(--color-accent-purple)' },
+    { key: 'shooting', name: 'ยิงเป้า', icon: '🎯', color: 'var(--color-danger)' },
+    { key: 'airplane', name: 'ขับเครื่องบิน', icon: '✈️', color: 'var(--color-primary-dark)' }
+  ];
+  var container = document.getElementById('highScoreCards');
+  container.innerHTML = '';
+  games.forEach(function (g) {
+    var score = hs[g.key] || 0;
+    var div = document.createElement('div');
+    div.className = 'soft-card text-center flex-fill';
+    div.style.minWidth = '120px';
+    div.innerHTML =
+      '<div style="font-size:2.2rem;">' + g.icon + '</div>' +
+      '<div style="font-size:0.85rem;color:var(--color-text-soft);font-weight:600;margin:0.2rem 0;">' + g.name + '</div>' +
+      '<div style="font-size:2.4rem;font-weight:700;color:' + g.color + ';">' + score + '</div>' +
+      '<div style="font-size:0.75rem;color:var(--color-text-soft);">⭐ แต้มสูงสุด</div>';
+    container.appendChild(div);
+  });
+}
+
+function drawDailyChart(data) {
+  var canvas = document.getElementById('dailyChart');
+  if (!canvas) return;
+  var ctx2 = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var days = [];
+  var today = new Date();
+  for (var i = 13; i >= 0; i--) {
+    var d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push({
+      label: d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
+      key: d.toDateString(),
+      count: 0
+    });
+  }
+
+  data.forEach(function (row) {
+    var key = new Date(row.practiced_at).toDateString();
+    var found = days.find(function (d) { return d.key === key; });
+    if (found) found.count++;
+  });
+
+  var maxCount = Math.max(1, Math.max.apply(null, days.map(function (d) { return d.count; })));
+  var padL = 28, padR = 10, padT = 22, padB = 38;
+  var chartW = W - padL - padR;
+  var chartH = H - padT - padB;
+  var slotW = chartW / days.length;
+  var barW = Math.max(8, slotW - 6);
+
+  ctx2.clearRect(0, 0, W, H);
+
+  // Gridlines
+  ctx2.strokeStyle = '#f0ebfc'; ctx2.lineWidth = 1;
+  for (var g = 0; g <= 4; g++) {
+    var gy = padT + chartH - (g / 4) * chartH;
+    ctx2.beginPath(); ctx2.moveTo(padL, gy); ctx2.lineTo(W - padR, gy); ctx2.stroke();
+    if (g > 0) {
+      ctx2.font = '10px Prompt,sans-serif'; ctx2.fillStyle = '#c9c2db'; ctx2.textAlign = 'right';
+      ctx2.fillText(Math.round((g / 4) * maxCount), padL - 4, gy + 3);
+    }
+  }
+
+  // Bars
+  days.forEach(function (day, i) {
+    var x = padL + i * slotW + (slotW - barW) / 2;
+    var barH2 = day.count ? Math.max(6, (day.count / maxCount) * chartH) : 3;
+    var y = padT + chartH - barH2;
+    var grad = ctx2.createLinearGradient(0, y, 0, y + barH2);
+    if (day.count) {
+      grad.addColorStop(0, '#2ec4b6'); grad.addColorStop(1, '#1a9e92');
+    } else {
+      grad.addColorStop(0, '#e8e3f5'); grad.addColorStop(1, '#d8d2ee');
+    }
+    ctx2.fillStyle = grad;
+    if (ctx2.roundRect) { ctx2.beginPath(); ctx2.roundRect(x, y, barW, barH2, 4); ctx2.fill(); }
+    else { ctx2.fillRect(x, y, barW, barH2); }
+    if (day.count) {
+      ctx2.font = 'bold 11px Prompt,sans-serif'; ctx2.fillStyle = '#2b2438'; ctx2.textAlign = 'center';
+      ctx2.fillText(day.count, x + barW / 2, y - 4);
+    }
+    if (i % 2 === 0) {
+      ctx2.font = '9px Prompt,sans-serif'; ctx2.fillStyle = '#9b93b0'; ctx2.textAlign = 'center';
+      ctx2.fillText(day.label, x + barW / 2, H - padB + 14);
+    }
+  });
 }
 
 async function renderRecordings(rows) {
