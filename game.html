@@ -320,8 +320,8 @@ var MatchingGame = (function () {
 var ShootingGame = (function () {
   var ctx, words, wIdx, targets, pops, animId;
   var W = 800, H = 450, GROUND = H - 80;
-  var CAPS = ['#e74c3c','#e67e22','#9b59b6','#2980b9','#27ae60'];
   var TIMEOUT_MS = 5000;
+  var MAX_TARGETS = 4;
 
   function start(ws) {
     words = ws; wIdx = 0; targets = []; pops = [];
@@ -337,6 +337,7 @@ var ShootingGame = (function () {
 
   function spawn() {
     if (!words.length) return;
+    if (targets.filter(function(u){ return !u.done && !u.expired; }).length >= MAX_TARGETS) return;
     var w = words[wIdx++ % words.length];
     var bx, t = 0;
     do { bx = 80 + Math.random() * (W - 160); t++; }
@@ -349,6 +350,10 @@ var ShootingGame = (function () {
       oscSpeed: 1.2 + Math.random() * 1.4,
       oscAmp: 28 + Math.random() * 32
     });
+  }
+
+  function delayedSpawn(ms) {
+    setTimeout(function () { if (ctx) spawn(); }, ms);
   }
 
   function click(e) {
@@ -374,7 +379,7 @@ var ShootingGame = (function () {
         var tRef = t;
         openPractice(t.w, null, function () {
           tRef.done = true;
-          spawn();
+          delayedSpawn(700);
         });
         return;
       }
@@ -406,8 +411,8 @@ var ShootingGame = (function () {
 
     toRemove.forEach(function (t) {
       targets = targets.filter(function (u) { return u !== t; });
-      if (t.expired) spawn(); // expired timeout: spawn replacement now
-      // done (practice finished): replacement already spawned in practice callback
+      if (t.expired) delayedSpawn(400); // stagger replacement for expired targets
+      // done: replacement already queued in practice close callback
     });
 
     pops.forEach(function (p) {
@@ -482,7 +487,7 @@ var ShootingGame = (function () {
 var AirplaneGame = (function () {
   var ctx, words, wIdx, bubbles, clouds, planeY, planeVY, animId, scrollT, progress;
   var W = 800, H = 380, GROUND = H - 50, TOTAL = 2400;
-  var PLANE_X = 130, GRAVITY = 0.32, FLAP = -9;
+  var PLANE_X = 130, GRAVITY = 0.18, FLAP = -7;
 
   function start(ws) {
     words = ws; wIdx = 0; bubbles = []; scrollT = 0; progress = 0;
@@ -522,7 +527,7 @@ var AirplaneGame = (function () {
         var b = bubbles[i];
         if (b.hit) continue;
         var dx = PLANE_X - b.x, dy = planeY - b.y;
-        if (dx*dx + dy*dy < 62*62) {
+        if (dx*dx + dy*dy < 46*46) {
           b.hit = true;
           openPractice(b.w, null, function(){
             bubbles = bubbles.filter(function(u){ return !u.hit; });
@@ -578,10 +583,10 @@ var AirplaneGame = (function () {
 
   function drawBubble(b) {
     ctx.save(); ctx.translate(b.x, b.y);
-    ctx.fillStyle='rgba(255,255,255,0.93)'; ctx.strokeStyle='#2ec4b6'; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.arc(0,0,44,0,Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.font='22px serif'; ctx.textAlign='center'; ctx.fillText(b.w.emoji||'🔸',0,-7);
-    ctx.font='bold 13px Prompt,sans-serif'; ctx.fillStyle='#2b2438'; ctx.fillText(b.w.word,0,16);
+    ctx.fillStyle='rgba(255,255,255,0.93)'; ctx.strokeStyle='#2ec4b6'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(0,0,32,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.font='17px serif'; ctx.textAlign='center'; ctx.fillText(b.w.emoji||'🔸',0,-5);
+    ctx.font='bold 11px Prompt,sans-serif'; ctx.fillStyle='#2b2438'; ctx.fillText(b.w.word,0,12);
     ctx.restore();
   }
 
