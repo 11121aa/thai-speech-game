@@ -909,8 +909,8 @@ a {
 }
 
 .mouth-diagram-box {
-  width: 150px;
-  height: 150px;
+  width: 220px;
+  height: 220px;
   border: 2px dashed var(--color-accent-purple);
   border-radius: var(--radius-md);
   background: var(--color-bg-soft);
@@ -929,8 +929,8 @@ a {
 }
 
 .camera-mirror {
-  width: 150px;
-  height: 150px;
+  width: 220px;
+  height: 220px;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-text);
