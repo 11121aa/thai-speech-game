@@ -62,6 +62,11 @@
           <span class="mode-title">ขับเครื่องบิน</span>
           <span class="mode-desc">เก็บลูกโป่งคำศัพท์บนท้องฟ้า</span>
         </div>
+        <div class="game-mode-card" id="cardFlashcard">
+          <span class="mode-icon">🎴</span>
+          <span class="mode-title">ไพ่คำศัพท์</span>
+          <span class="mode-desc">ดูภาพแล้วพูดคำที่เห็น ทีละใบ</span>
+        </div>
       </div>
     </div>
 
@@ -86,6 +91,33 @@
       <div id="airplaneGame" style="display:none;">
         <div class="game-canvas-wrap">
           <canvas id="airCanvas" width="800" height="380"></canvas>
+        </div>
+      </div>
+      <!-- Flashcard Game -->
+      <div id="flashcardGame" style="display:none;">
+        <div class="flashcard-arena">
+          <div class="fc-progress-row">
+            <span id="fcProgressText" class="fc-progress-text">0 / 0</span>
+            <div class="fc-progress-bar"><div id="fcProgressFill" class="fc-progress-fill"></div></div>
+          </div>
+          <div class="fc-stage">
+            <div class="fc-stack-bg fc-s2"></div>
+            <div class="fc-stack-bg fc-s1"></div>
+            <div class="fc-card" id="fcCard">
+              <div class="fc-emoji" id="fcEmoji">🔸</div>
+              <div class="fc-reading" id="fcReading"></div>
+              <div class="fc-word-reveal" id="fcWordReveal"></div>
+              <div class="fc-stack-badge" id="fcStackCount"></div>
+            </div>
+          </div>
+          <div class="fc-actions">
+            <button class="btn btn-outline-primary btn-bouncy" id="fcBtnListen">
+              <i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง
+            </button>
+            <button class="btn btn-warning btn-lg btn-bouncy" id="fcBtnSpeak">
+              🎤 พูดคำนี้!
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -208,7 +240,7 @@
 <script src="js/practice-panel.js"></script>
 <script src="js/main.js"></script>
 <script>
-/* ===== Global game-session state (reset each time a game starts) ===== */
+/* ===== Global game-session state ===== */
 var G = {
   mode: null, words: [], pts: 0, timeLeft: 60,
   paused: false, timerHandle: null,
@@ -241,21 +273,28 @@ function finishGame() {
   MatchingGame.stop();
   ShootingGame.stop();
   AirplaneGame.stop();
+  FlashcardGame.stop();
   var hs = G.highScores[G.mode] || 0;
-  if (G.pts > hs) { G.highScores[G.mode] = G.pts; localStorage.setItem('ghsv2', JSON.stringify(G.highScores)); }
+  if (G.pts > hs) {
+    G.highScores[G.mode] = G.pts;
+    localStorage.setItem('ghsv2', JSON.stringify(G.highScores));
+  }
   document.getElementById('finalPoints').textContent = G.pts;
   document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
   showScreen('screenFinish');
 }
 
 function startTimer(limit) {
-  G.timeLeft = limit;
-  document.getElementById('hudTimer').textContent = limit;
   clearInterval(G.timerHandle);
+  G.timeLeft = limit;
+  var timerEl = document.getElementById('hudTimer');
+  timerEl.textContent = limit;
+  timerEl.classList.remove('timer-urgent');
   G.timerHandle = setInterval(function () {
     if (G.paused) return;
     G.timeLeft--;
-    document.getElementById('hudTimer').textContent = G.timeLeft;
+    timerEl.textContent = G.timeLeft;
+    if (G.timeLeft <= 10) timerEl.classList.add('timer-urgent');
     if (G.timeLeft <= 0) finishGame();
   }, 1000);
 }
@@ -263,6 +302,7 @@ function startTimer(limit) {
 /* ===== Matching Game ===== */
 var MatchingGame = (function () {
   var cards, flipped, matchedPairs, totalPairs, locked;
+
   function init(words) {
     var n = Math.min(8, words.length);
     var pool = words.slice(0, n);
@@ -274,9 +314,8 @@ var MatchingGame = (function () {
     });
     deck.sort(function () { return Math.random() - 0.5; });
     cards = deck;
-    var cols = n <= 6 ? 4 : 4;
     var grid = document.getElementById('matchGrid');
-    grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    grid.style.gridTemplateColumns = 'repeat(4, 1fr)';
     grid.innerHTML = '';
     deck.forEach(function (card, i) {
       var el = document.createElement('div');
@@ -290,6 +329,7 @@ var MatchingGame = (function () {
       grid.appendChild(el);
     });
   }
+
   function onCard(i, el) {
     if (locked || G.paused || el.classList.contains('flipped') || el.classList.contains('matched')) return;
     el.classList.add('flipped');
@@ -298,6 +338,7 @@ var MatchingGame = (function () {
     locked = true;
     var a = flipped[0], b = flipped[1];
     if (cards[a.i].w.id === cards[b.i].w.id && cards[a.i].type !== cards[b.i].type) {
+      // Correct match
       a.el.classList.add('matched'); b.el.classList.add('matched');
       matchedPairs++;
       flipped = [];
@@ -306,12 +347,18 @@ var MatchingGame = (function () {
         if (matchedPairs >= totalPairs) setTimeout(finishGame, 400);
       });
     } else {
+      // Mismatch: shake both cards, then force pronunciation of first card's word
+      a.el.classList.add('mismatch'); b.el.classList.add('mismatch');
       setTimeout(function () {
-        a.el.classList.remove('flipped'); b.el.classList.remove('flipped');
-        flipped = []; locked = false;
-      }, 900);
+        a.el.classList.remove('mismatch'); b.el.classList.remove('mismatch');
+        openPractice(cards[a.i].w, null, function () {
+          a.el.classList.remove('flipped'); b.el.classList.remove('flipped');
+          flipped = []; locked = false;
+        });
+      }, 450);
     }
   }
+
   function stop() {}
   return { init: init, stop: stop };
 })();
@@ -329,15 +376,15 @@ var ShootingGame = (function () {
     ctx = canvas.getContext('2d');
     canvas.onclick = click; canvas.ontouchend = touch;
     spawn();
-    setTimeout(function(){ if(ctx) spawn(); }, 900);
-    setTimeout(function(){ if(ctx) spawn(); }, 1800);
-    setTimeout(function(){ if(ctx) spawn(); }, 2700);
+    setTimeout(function () { if (ctx) spawn(); }, 900);
+    setTimeout(function () { if (ctx) spawn(); }, 1800);
+    setTimeout(function () { if (ctx) spawn(); }, 2700);
     loop();
   }
 
   function spawn() {
     if (!words.length) return;
-    if (targets.filter(function(u){ return !u.done && !u.expired; }).length >= MAX_TARGETS) return;
+    if (targets.filter(function (u) { return !u.done && !u.expired; }).length >= MAX_TARGETS) return;
     var w = words[wIdx++ % words.length];
     var bx, t = 0;
     do { bx = 80 + Math.random() * (W - 160); t++; }
@@ -390,7 +437,6 @@ var ShootingGame = (function () {
     if (!ctx) return;
     var now = Date.now();
     drawBg();
-
     var toRemove = [];
     targets.forEach(function (t) {
       if (!t.hit && !t.expired) {
@@ -404,17 +450,13 @@ var ShootingGame = (function () {
       } else if (t.done || t.expired) {
         t.s = Math.max(0, t.s - 0.13);
       }
-      // hit but not done → stay at full size while practice panel is open
       if (t.s > 0) drawTarget(t, now);
       else if (t.done || t.expired) toRemove.push(t);
     });
-
     toRemove.forEach(function (t) {
       targets = targets.filter(function (u) { return u !== t; });
-      if (t.expired) delayedSpawn(400); // stagger replacement for expired targets
-      // done: replacement already queued in practice close callback
+      if (t.expired) delayedSpawn(400);
     });
-
     pops.forEach(function (p) {
       ctx.globalAlpha = p.life;
       ctx.font = 'bold 20px Prompt, sans-serif';
@@ -443,36 +485,30 @@ var ShootingGame = (function () {
     if (t.hit && !t.done) ctx.globalAlpha = 0.5;
     ctx.translate(t.x + shakeX, t.y);
     ctx.scale(t.s, t.s);
-    // Pole
     ctx.fillStyle = '#7d6b5a'; ctx.fillRect(-5, -90, 10, 90);
-    // Concentric rings (outer → inner)
-    [{ r:46,c:'#e74c3c'},{r:37,c:'#fff'},{r:27,c:'#2980b9'},{r:18,c:'#fff'},{r:10,c:'#f1c40f'}].forEach(function(rg){
-      ctx.beginPath(); ctx.arc(0,-90,rg.r,0,Math.PI*2);
-      ctx.fillStyle=rg.c; ctx.fill();
-      ctx.strokeStyle='rgba(0,0,0,0.1)'; ctx.lineWidth=1; ctx.stroke();
+    [{ r: 46, c: '#e74c3c' }, { r: 37, c: '#fff' }, { r: 27, c: '#2980b9' }, { r: 18, c: '#fff' }, { r: 10, c: '#f1c40f' }].forEach(function (rg) {
+      ctx.beginPath(); ctx.arc(0, -90, rg.r, 0, Math.PI * 2);
+      ctx.fillStyle = rg.c; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.stroke();
     });
-    // Crosshair
-    ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(-46,-90); ctx.lineTo(46,-90); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,-136); ctx.lineTo(0,-44); ctx.stroke();
-    // Word bubble
-    ctx.font='bold 14px Prompt,sans-serif'; ctx.textAlign='center';
-    var bw=Math.max(60,ctx.measureText(t.w.word).width+18);
-    ctx.fillStyle=t.hit?'#ddd':'#fff';
-    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(-bw/2,-158,bw,28,6);ctx.fill();}
-    else{ctx.fillRect(-bw/2,-158,bw,28);}
-    ctx.fillStyle='#2b2438'; ctx.fillText(t.w.word,0,-137);
-    if(t.w.emoji){ctx.font='20px serif';ctx.fillText(t.w.emoji,0,-170);}
-    // Countdown ring
-    if(!t.hit&&!t.expired){
-      var frac=timeLeft/5;
-      ctx.strokeStyle=frac>0.5?'#27ae60':frac>0.25?'#f39c12':'#e74c3c';
-      ctx.lineWidth=5; ctx.lineCap='round';
-      ctx.beginPath(); ctx.arc(0,-90,60,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-46, -90); ctx.lineTo(46, -90); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -136); ctx.lineTo(0, -44); ctx.stroke();
+    ctx.font = 'bold 14px Prompt,sans-serif'; ctx.textAlign = 'center';
+    var bw = Math.max(60, ctx.measureText(t.w.word).width + 18);
+    ctx.fillStyle = t.hit ? '#ddd' : '#fff';
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(-bw / 2, -158, bw, 28, 6); ctx.fill(); }
+    else { ctx.fillRect(-bw / 2, -158, bw, 28); }
+    ctx.fillStyle = '#2b2438'; ctx.fillText(t.w.word, 0, -137);
+    if (t.w.emoji) { ctx.font = '20px serif'; ctx.fillText(t.w.emoji, 0, -170); }
+    if (!t.hit && !t.expired) {
+      var frac = timeLeft / 5;
+      ctx.strokeStyle = frac > 0.5 ? '#27ae60' : frac > 0.25 ? '#f39c12' : '#e74c3c';
+      ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, -90, 60, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
     }
-    // Mic icon while being practiced
-    if(t.hit&&!t.done){ctx.font='26px serif';ctx.fillText('🎤',0,-82);}
-    ctx.globalAlpha=1; ctx.restore();
+    if (t.hit && !t.done) { ctx.font = '26px serif'; ctx.fillText('🎤', 0, -82); }
+    ctx.globalAlpha = 1; ctx.restore();
   }
 
   function stop() {
@@ -496,7 +532,7 @@ var AirplaneGame = (function () {
     for (var i = 0; i < 5; i++) clouds.push({ x: 60 + Math.random() * W * 1.8, y: 25 + Math.random() * 110, rw: 65 + Math.random() * 70, spd: 0.6 + Math.random() * 0.7 });
     var canvas = document.getElementById('airCanvas');
     ctx = canvas.getContext('2d');
-    canvas.onclick = flap; canvas.ontouchend = function(e){ e.preventDefault(); flap(); };
+    canvas.onclick = flap; canvas.ontouchend = function (e) { e.preventDefault(); flap(); };
     spawnBubble(); spawnBubble();
     loop();
   }
@@ -513,24 +549,21 @@ var AirplaneGame = (function () {
     if (!G.paused) {
       scrollT++;
       progress = Math.min(TOTAL, progress + 2);
-      // Gravity physics
       planeVY += GRAVITY;
       planeY += planeVY;
       if (planeY >= GROUND - 28) { planeY = GROUND - 28; planeVY = 0; }
       if (planeY < 18) { planeY = 18; planeVY = 0; }
-      // Move clouds and bubbles
-      clouds.forEach(function(c){ c.x -= c.spd; if(c.x < -c.rw-40) c.x = W + c.rw; });
-      bubbles.forEach(function(b){ if(!b.hit) b.x -= 2.2; });
-      bubbles = bubbles.filter(function(b){ return b.x > -80; });
-      // Auto-collide with bubbles (plane hits bubble = practice opens)
+      clouds.forEach(function (c) { c.x -= c.spd; if (c.x < -c.rw - 40) c.x = W + c.rw; });
+      bubbles.forEach(function (b) { if (!b.hit) b.x -= 2.2; });
+      bubbles = bubbles.filter(function (b) { return b.x > -80; });
       for (var i = bubbles.length - 1; i >= 0; i--) {
         var b = bubbles[i];
         if (b.hit) continue;
         var dx = PLANE_X - b.x, dy = planeY - b.y;
-        if (dx*dx + dy*dy < 46*46) {
+        if (dx * dx + dy * dy < 46 * 46) {
           b.hit = true;
-          openPractice(b.w, null, function(){
-            bubbles = bubbles.filter(function(u){ return !u.hit; });
+          openPractice(b.w, null, function () {
+            bubbles = bubbles.filter(function (u) { return !u.hit; });
             spawnBubble();
           });
           break;
@@ -544,27 +577,26 @@ var AirplaneGame = (function () {
   }
 
   function draw() {
-    var g = ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#87ceeb'); g.addColorStop(1,'#c5e8f7');
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-    clouds.forEach(function(c){
-      ctx.fillStyle='rgba(255,255,255,0.85)';
-      ctx.beginPath(); ctx.ellipse(c.x,c.y,c.rw,25,0,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x-c.rw*0.35,c.y+10,c.rw*0.55,20,0,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x+c.rw*0.3,c.y+8,c.rw*0.5,18,0,0,Math.PI*2); ctx.fill();
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#87ceeb'); g.addColorStop(1, '#c5e8f7');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    clouds.forEach(function (c) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rw, 25, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x - c.rw * 0.35, c.y + 10, c.rw * 0.55, 20, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x + c.rw * 0.3, c.y + 8, c.rw * 0.5, 18, 0, 0, Math.PI * 2); ctx.fill();
     });
-    ctx.fillStyle='#5dba5d'; ctx.fillRect(0,GROUND,W,H-GROUND);
-    var pw=(progress/TOTAL)*(W-40);
-    ctx.fillStyle='#ddd'; ctx.fillRect(20,H-15,W-40,7);
-    ctx.fillStyle='#2ec4b6'; ctx.fillRect(20,H-15,pw,7);
-    ctx.font='16px serif'; ctx.fillText('🏁',18+pw,H-6);
+    ctx.fillStyle = '#5dba5d'; ctx.fillRect(0, GROUND, W, H - GROUND);
+    var pw = (progress / TOTAL) * (W - 40);
+    ctx.fillStyle = '#ddd'; ctx.fillRect(20, H - 15, W - 40, 7);
+    ctx.fillStyle = '#2ec4b6'; ctx.fillRect(20, H - 15, pw, 7);
+    ctx.font = '16px serif'; ctx.fillText('🏁', 18 + pw, H - 6);
     bubbles.forEach(drawBubble);
     drawPlane(PLANE_X, planeY, planeVY);
-    // Tap hint at start
     if (scrollT < 80) {
-      ctx.fillStyle='rgba(43,36,56,0.55)';
-      ctx.font='bold 18px Prompt,sans-serif'; ctx.textAlign='center';
-      ctx.fillText('แตะหน้าจอเพื่อบินขึ้น! ✈️', W/2, 45);
+      ctx.fillStyle = 'rgba(43,36,56,0.55)';
+      ctx.font = 'bold 18px Prompt,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('แตะหน้าจอเพื่อบินขึ้น! ✈️', W / 2, 45);
     }
   }
 
@@ -572,21 +604,21 @@ var AirplaneGame = (function () {
     ctx.save(); ctx.translate(x, y);
     var tilt = Math.max(-0.45, Math.min(0.45, vy * 0.05));
     ctx.rotate(tilt);
-    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(0,0,42,14,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#2ec4b6';
-    ctx.beginPath(); ctx.moveTo(5,-2); ctx.lineTo(-12,-26); ctx.lineTo(22,-2); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-30,2); ctx.lineTo(-42,-12); ctx.lineTo(-26,2); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#87ceeb'; ctx.beginPath(); ctx.ellipse(12,-4,8,6,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#ff9f1c'; ctx.beginPath(); ctx.moveTo(42,0); ctx.lineTo(54,-3); ctx.lineTo(42,-8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, 42, 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2ec4b6';
+    ctx.beginPath(); ctx.moveTo(5, -2); ctx.lineTo(-12, -26); ctx.lineTo(22, -2); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-30, 2); ctx.lineTo(-42, -12); ctx.lineTo(-26, 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#87ceeb'; ctx.beginPath(); ctx.ellipse(12, -4, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff9f1c'; ctx.beginPath(); ctx.moveTo(42, 0); ctx.lineTo(54, -3); ctx.lineTo(42, -8); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
   function drawBubble(b) {
     ctx.save(); ctx.translate(b.x, b.y);
-    ctx.fillStyle='rgba(255,255,255,0.93)'; ctx.strokeStyle='#2ec4b6'; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(0,0,32,0,Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.font='17px serif'; ctx.textAlign='center'; ctx.fillText(b.w.emoji||'🔸',0,-5);
-    ctx.font='bold 11px Prompt,sans-serif'; ctx.fillStyle='#2b2438'; ctx.fillText(b.w.word,0,12);
+    ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.strokeStyle = '#2ec4b6'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, 32, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.font = '17px serif'; ctx.textAlign = 'center'; ctx.fillText(b.w.emoji || '🔸', 0, -5);
+    ctx.font = 'bold 11px Prompt,sans-serif'; ctx.fillStyle = '#2b2438'; ctx.fillText(b.w.word, 0, 12);
     ctx.restore();
   }
 
@@ -598,12 +630,87 @@ var AirplaneGame = (function () {
   return { start: start, stop: stop };
 })();
 
+/* ===== Flashcard Game ===== */
+var FlashcardGame = (function () {
+  var pool, idx, doneCount, currentWord;
+  var MAX_CARDS = 15;
+
+  function start(ws) {
+    pool = ws.slice(0, MAX_CARDS);
+    pool.sort(function () { return Math.random() - 0.5; });
+    idx = 0; doneCount = 0;
+    showCard();
+  }
+
+  function showCard() {
+    if (!pool || idx >= pool.length) {
+      setTimeout(finishGame, 600);
+      return;
+    }
+    currentWord = pool[idx++];
+    document.getElementById('fcEmoji').textContent = currentWord.emoji || '🔸';
+    document.getElementById('fcReading').textContent = currentWord.reading;
+    var revealEl = document.getElementById('fcWordReveal');
+    revealEl.textContent = '';
+    revealEl.style.opacity = '0';
+    var remaining = pool.length - idx;
+    document.getElementById('fcStackCount').textContent = remaining > 0 ? remaining + ' ใบ' : 'ใบสุดท้าย!';
+    document.getElementById('fcBtnSpeak').disabled = false;
+    document.getElementById('fcBtnListen').disabled = false;
+    updateProgress();
+    // Animate card in
+    var card = document.getElementById('fcCard');
+    card.classList.remove('fc-enter', 'fc-exit');
+    void card.offsetWidth; // force reflow
+    card.classList.add('fc-enter');
+    setTimeout(function () { card.classList.remove('fc-enter'); }, 500);
+  }
+
+  function practice() {
+    if (!currentWord) return;
+    document.getElementById('fcBtnSpeak').disabled = true;
+    document.getElementById('fcBtnListen').disabled = true;
+    openPractice(currentWord, null, function () {
+      doneCount++;
+      updateProgress();
+      // Briefly show the Thai word text as confirmation
+      var revealEl = document.getElementById('fcWordReveal');
+      revealEl.textContent = currentWord.word;
+      revealEl.style.opacity = '1';
+      // Animate card out then advance
+      var card = document.getElementById('fcCard');
+      setTimeout(function () {
+        card.classList.add('fc-exit');
+        revealEl.style.opacity = '0';
+        setTimeout(function () {
+          card.classList.remove('fc-exit');
+          showCard();
+        }, 400);
+      }, 750);
+    });
+  }
+
+  function speak() {
+    if (currentWord) SpeechTool.speak(currentWord.word);
+  }
+
+  function updateProgress() {
+    if (!pool) return;
+    document.getElementById('fcProgressText').textContent = doneCount + ' / ' + pool.length;
+    document.getElementById('fcProgressFill').style.width = (doneCount / pool.length * 100) + '%';
+  }
+
+  function stop() { currentWord = null; pool = null; }
+
+  return { start: start, stop: stop, practice: practice, speak: speak };
+})();
+
 /* ===== Setup overlay helpers ===== */
 var _allWords = [], _setupMode = null, _setupCam = null;
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️' };
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴' };
   document.getElementById('setupModeName').textContent = names[mode];
   populateWordSets('easy');
   startSetupCam();
@@ -647,30 +754,30 @@ function launchGame() {
 
   G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false;
   document.getElementById('hudPoints').textContent = 0;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️' };
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴' };
   document.getElementById('hudModeName').textContent = names[G.mode];
 
-  ['matchingGame','shootingGame','airplaneGame'].forEach(function (id) { document.getElementById(id).style.display = 'none'; });
+  ['matchingGame', 'shootingGame', 'airplaneGame', 'flashcardGame'].forEach(function (id) {
+    document.getElementById(id).style.display = 'none';
+  });
   showScreen('screenGame');
 
-  var limit = G.mode === 'matching' ? 120 : 60;
+  var limit = G.mode === 'matching' ? 120 : G.mode === 'flashcard' ? 180 : 60;
   startTimer(limit);
 
-  if (G.mode === 'matching') { document.getElementById('matchingGame').style.display = 'block'; MatchingGame.init(pool); }
-  else if (G.mode === 'shooting') { document.getElementById('shootingGame').style.display = 'block'; ShootingGame.start(pool); }
-  else { document.getElementById('airplaneGame').style.display = 'block'; AirplaneGame.start(pool); }
-}
-
-function startTimer(limit) {
-  clearInterval(G.timerHandle);
-  G.timeLeft = limit;
-  document.getElementById('hudTimer').textContent = limit;
-  G.timerHandle = setInterval(function () {
-    if (G.paused) return;
-    G.timeLeft--;
-    document.getElementById('hudTimer').textContent = G.timeLeft;
-    if (G.timeLeft <= 0) finishGame();
-  }, 1000);
+  if (G.mode === 'matching') {
+    document.getElementById('matchingGame').style.display = 'block';
+    MatchingGame.init(pool);
+  } else if (G.mode === 'shooting') {
+    document.getElementById('shootingGame').style.display = 'block';
+    ShootingGame.start(pool);
+  } else if (G.mode === 'flashcard') {
+    document.getElementById('flashcardGame').style.display = 'block';
+    FlashcardGame.start(pool);
+  } else {
+    document.getElementById('airplaneGame').style.display = 'block';
+    AirplaneGame.start(pool);
+  }
 }
 
 /* ===== Page init ===== */
@@ -681,6 +788,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardMatching').addEventListener('click', function () { openSetup('matching'); });
   document.getElementById('cardShooting').addEventListener('click', function () { openSetup('shooting'); });
   document.getElementById('cardAirplane').addEventListener('click', function () { openSetup('airplane'); });
+  document.getElementById('cardFlashcard').addEventListener('click', function () { openSetup('flashcard'); });
+
+  document.getElementById('fcBtnSpeak').addEventListener('click', function () { FlashcardGame.practice(); });
+  document.getElementById('fcBtnListen').addEventListener('click', function () { FlashcardGame.speak(); });
 
   document.querySelectorAll('.diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -690,11 +801,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   });
 
-  document.getElementById('btnSetupCancel').addEventListener('click', function () { stopSetupCam(); document.getElementById('screenSetup').style.display = 'none'; });
+  document.getElementById('btnSetupCancel').addEventListener('click', function () {
+    stopSetupCam();
+    document.getElementById('screenSetup').style.display = 'none';
+  });
   document.getElementById('btnSetupStart').addEventListener('click', launchGame);
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });

@@ -985,3 +985,149 @@ a {
   box-shadow: var(--shadow-soft);
   z-index: 5;
 }
+
+/* ============ Flashcard game ============ */
+.flashcard-arena {
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 1rem 0 2rem;
+}
+.fc-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.fc-progress-text {
+  font-weight: 700;
+  color: var(--color-text-soft);
+  min-width: 55px;
+  font-size: 0.9rem;
+  text-align: left;
+}
+.fc-progress-bar {
+  flex: 1;
+  height: 10px;
+  background: #e0d6f5;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.fc-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent-purple));
+  border-radius: 5px;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+.fc-stage {
+  position: relative;
+  height: 240px;
+  margin-bottom: 2rem;
+}
+.fc-stack-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 280px;
+  height: 180px;
+  border-radius: 20px;
+}
+.fc-s2 {
+  transform: translate(-50%, -50%) rotate(6deg);
+  background: #ddd5ee;
+  border: 2px solid #c8b8e8;
+}
+.fc-s1 {
+  transform: translate(-50%, -50%) rotate(3deg);
+  background: #e6ddf7;
+  border: 2px solid #d0c0ec;
+}
+.fc-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 180px;
+  border-radius: 20px;
+  background: #fff;
+  border: 3px solid var(--color-accent-purple);
+  box-shadow: 0 10px 30px rgba(138, 92, 246, 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 1rem;
+}
+.fc-emoji { font-size: 3.5rem; line-height: 1; }
+.fc-reading { font-size: 1.15rem; font-weight: 700; color: var(--color-accent-purple); }
+.fc-word-reveal {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-success);
+  min-height: 1.8rem;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+.fc-stack-badge {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: var(--color-accent-purple);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.5rem;
+}
+.fc-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+@keyframes fcCardEnter {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.82); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes fcCardExit {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -65%) scale(0.88); }
+}
+.fc-card.fc-enter { animation: fcCardEnter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.fc-card.fc-exit  { animation: fcCardExit 0.35s ease forwards; }
+
+/* ============ Polish: timer urgency ============ */
+#hudTimer.timer-urgent {
+  color: var(--color-danger);
+  display: inline-block;
+  animation: timerUrgentPulse 0.7s ease infinite;
+}
+@keyframes timerUrgentPulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.25); }
+}
+
+/* ============ Polish: matching mismatch shake ============ */
+@keyframes cardShake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-7px); }
+  40%       { transform: translateX(7px); }
+  60%       { transform: translateX(-5px); }
+  80%       { transform: translateX(4px); }
+}
+.match-card.mismatch { animation: cardShake 0.45s ease; }
+
+/* ============ Polish: matching card bounce on match ============ */
+@keyframes matchedBounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.1); }
+  70%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+.match-card.matched {
+  animation: matchedBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
+}
