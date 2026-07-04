@@ -908,6 +908,16 @@ a {
   margin: 1rem 0;
 }
 
+.mouth-animation-box {
+  width: 220px;
+  height: 220px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+
 .mouth-diagram-box {
   width: 220px;
   height: 220px;
