@@ -3,7 +3,7 @@ const PracticePanel = (function () {
   // Files live in MouthAnimation/ and are referenced as <img> so CSS
   // animations inside the SVG are isolated and always play in Chrome.
   const MOUTH_ANIMATIONS = {
-    por: '<img src="MouthAnimation/por.svg" alt="ปากเสียง ป" style="width:100%;height:100%;display:block;">'
+    por: '<img src="MouthAnimation/PouFish.gif" alt="ปากเสียง ป" style="width:100%;height:100%;display:block;">'
   };
 
   // Placeholder mouth-position references, keyed by exercise_code.
