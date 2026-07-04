@@ -40,6 +40,25 @@
 <main class="py-5">
   <div class="container" style="max-width:480px;">
     <div class="soft-card">
+      <!-- shown only when user arrives via password-reset email -->
+      <div id="resetSection" style="display:none;">
+        <h2 class="h4 text-center mb-4">ตั้งรหัสผ่านใหม่</h2>
+        <form id="resetForm">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">รหัสผ่านใหม่</label>
+            <input type="password" class="form-control" id="resetPassword" required minlength="6">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">ยืนยันรหัสผ่านใหม่</label>
+            <input type="password" class="form-control" id="resetPasswordConfirm" required minlength="6">
+          </div>
+          <div class="alert alert-danger" id="resetError" style="display:none;"></div>
+          <div class="alert alert-success" id="resetSuccess" style="display:none;"></div>
+          <button type="submit" class="btn btn-warning btn-lg w-100 btn-bouncy">บันทึกรหัสผ่านใหม่</button>
+        </form>
+      </div>
+
+      <div id="loginRegisterTabs">
       <ul class="nav nav-pills justify-content-center mb-4 gap-2" id="authTabs">
         <li class="nav-item">
           <button class="nav-link active" id="tabLoginBtn" data-bs-toggle="pill" data-bs-target="#tabLogin" type="button">เข้าสู่ระบบ</button>
@@ -63,7 +82,23 @@
             </div>
             <div class="alert alert-danger" id="loginError" style="display:none;"></div>
             <button type="submit" class="btn btn-warning btn-lg w-100 btn-bouncy">เข้าสู่ระบบ</button>
+            <div class="text-center mt-3">
+              <button type="button" class="btn btn-link btn-sm p-0 text-muted" id="forgotToggle">ลืมรหัสผ่าน?</button>
+            </div>
           </form>
+
+          <div id="forgotSection" style="display:none;" class="mt-3 border-top pt-3">
+            <p class="small text-muted mb-2">กรอกอีเมลที่ลงทะเบียนไว้ เราจะส่งลิงก์รีเซ็ตรหัสผ่านให้</p>
+            <form id="forgotForm">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">อีเมล</label>
+                <input type="email" class="form-control" id="forgotEmail" required>
+              </div>
+              <div class="alert alert-danger" id="forgotError" style="display:none;"></div>
+              <div class="alert alert-success" id="forgotSuccess" style="display:none;"></div>
+              <button type="submit" class="btn btn-outline-secondary w-100">ส่งลิงก์รีเซ็ตรหัสผ่าน</button>
+            </form>
+          </div>
         </div>
 
         <div class="tab-pane fade" id="tabRegister">
@@ -100,6 +135,7 @@
           </form>
         </div>
       </div>
+      </div><!-- /loginRegisterTabs -->
     </div>
   </div>
 </main>
@@ -140,12 +176,74 @@
   const redirectTarget = new URLSearchParams(location.search).get("redirect") || "index.html";
 
   document.addEventListener("DOMContentLoaded", async function () {
+    // Check if this is a password-reset redirect (Supabase puts type=recovery in the URL hash)
+    const hashParams = new URLSearchParams(location.hash.slice(1));
+    if (hashParams.get("type") === "recovery") {
+      document.getElementById("loginRegisterTabs").style.display = "none";
+      document.getElementById("resetSection").style.display = "block";
+      return;
+    }
+
     const session = await Auth.getSession();
     if (session) {
       location.href = redirectTarget;
       return;
     }
     Auth.initNav();
+  });
+
+  // Toggle forgot-password section
+  document.getElementById("forgotToggle").addEventListener("click", function () {
+    const sec = document.getElementById("forgotSection");
+    const visible = sec.style.display !== "none";
+    sec.style.display = visible ? "none" : "block";
+    if (!visible) document.getElementById("forgotEmail").focus();
+  });
+
+  // Send reset email
+  document.getElementById("forgotForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const errEl = document.getElementById("forgotError");
+    const okEl = document.getElementById("forgotSuccess");
+    errEl.style.display = "none";
+    okEl.style.display = "none";
+    const email = document.getElementById("forgotEmail").value.trim();
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.origin + location.pathname
+    });
+    if (error) {
+      errEl.textContent = "ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่";
+      errEl.style.display = "block";
+      return;
+    }
+    okEl.textContent = "ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ " + email + " แล้ว กรุณาตรวจสอบกล่องจดหมาย";
+    okEl.style.display = "block";
+    document.getElementById("forgotForm").reset();
+  });
+
+  // Set new password (recovery flow)
+  document.getElementById("resetForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const errEl = document.getElementById("resetError");
+    const okEl = document.getElementById("resetSuccess");
+    errEl.style.display = "none";
+    okEl.style.display = "none";
+    const pwd = document.getElementById("resetPassword").value;
+    const confirm = document.getElementById("resetPasswordConfirm").value;
+    if (pwd !== confirm) {
+      errEl.textContent = "รหัสผ่านทั้งสองช่องไม่ตรงกัน";
+      errEl.style.display = "block";
+      return;
+    }
+    const { error } = await sb.auth.updateUser({ password: pwd });
+    if (error) {
+      errEl.textContent = "เปลี่ยนรหัสผ่านไม่สำเร็จ ลิงก์อาจหมดอายุ กรุณาขอลิงก์ใหม่";
+      errEl.style.display = "block";
+      return;
+    }
+    okEl.textContent = "เปลี่ยนรหัสผ่านสำเร็จ กำลังพาไปหน้าหลัก...";
+    okEl.style.display = "block";
+    setTimeout(function () { location.href = redirectTarget; }, 1800);
   });
 
   document.getElementById("loginForm").addEventListener("submit", async function (e) {
