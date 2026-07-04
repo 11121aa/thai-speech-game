@@ -1,0 +1,72 @@
+<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .lip-up { animation: lu 2.4s ease-in-out infinite; }
+    .lip-dn { animation: ld 2.4s ease-in-out infinite; }
+    .puff   { opacity: 0; animation: pf 2.4s linear infinite; }
+
+    @keyframes lu {
+      0%, 18%  { transform: translateY(0px); }
+      30%, 52% { transform: translateY(16px); }
+      65%,100% { transform: translateY(0px); }
+    }
+    @keyframes ld {
+      0%, 18%  { transform: translateY(0px); }
+      30%, 52% { transform: translateY(-16px); }
+      65%,100% { transform: translateY(0px); }
+    }
+    @keyframes pf {
+      0%,55%,80%,100% { opacity: 0; }
+      60%,75%         { opacity: 1; }
+    }
+  </style>
+
+  <!-- Background -->
+  <rect width="220" height="220" fill="#fdf4ec" rx="14"/>
+
+  <!-- Nose + face outline (static) -->
+  <path d="M45,16 C43,28 37,50 34,68 C32,82 37,93 46,100 C50,104 56,107 60,108"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Upper lip (animates DOWN to close) -->
+  <path class="lip-up"
+        d="M60,108 C82,106 112,105 142,108 C156,110 166,114 173,119"
+        fill="none" stroke="#c0392b" stroke-width="6.5" stroke-linecap="round"/>
+
+  <!-- Palate (static) -->
+  <path d="M58,122 C84,126 118,129 150,130 C163,130 172,130 177,130"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+
+  <!-- Lower lip (animates UP to close) -->
+  <path class="lip-dn"
+        d="M58,132 C84,130 118,129 150,132 C164,134 174,137 180,141"
+        fill="none" stroke="#c0392b" stroke-width="6.5" stroke-linecap="round"/>
+
+  <!-- Tongue (static) -->
+  <path d="M56,158 C78,150 110,146 146,149 C162,151 173,156 179,163"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+
+  <!-- Lower jaw (static) -->
+  <path d="M52,183 C76,177 124,173 165,174"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+
+  <!-- Pharynx walls (static) -->
+  <path d="M177,130 C176,154 176,172 175,190"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M190,118 C189,142 189,165 188,192"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M177,130 C182,125 186,121 190,118"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+
+  <!-- Air puff (appears at release) -->
+  <g class="puff">
+    <path d="M46,113 C34,111 22,109 10,107"
+          fill="none" stroke="#2980b9" stroke-width="4" stroke-linecap="round" stroke-dasharray="7 5"/>
+    <path d="M46,119 C32,120 18,122 8,122"
+          fill="none" stroke="#2980b9" stroke-width="4" stroke-linecap="round" stroke-dasharray="7 5"/>
+    <path d="M50,125 C36,128 20,130 6,132"
+          fill="none" stroke="#2980b9" stroke-width="4" stroke-linecap="round" stroke-dasharray="7 5"/>
+  </g>
+
+  <!-- Label -->
+  <text x="8" y="212" font-family="Prompt,sans-serif" font-size="12" fill="#bbb">เสียง ป</text>
+</svg>

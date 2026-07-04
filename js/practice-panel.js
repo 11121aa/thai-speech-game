@@ -1,51 +1,9 @@
 const PracticePanel = (function () {
-  // SVG mouth animations keyed by exercise_code.
-  // Each SVG loops showing how the mouth moves to produce that sound.
+  // Mouth animation img tags keyed by exercise_code.
+  // Files live in MouthAnimation/ and are referenced as <img> so CSS
+  // animations inside the SVG are isolated and always play in Chrome.
   const MOUTH_ANIMATIONS = {
-    por: `<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
-  <style>
-    .lip-up{animation:lu 2.5s ease-in-out infinite}
-    .lip-dn{animation:ld 2.5s ease-in-out infinite}
-    .puff{opacity:0;animation:pf 2.5s linear infinite}
-    @keyframes lu{0%,100%{transform:translateY(0)}28%,60%{transform:translateY(10px)}}
-    @keyframes ld{0%,100%{transform:translateY(0)}28%,60%{transform:translateY(-10px)}}
-    @keyframes pf{0%,60%,78%,100%{opacity:0}64%,74%{opacity:1}}
-  </style>
-  <rect width="220" height="220" fill="#fdf4ec" rx="14"/>
-  <!-- Nose (static) -->
-  <path d="M45,16 C43,28 37,50 34,68 C32,82 37,93 46,100 C50,104 56,107 60,108"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Upper lip only (animates down) -->
-  <path class="lip-up"
-        d="M60,108 C82,106 112,105 142,108 C156,110 166,114 173,119"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <!-- Palate (static) -->
-  <path d="M58,122 C84,126 118,129 150,130 C163,130 172,130 177,130"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <!-- Lower lip only (animates up) -->
-  <path class="lip-dn"
-        d="M58,132 C84,130 118,129 150,132 C164,134 174,137 180,141"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <!-- Tongue (static) -->
-  <path d="M56,158 C78,150 110,146 146,149 C162,151 173,156 179,163"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <!-- Lower jaw (static) -->
-  <path d="M52,183 C76,177 124,173 165,174"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <!-- Pharynx (static) -->
-  <path d="M177,130 C176,154 176,172 175,190"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <path d="M190,118 C189,142 189,165 188,192"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <path d="M177,130 C182,125 186,121 190,118"
-        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <!-- Air puff at release -->
-  <g class="puff">
-    <path d="M46,113 C34,111 22,109 10,107" fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="7 5"/>
-    <path d="M46,119 C32,120 18,122 8,122" fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="7 5"/>
-  </g>
-  <text x="8" y="212" font-family="Prompt,sans-serif" font-size="12" fill="#bbb">เสียง ป</text>
-</svg>`
+    por: '<img src="MouthAnimation/por.svg" alt="ปากเสียง ป" style="width:100%;height:100%;display:block;">'
   };
 
   // Placeholder mouth-position references, keyed by exercise_code.
