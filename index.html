@@ -50,46 +50,101 @@
             <a href="app.html" class="btn btn-warning btn-lg btn-bouncy"><i class="bi bi-mic-fill me-2"></i>เริ่มฝึกออกเสียงเลย</a>
             <a href="about.html" class="btn btn-outline-primary btn-lg btn-bouncy">เรียนรู้เพิ่มเติม</a>
           </div>
-          <div class="d-flex gap-4 mt-5 flex-wrap">
-            <div><strong style="font-size:1.6rem;color:var(--color-primary-dark);">449</strong><div class="text-secondary">คำศัพท์ฝึกพูด</div></div>
-            <div><strong style="font-size:1.6rem;color:var(--color-primary-dark);">21</strong><div class="text-secondary">หมวดกลุ่มเสียง</div></div>
-            <div><strong style="font-size:1.6rem;color:var(--color-primary-dark);">4-7</strong><div class="text-secondary">ขวบ เหมาะกับวัย</div></div>
+          <div class="d-flex gap-3 mt-5 flex-wrap">
+            <div class="hero-stat-pill">
+              <strong style="color:var(--color-primary-dark);">449</strong>
+              <span>คำศัพท์</span>
+            </div>
+            <div class="hero-stat-pill">
+              <strong style="color:var(--color-accent-purple);">21</strong>
+              <span>กลุ่มเสียง</span>
+            </div>
+            <div class="hero-stat-pill">
+              <strong style="color:var(--color-secondary-dark);">4–7</strong>
+              <span>ขวบ</span>
+            </div>
           </div>
         </div>
         <div class="col-lg-6">
           <svg viewBox="0 0 560 480" class="img-fluid" role="img" aria-label="ภาพประกอบเด็กกำลังพูดผ่านไมโครโฟนพร้อมคลื่นเสียง">
-            <circle cx="460" cy="90" r="120" fill="#2ec4b6" opacity="0.15"/>
-            <circle cx="70" cy="380" r="140" fill="#ff6b9d" opacity="0.12"/>
-            <circle cx="480" cy="420" r="70" fill="#ffce54" opacity="0.18"/>
-            <ellipse cx="280" cy="430" rx="230" ry="34" fill="#bdeefe"/>
-            <path d="M 330 150 A 70 70 0 0 1 330 290" stroke="#2ec4b6" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.85"/>
-            <path d="M 350 120 A 110 110 0 0 1 350 320" stroke="#2ec4b6" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.55"/>
-            <path d="M 370 90 A 150 150 0 0 1 370 350" stroke="#2ec4b6" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.3"/>
-            <rect x="262" y="250" width="14" height="120" rx="6" fill="#cfd8e3"/>
-            <ellipse cx="269" cy="372" rx="40" ry="10" fill="#cfd8e3"/>
-            <rect x="232" y="150" width="74" height="110" rx="37" fill="#8a5cf6"/>
-            <rect x="244" y="166" width="50" height="10" rx="5" fill="#ffffff" opacity="0.5"/>
-            <rect x="244" y="184" width="50" height="10" rx="5" fill="#ffffff" opacity="0.5"/>
-            <rect x="244" y="202" width="50" height="10" rx="5" fill="#ffffff" opacity="0.5"/>
-            <path d="M 90 430 C 90 330 150 280 210 280 C 270 280 330 330 330 430 Z" fill="#ff9f1c"/>
-            <path d="M 220 320 C 250 300 250 280 245 255" stroke="#ff9f1c" stroke-width="22" fill="none" stroke-linecap="round"/>
-            <circle cx="190" cy="230" r="78" fill="#ffd9b3"/>
-            <path d="M 112 215 C 105 150 270 140 268 215 C 250 180 130 180 112 215 Z" fill="#4a3728"/>
-            <circle cx="116" cy="232" r="14" fill="#ffd9b3"/>
-            <circle cx="264" cy="232" r="14" fill="#ffd9b3"/>
-            <circle cx="150" cy="252" r="11" fill="#ff9f9f" opacity="0.5"/>
-            <circle cx="230" cy="252" r="11" fill="#ff9f9f" opacity="0.5"/>
-            <circle cx="158" cy="222" r="9" fill="#2b2438"/>
-            <circle cx="222" cy="222" r="9" fill="#2b2438"/>
-            <circle cx="161" cy="218" r="3" fill="#ffffff"/>
-            <circle cx="225" cy="218" r="3" fill="#ffffff"/>
-            <path d="M 165 252 Q 190 272 215 252" stroke="#2b2438" stroke-width="6" fill="none" stroke-linecap="round"/>
-            <path d="M470 200 l6 14 15 2 -11 10 3 15 -13 -8 -13 8 3 -15 -11 -10 15 -2 z" fill="#ffce54"/>
-            <path d="M70 130 l5 11 12 2 -9 8 2 12 -10 -6 -10 6 2 -12 -9 -8 12 -2 z" fill="#ff6b9d"/>
-            <path d="M500 330 l4 9 10 1 -7 7 2 10 -9 -5 -9 5 2 -10 -7 -7 10 -1 z" fill="#2ec4b6"/>
+            <style>
+              .float1{animation:fl1 3s ease-in-out infinite}
+              .float2{animation:fl2 3.5s ease-in-out infinite}
+              .float3{animation:fl3 2.8s ease-in-out infinite}
+              @keyframes fl1{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+              @keyframes fl2{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+              @keyframes fl3{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+            </style>
+            <!-- Background blobs -->
+            <circle cx="460" cy="90"  r="130" fill="#2ec4b6" opacity="0.14"/>
+            <circle cx="70"  cy="380" r="150" fill="#ff6b9d" opacity="0.11"/>
+            <circle cx="490" cy="420" r="80"  fill="#ffce54" opacity="0.17"/>
+            <!-- Ground shadow -->
+            <ellipse cx="280" cy="432" rx="240" ry="36" fill="#bdeefe"/>
+
+            <!-- Sound waves -->
+            <path d="M 330 155 A 68 68 0 0 1 330 285" stroke="#2ec4b6" stroke-width="9" fill="none" stroke-linecap="round" opacity="0.85"/>
+            <path d="M 352 122 A 112 112 0 0 1 352 318" stroke="#2ec4b6" stroke-width="9" fill="none" stroke-linecap="round" opacity="0.5"/>
+            <path d="M 374 90"  stroke="#2ec4b6" stroke-width="9" fill="none" opacity="0"/>
+
+            <!-- Mic stand -->
+            <rect x="262" y="250" width="15" height="125" rx="7" fill="#c0cad6"/>
+            <ellipse cx="269" cy="377" rx="42" ry="11" fill="#c0cad6"/>
+            <!-- Mic body -->
+            <rect x="232" y="148" width="76" height="114" rx="38" fill="#8a5cf6"/>
+            <rect x="244" y="166" width="52" height="11" rx="5" fill="#fff" opacity="0.45"/>
+            <rect x="244" y="185" width="52" height="11" rx="5" fill="#fff" opacity="0.45"/>
+            <rect x="244" y="204" width="52" height="11" rx="5" fill="#fff" opacity="0.45"/>
+
+            <!-- Child body -->
+            <path d="M 90 432 C 90 328 148 276 210 276 C 272 276 332 328 332 432 Z" fill="#ff9f1c"/>
+            <!-- Arm holding mic -->
+            <path d="M 222 318 C 252 298 252 278 248 252" stroke="#ff9f1c" stroke-width="24" fill="none" stroke-linecap="round"/>
+
+            <!-- Head -->
+            <circle cx="190" cy="228" r="80" fill="#ffd9b3"/>
+            <!-- Hair -->
+            <path d="M 110 213 C 102 146 272 136 270 213 C 252 175 128 175 110 213 Z" fill="#4a3728"/>
+            <!-- Ears -->
+            <circle cx="112" cy="230" r="15" fill="#ffd9b3"/>
+            <circle cx="268" cy="230" r="15" fill="#ffd9b3"/>
+            <!-- Cheeks -->
+            <circle cx="148" cy="252" r="13" fill="#ffb3b3" opacity="0.5"/>
+            <circle cx="232" cy="252" r="13" fill="#ffb3b3" opacity="0.5"/>
+            <!-- Eyes -->
+            <circle cx="158" cy="220" r="11" fill="#2b2438"/>
+            <circle cx="222" cy="220" r="11" fill="#2b2438"/>
+            <circle cx="162" cy="216" r="4" fill="#fff"/>
+            <circle cx="226" cy="216" r="4" fill="#fff"/>
+            <!-- Big smile -->
+            <path d="M 155 255 Q 190 288 225 255" stroke="#2b2438" stroke-width="7" fill="none" stroke-linecap="round"/>
+
+            <!-- Stars — animated float -->
+            <g class="float1" style="transform-origin:474px 200px">
+              <path d="M474 184 l7 16 17 2 -12 12 3 17 -15 -9 -15 9 3-17 -12-12 17-2 z" fill="#ffce54"/>
+            </g>
+            <g class="float2" style="transform-origin:72px 132px">
+              <path d="M72 118 l6 13 14 2 -10 10 2 14 -12 -7 -12 7 2-14 -10-10 14-2 z" fill="#ff6b9d"/>
+            </g>
+            <g class="float3" style="transform-origin:506px 334px">
+              <path d="M506 320 l5 11 12 2 -9 9 2 12 -10 -6 -10 6 2-12 -9-9 12-2 z" fill="#2ec4b6"/>
+            </g>
+            <!-- Extra small sparkles -->
+            <g class="float2" style="transform-origin:420px 370px">
+              <path d="M420 362 l4 8 9 1 -6 6 1 9 -8-5 -8 5 1-9 -6-6 9-1 z" fill="#8a5cf6" opacity="0.7"/>
+            </g>
+            <g class="float1" style="transform-origin:58px 260px">
+              <path d="M58 252 l3 7 8 1 -6 5 2 8 -7-4 -7 4 2-8 -6-5 8-1 z" fill="#ff9f1c" opacity="0.7"/>
+            </g>
           </svg>
         </div>
       </div>
+    </div>
+    <!-- Wave transition hero → features -->
+    <div class="hero-wave" aria-hidden="true">
+      <svg viewBox="0 0 1440 72" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <path d="M0,36 C240,72 480,0 720,36 C960,72 1200,12 1440,48 L1440,72 L0,72 Z" fill="#fff"/>
+      </svg>
     </div>
   </section>
 
@@ -103,28 +158,28 @@
       <div class="row g-4">
         <div class="col-md-6 col-lg-3">
           <div class="feature-card">
-            <div class="feature-icon bg-soft-pink">🌾</div>
+            <div class="feature-icon" style="background:linear-gradient(135deg,#ffe4f0,#ffb3d1);">🌾</div>
             <h5>เกมผจญภัยฝึกออกเสียง</h5>
             <p class="text-secondary mb-0">เดินสำรวจหมู่บ้านน่ารัก ชนของวิเศษเพื่อสุ่มคำมาฝึกออกเสียง</p>
           </div>
         </div>
         <div class="col-md-6 col-lg-3">
           <div class="feature-card">
-            <div class="feature-icon bg-soft-purple">📚</div>
+            <div class="feature-icon" style="background:linear-gradient(135deg,#ede4ff,#c9aaff);">📚</div>
             <h5>คลังคำกว่า 449 คำ</h5>
             <p class="text-secondary mb-0">จัดกลุ่มตามเสียงพยัญชนะ ฝึกเจาะจุดเสียงที่ออกเสียงยาก เช่น ร ล คำควบกล้ำ</p>
           </div>
         </div>
         <div class="col-md-6 col-lg-3">
           <div class="feature-card">
-            <div class="feature-icon bg-soft-yellow">🧒</div>
+            <div class="feature-icon" style="background:linear-gradient(135deg,#fff3cc,#ffd966);">🧒</div>
             <h5>แบ่งระดับตามวัย</h5>
             <p class="text-secondary mb-0">เลือกอายุ 4-7 ขวบ ระบบจะปรับความยากของคำให้เหมาะกับน้องอัตโนมัติ</p>
           </div>
         </div>
         <div class="col-md-6 col-lg-3">
           <div class="feature-card">
-            <div class="feature-icon" style="background:#e3f6e5;">🩺</div>
+            <div class="feature-icon" style="background:linear-gradient(135deg,#c8f7e8,#7de8c0);">🩺</div>
             <h5>ผู้เชี่ยวชาญให้คะแนนจริง</h5>
             <p class="text-secondary mb-0">ทุกเสียงที่บันทึกจะถูกฟังและให้คะแนนโดยผู้เชี่ยวชาญ ดูผลได้ที่หน้า "การจัดการ"</p>
           </div>

@@ -1190,3 +1190,204 @@ a {
 .match-card.matched {
   animation: matchedBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
 }
+
+/* ============================================================
+   Kid-friendly visual polish
+   ============================================================ */
+
+/* Bouncing brand emoji in navbar */
+.brand-emoji {
+  display: inline-block;
+  animation: brandBounce 3s ease-in-out infinite;
+}
+@keyframes brandBounce {
+  0%, 62%, 100% { transform: translateY(0); }
+  72% { transform: translateY(-8px); }
+  82% { transform: translateY(-3px); }
+  91% { transform: translateY(-6px); }
+}
+
+/* Colorful accent stripe under navbar */
+.site-header {
+  border-bottom: 4px solid var(--color-primary);
+  box-shadow: 0 2px 20px rgba(43,36,56,0.07);
+}
+
+/* Hero section — warmer gradient */
+.hero-section {
+  background: linear-gradient(140deg, #eefbfa 0%, #f5efff 55%, #fff9ed 100%);
+  padding-bottom: 0 !important;
+}
+.hero-wave {
+  overflow: hidden;
+  line-height: 0;
+  margin-top: 3rem;
+}
+.hero-wave svg { display: block; width: 100%; height: 72px; }
+
+/* Feature icons — bigger */
+.feature-icon {
+  width: 76px;
+  height: 76px;
+  font-size: 2.5rem;
+}
+
+/* Feature cards — springy hover + icon wiggle */
+.feature-card {
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.feature-card:hover {
+  transform: translateY(-12px) scale(1.03) rotate(-0.5deg);
+  box-shadow: 0 28px 60px rgba(46,196,182,0.17);
+  border-color: var(--color-primary);
+}
+.feature-card:hover .feature-icon {
+  animation: iconWiggle 0.48s ease;
+}
+@keyframes iconWiggle {
+  0%,100% { transform: scale(1) rotate(0deg); }
+  30%      { transform: scale(1.22) rotate(-12deg); }
+  70%      { transform: scale(1.22) rotate(9deg); }
+}
+
+/* 3D push — orange warning buttons */
+.btn-warning {
+  box-shadow: 0 6px 0 #b96c00, 0 8px 20px rgba(255,159,28,0.22);
+  transition: transform 0.1s ease, box-shadow 0.1s ease,
+              background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-warning:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 9px 0 #b96c00, 0 14px 28px rgba(255,159,28,0.28);
+  background-color: var(--color-secondary);
+  border-color: var(--color-secondary);
+  color: #fff;
+}
+.btn-warning:active {
+  transform: translateY(4px) !important;
+  box-shadow: 0 2px 0 #b96c00 !important;
+}
+
+/* 3D push — teal primary buttons */
+.btn-primary {
+  box-shadow: 0 6px 0 #13726a;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 9px 0 #13726a;
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+.btn-primary:active {
+  transform: translateY(4px) !important;
+  box-shadow: 0 2px 0 #13726a !important;
+}
+
+/* Age-pick buttons — bigger, 3D bounce */
+.age-pick-btn {
+  width: 140px;
+  height: 140px;
+  font-size: 2.5rem;
+  box-shadow: 0 8px 0 rgba(22,122,114,0.38), var(--shadow-soft);
+  transition: transform 0.14s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.14s;
+}
+.age-pick-btn:hover {
+  transform: translateY(-8px) scale(1.1);
+  box-shadow: 0 16px 0 rgba(22,122,114,0.38), var(--shadow-soft);
+  background: var(--color-bg-soft);
+}
+.age-pick-btn:active {
+  transform: translateY(6px) scale(0.95) !important;
+  box-shadow: 0 2px 0 rgba(22,122,114,0.38) !important;
+}
+.age-pick-btn.active-age {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 8px 0 rgba(22,122,114,0.55);
+}
+.age-pick-btn.active-age small { color: rgba(255,255,255,0.9); }
+
+/* Challenge word — bigger */
+.challenge-word { font-size: 4.2rem; }
+@media (max-width: 575.98px) { .challenge-word { font-size: 3rem; } }
+
+/* Soft card — subtle lift */
+.soft-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.soft-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 22px 48px rgba(43,36,56,0.12);
+}
+
+/* Game mode cards — springy + bigger icon */
+.game-mode-card {
+  transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1),
+              border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.game-mode-card:hover { transform: translateY(-10px) scale(1.05); }
+.game-mode-card .mode-icon { font-size: 4rem; }
+.game-mode-card:hover .mode-icon { animation: iconWiggle 0.48s ease; }
+
+/* Level nodes — spring + glow */
+.level-node {
+  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease;
+}
+.level-node:hover {
+  transform: translateY(-8px) scale(1.12);
+  box-shadow: 0 22px 0 rgba(0,0,0,0.09), 0 0 0 6px rgba(255,255,255,0.55);
+}
+
+/* Section backgrounds — richer gradients */
+section.bg-soft-purple {
+  background: linear-gradient(150deg, #f0e8ff 0%, #e9dcff 100%);
+}
+section.bg-soft-yellow {
+  background: linear-gradient(150deg, #fffbee 0%, #fff0cc 100%);
+}
+
+/* Footer — richer gradient (stays dark, max readability) */
+.site-footer {
+  background: linear-gradient(135deg, #1d2d5e 0%, #2b2438 45%, #3e1c6f 100%);
+}
+
+/* Process flow steps — lift on hover */
+.process-step {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.process-step:hover {
+  transform: translateY(-6px) scale(1.05);
+  box-shadow: 0 18px 40px rgba(43,36,56,0.13);
+}
+
+/* Mic button — wider pulse ring */
+@keyframes pulse-rec {
+  0%   { box-shadow: 0 0 0 0 rgba(255,93,93,0.65); }
+  70%  { box-shadow: 0 0 0 24px rgba(255,93,93,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,93,93,0); }
+}
+
+/* Hero stat pills */
+.hero-stat-pill {
+  background: #fff;
+  border-radius: 20px;
+  padding: 0.75rem 1.4rem;
+  box-shadow: 0 6px 20px rgba(43,36,56,0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 88px;
+  gap: 0.1rem;
+}
+.hero-stat-pill strong {
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 800;
+}
+.hero-stat-pill span {
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+  font-weight: 600;
+}
