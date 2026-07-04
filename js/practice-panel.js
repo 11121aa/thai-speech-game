@@ -3,57 +3,48 @@ const PracticePanel = (function () {
   // Each SVG loops showing how the mouth moves to produce that sound.
   const MOUTH_ANIMATIONS = {
     por: `<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
+  <style>
+    .lip-up{animation:lu 2.5s ease-in-out infinite}
+    .lip-dn{animation:ld 2.5s ease-in-out infinite}
+    .puff{opacity:0;animation:pf 2.5s linear infinite}
+    @keyframes lu{0%,100%{transform:translateY(0)}28%,60%{transform:translateY(10px)}}
+    @keyframes ld{0%,100%{transform:translateY(0)}28%,60%{transform:translateY(-10px)}}
+    @keyframes pf{0%,60%,78%,100%{opacity:0}64%,74%{opacity:1}}
+  </style>
   <rect width="220" height="220" fill="#fdf4ec" rx="14"/>
-  <!-- Nose profile (static) -->
-  <path d="M 52,20 C 50,30 44,50 41,66 C 39,78 44,89 52,96 C 56,100 62,102 66,103"
+  <!-- Nose (static) -->
+  <path d="M45,16 C43,28 37,50 34,68 C32,82 37,93 46,100 C50,104 56,107 60,108"
         fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Upper lip + palate (moves DOWN on closure) -->
-  <g>
-    <animateTransform attributeName="transform" type="translate"
-      values="0,0; 0,12; 0,12; 0,0"
-      keyTimes="0; 0.28; 0.58; 1"
-      dur="2.5s" repeatCount="indefinite"
-      calcMode="spline"
-      keySplines="0.5 0 0.2 1; 0 0 1 1; 0.3 0 0.9 1"/>
-    <path d="M 66,103 C 88,101 118,100 150,103 C 163,105 173,109 180,113"
-          fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-    <path d="M 64,115 C 92,119 128,122 161,124 C 174,124 183,124 190,124"
-          fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  </g>
-  <!-- Lower lip + tongue + jaw (moves UP on closure) -->
-  <g>
-    <animateTransform attributeName="transform" type="translate"
-      values="0,0; 0,-13; 0,-13; 0,0"
-      keyTimes="0; 0.28; 0.58; 1"
-      dur="2.5s" repeatCount="indefinite"
-      calcMode="spline"
-      keySplines="0.5 0 0.2 1; 0 0 1 1; 0.3 0 0.9 1"/>
-    <path d="M 64,128 C 90,126 122,125 155,128 C 168,130 178,133 184,137"
-          fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-    <path d="M 62,156 C 86,148 116,144 150,147 C 165,149 177,154 184,161"
-          fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-    <path d="M 56,182 C 82,176 130,172 170,173"
-          fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  </g>
-  <!-- Pharynx right side (static) -->
-  <path d="M 190,124 C 189,148 189,168 188,190"
+  <!-- Upper lip only (animates down) -->
+  <path class="lip-up"
+        d="M60,108 C82,106 112,105 142,108 C156,110 166,114 173,119"
         fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <path d="M 204,108 C 203,135 203,162 202,194"
+  <!-- Palate (static) -->
+  <path d="M58,122 C84,126 118,129 150,130 C163,130 172,130 177,130"
         fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <path d="M 190,124 C 195,118 200,112 204,108"
+  <!-- Lower lip only (animates up) -->
+  <path class="lip-dn"
+        d="M58,132 C84,130 118,129 150,132 C164,134 174,137 180,141"
         fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
-  <!-- Air puff at release (dashed lines left of lips, brief flash) -->
-  <g opacity="0">
-    <animate attributeName="opacity"
-      values="0; 0; 1; 1; 0"
-      keyTimes="0; 0.56; 0.6; 0.68; 0.76"
-      dur="2.5s" repeatCount="indefinite"/>
-    <path d="M 52,108 C 40,106 28,104 16,102"
-          fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="7 5"/>
-    <path d="M 52,114 C 38,115 24,117 12,117"
-          fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="7 5"/>
+  <!-- Tongue (static) -->
+  <path d="M56,158 C78,150 110,146 146,149 C162,151 173,156 179,163"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- Lower jaw (static) -->
+  <path d="M52,183 C76,177 124,173 165,174"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- Pharynx (static) -->
+  <path d="M177,130 C176,154 176,172 175,190"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M190,118 C189,142 189,165 188,192"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M177,130 C182,125 186,121 190,118"
+        fill="none" stroke="#1a1a1a" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- Air puff at release -->
+  <g class="puff">
+    <path d="M46,113 C34,111 22,109 10,107" fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="7 5"/>
+    <path d="M46,119 C32,120 18,122 8,122" fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="7 5"/>
   </g>
-  <text x="8" y="214" font-family="Prompt,sans-serif" font-size="12" fill="#aaa" font-weight="500">เสียง ป</text>
+  <text x="8" y="212" font-family="Prompt,sans-serif" font-size="12" fill="#bbb">เสียง ป</text>
 </svg>`
   };
 
