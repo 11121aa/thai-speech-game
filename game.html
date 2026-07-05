@@ -70,7 +70,12 @@
         <div class="game-mode-card" id="cardPlatformer">
           <span class="mode-icon">🍄</span>
           <span class="mode-title">วิ่งเก็บเหรียญ</span>
-          <span class="mode-desc">กระโดด สไลด์ เก็บเหรียญและคำศัพท์</span>
+          <span class="mode-desc">กระโดด สไลด์ หลีกหิน เก็บเหรียญ</span>
+        </div>
+        <div class="game-mode-card" id="cardCrossy">
+          <span class="mode-icon">🚗</span>
+          <span class="mode-title">ข้ามถนน</span>
+          <span class="mode-desc">โดดข้ามรถ ฝึกพูดคำทุกครั้งที่ข้ามได้</span>
         </div>
       </div>
     </div>
@@ -105,6 +110,20 @@
       </div>
       <!-- Flashcard Game — Phaser renders here -->
       <div id="flashcardGame" style="display:none;"></div>
+      <!-- Crossy Road: Phaser canvas + 4-directional DOM buttons -->
+      <div id="crossyGame" style="display:none;">
+        <div class="platformer-wrap">
+          <div id="crossyCanvas" class="game-canvas-wrap"></div>
+          <div class="platformer-btns" style="flex-direction:column;gap:6px;">
+            <button class="pf-btn" id="cryBtnUp">↑<br><small>หน้า</small></button>
+            <div style="display:flex;gap:8px;">
+              <button class="pf-btn" id="cryBtnLeft">←<br><small>ซ้าย</small></button>
+              <button class="pf-btn" id="cryBtnDown">↓<br><small>หลัง</small></button>
+              <button class="pf-btn" id="cryBtnRight">→<br><small>ขวา</small></button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Finish Screen -->
@@ -225,6 +244,7 @@
 <script src="js/game-platformer.js"></script>
 <script src="js/game-matching.js"></script>
 <script src="js/game-flashcard.js"></script>
+<script src="js/game-crossy.js"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -266,7 +286,13 @@ function openPractice(word, onCorrect, onClosed) {
 var GAME_CBS = {
   onPoints:  addPts,
   onPractice: openPractice,
-  onFinish:  function () { finishGame(); }
+  onFinish:  function () { finishGame(); },
+  // Games that use timer-as-health call this to add/subtract seconds
+  onTime: function (delta) {
+    G.timeLeft = Math.max(0, G.timeLeft + delta);
+    document.getElementById('hudTimer').textContent = Math.ceil(G.timeLeft);
+    if (G.timeLeft <= 0) finishGame();
+  }
 };
 
 function finishGame() {
@@ -277,6 +303,7 @@ function finishGame() {
   AirplaneGame.stop();
   FlashcardGame.stop();
   PlatformerGame.stop();
+  CrossyGame.stop();
   var hs = G.highScores[G.mode] || 0;
   if (G.pts > hs) {
     G.highScores[G.mode] = G.pts;
@@ -308,8 +335,8 @@ var _allWords = [], _setupMode = null, _setupCam = null;
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄' };
-  document.getElementById('setupModeName').textContent = names[mode];
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗' };
+  document.getElementById('setupModeName').textContent = names[mode] || mode;
   populateWordSets('easy');
   startSetupCam();
   document.getElementById('screenSetup').style.display = 'flex';
@@ -352,15 +379,23 @@ function launchGame() {
 
   G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false;
   document.getElementById('hudPoints').textContent = 0;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🍄', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄' };
-  document.getElementById('hudModeName').textContent = names[G.mode];
+  var names = {
+    matching:  'จับคู่ภาพ 🃏',
+    shooting:  'ยิงเป้า 🎯',
+    airplane:  'ขับเครื่องบิน ✈️',
+    flashcard: 'ไพ่คำศัพท์ 🎴',
+    platformer:'วิ่งเก็บเหรียญ 🍄',
+    crossy:    'ข้ามถนน 🚗'
+  };
+  document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
 
-  ['matchingGame', 'shootingGame', 'airplaneGame', 'flashcardGame', 'platformerGame'].forEach(function (id) {
+  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
 
-  var limit = G.mode === 'matching' ? 120 : G.mode === 'flashcard' ? 180 : G.mode === 'platformer' ? 90 : 60;
+  var limit = G.mode === 'matching' ? 120 : G.mode === 'flashcard' ? 180 :
+              G.mode === 'platformer' ? 90  : G.mode === 'crossy'   ? 90  : 60;
   startTimer(limit);
 
   if (G.mode === 'matching') {
@@ -368,13 +403,16 @@ function launchGame() {
     MatchingGame.start(pool, GAME_CBS);   // Phaser game
   } else if (G.mode === 'shooting') {
     document.getElementById('shootingGame').style.display = 'block';
-    ShootingGame.start(pool, GAME_CBS);   // Phaser game
+    ShootingGame.start(pool, GAME_CBS);   // Phaser game (rotating cannon)
   } else if (G.mode === 'flashcard') {
     document.getElementById('flashcardGame').style.display = 'block';
     FlashcardGame.start(pool, GAME_CBS);  // Phaser game
   } else if (G.mode === 'platformer') {
     document.getElementById('platformerGame').style.display = 'block';
-    PlatformerGame.start(pool, GAME_CBS); // Phaser game
+    PlatformerGame.start(pool, GAME_CBS); // Phaser game (jump + slide + obstacles)
+  } else if (G.mode === 'crossy') {
+    document.getElementById('crossyGame').style.display = 'block';
+    CrossyGame.start(pool, GAME_CBS);     // Phaser game (crossy road)
   } else {
     document.getElementById('airplaneGame').style.display = 'block';
     AirplaneGame.start(pool, GAME_CBS);   // Phaser game
@@ -391,6 +429,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardAirplane').addEventListener('click', function () { openSetup('airplane'); });
   document.getElementById('cardFlashcard').addEventListener('click', function () { openSetup('flashcard'); });
   document.getElementById('cardPlatformer').addEventListener('click', function () { openSetup('platformer'); });
+  document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
 
   document.querySelectorAll('.diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
