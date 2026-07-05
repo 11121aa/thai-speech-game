@@ -45,6 +45,7 @@ const PracticePanel = (function () {
       el("ppBtnMic").addEventListener("click", onMicClick);
       el("ppBtnCorrect").addEventListener("click", markCorrect);
       el("ppBtnRetry").addEventListener("click", resetForRetry);
+      el("ppBtnSkip").addEventListener("click", function () { modal.hide(); });
       modalEl.addEventListener("hidden.bs.modal", onModalHidden);
     }
   }

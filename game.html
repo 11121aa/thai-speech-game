@@ -173,11 +173,15 @@
   </div>
 </div>
 
-<!-- Shared Practice Modal -->
-<div class="modal fade" id="practiceModal" tabindex="-1">
+<!-- Shared Practice Modal — static backdrop prevents accidental close on mobile -->
+<div class="modal fade" id="practiceModal" tabindex="-1"
+     data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content" style="border-radius:24px;">
-      <div class="modal-body text-center p-4">
+      <div class="modal-body text-center p-4" style="position:relative;">
+        <button id="ppBtnSkip" title="ข้าม"
+          style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:1.4rem;color:#bbb;cursor:pointer;line-height:1;"
+          aria-label="ข้าม">✕</button>
         <p class="text-secondary mb-1">ลองออกเสียงคำนี้ดูสิ</p>
         <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
         <div class="challenge-word" id="ppWord">บ้าน</div>

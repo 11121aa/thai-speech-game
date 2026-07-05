@@ -286,11 +286,19 @@ function createMatchingGame(words, callbacks) {
         });
 
       } else {
-        // ── WRONG MATCH — just flip both cards back, no practice ──
-        this.time.delayedCall(600, function () { // wait 0.6s so player can see both cards
-          self.flipCard(a, false); // flip card A back to face-down
-          self.flipCard(b, false); // flip card B back to face-down
-          self.locked = false;     // allow tapping again
+        // ── WRONG MATCH — flip both cards back, no practice ──
+        // Keep locked=true the whole time (600ms pause + 220ms animation)
+        // so a fast tap can't sneak in mid-animation
+        this.time.delayedCall(600, function () {
+          // Kill any conflicting tweens before starting the flip-back
+          self.tweens.killTweensOf(a.container);
+          self.tweens.killTweensOf(b.container);
+          a.container.scaleX = 1; // reset in case a tween left it mid-scale
+          b.container.scaleX = 1;
+          self.flipCard(a, false);
+          self.flipCard(b, false);
+          // Unlock only after the flip animation (110+110 = 220ms) completes
+          self.time.delayedCall(240, function () { self.locked = false; });
         });
       }
     },
