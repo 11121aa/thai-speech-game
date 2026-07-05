@@ -16,7 +16,7 @@
 //    - Tap a second card — if they belong to the same word → correct match!
 //    - Correct match → pronunciation practice modal opens
 //    - Wrong match → both cards flip back face-down (no penalty other than -100 pts)
-//    - Score starts at 100,000; each flip costs 100 points
+//    - Score starts at 10,000; each flip costs 100 points
 //    - Match all pairs to finish
 // ============================================================
 
@@ -55,6 +55,12 @@ function createMatchingGame(words, callbacks) {
       this.flipCount    = 0;    // total number of individual cards opened (each costs 100 pts)
     },
 
+    preload: function () {
+      this.load.audio('FlipCard',  'soundeffect/FlipCard.mp3');
+      this.load.audio('WrongSFX',  'soundeffect/WrongSFX.mp3');
+      this.load.audio('CorrectSFX','soundeffect/CorrectSFX.mp3');
+    },
+
     // create() — runs once when the scene starts; builds the card grid
     create: function () {
       var self = this;
@@ -82,6 +88,10 @@ function createMatchingGame(words, callbacks) {
 
       // ── Draw the background ────────────��──────────────────────────
       // 20 horizontal gradient bands from off-white at the top to near-white at the bottom
+      this.sfxFlip    = this.sound.add('FlipCard',   { volume: 0.6 });
+      this.sfxWrong   = this.sound.add('WrongSFX',   { volume: 0.7 });
+      this.sfxCorrect = this.sound.add('CorrectSFX', { volume: 0.75 });
+
       var bg = this.add.graphics();
       for (var b = 0; b < 20; b++) {
         var tb = b / 20;
@@ -151,7 +161,7 @@ function createMatchingGame(words, callbacks) {
 
       // ��─ Seed the score at 100,000 ─────────────────────────────────
       // Score starts high and decreases by 100 per flip
-      callbacks.onPoints(100000);
+      callbacks.onPoints(10000);
 
       // ── Hint text at the bottom ───────────────────────────────────
       this.add.text(W / 2, H - 16,
@@ -214,6 +224,7 @@ function createMatchingGame(words, callbacks) {
     flipCard: function (card, toFront) {
       var self = this;
       card.faceUp = toFront;
+      if (this.sfxFlip) this.sfxFlip.play(); // play on every flip (face-up and face-down)
       if (toFront) {
         this.flipped.push(card); // add to the "waiting" list
 
@@ -264,6 +275,7 @@ function createMatchingGame(words, callbacks) {
 
       if (isMatch) {
         // ── CORRECT MATCH ─────────────────────────────────────────
+        if (this.sfxCorrect) this.sfxCorrect.play();
         a.matched = b.matched = true; // mark both cards as permanently matched
 
         // Dim matched cards so the remaining cards stand out
@@ -287,6 +299,7 @@ function createMatchingGame(words, callbacks) {
 
       } else {
         // ── WRONG MATCH — flip both cards back, no practice ──
+        if (this.sfxWrong) this.sfxWrong.play();
         // Keep locked=true the whole time (600ms pause + 220ms animation)
         // so a fast tap can't sneak in mid-animation
         this.time.delayedCall(600, function () {
@@ -328,8 +341,7 @@ function createMatchingGame(words, callbacks) {
     width:  W,
     height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
-    scene:  MatchScene,
-    audio:  { noAudio: true }
+    scene:  MatchScene
   });
 }
 
