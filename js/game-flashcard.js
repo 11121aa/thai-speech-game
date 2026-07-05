@@ -152,65 +152,72 @@ function createFlashcardGame(words, callbacks) {
       cont.badgeTxt = badgeTxt;
     },
 
-    // ── [BTN] Build the two interactive buttons below the card ────
+    // ── [BTN] Build the three interactive buttons below the card ──
     buildButtons: function () {
       var self  = this;
-      var BTN_Y = CARD_Y + CARD_H / 2 + 40; // Y position for both buttons (below the card)
+      var BTN_Y = CARD_Y + CARD_H / 2 + 40; // Y position for all buttons (below the card)
 
       // ── Helper: create a rounded button with a label ──────────────
-      // x          = horizontal centre of the button
-      // w, h       = width and height
-      // fillColor  = background colour
-      // strokeColor= border colour
-      // label      = button text
-      // onClick    = function called when the button is clicked/tapped
       function makeBtn(x, w, h, fillColor, strokeColor, label, onClick) {
-        // Draw the button background
         var gfx = self.add.graphics();
         gfx.fillStyle(fillColor);
         gfx.fillRoundedRect(x - w / 2, BTN_Y - h / 2, w, h, 10);
         gfx.lineStyle(2, strokeColor);
         gfx.strokeRoundedRect(x - w / 2, BTN_Y - h / 2, w, h, 10);
 
-        // Text label on top of the button — this is what receives the pointer events
         var txt = self.add.text(x, BTN_Y, label, {
           fontFamily: 'Prompt, sans-serif',
-          fontSize: '17px', fontStyle: 'bold', color: '#ffffff'
-        }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true }); // enable mouse cursor change on hover
+          fontSize: '16px', fontStyle: 'bold', color: '#ffffff'
+        }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true });
 
-        // Pointer event handlers on the text object
         txt.on('pointerdown', function () {
-          if (!self.canInteract) return; // ignore clicks while modal is open
+          if (!self.canInteract) return;
           onClick();
         });
-        txt.on('pointerover',  function () { gfx.setAlpha(0.85); }); // slightly dim on hover
-        txt.on('pointerout',   function () { gfx.setAlpha(1);    }); // restore on mouse-out
+        txt.on('pointerover',  function () { gfx.setAlpha(0.85); });
+        txt.on('pointerout',   function () { gfx.setAlpha(1);    });
 
         return { gfx: gfx, txt: txt };
       }
 
-      // ── [BTN] Listen button — plays the word using text-to-speech ─
-      // SpeechTool.speak() is defined in js/speech.js (loaded before this file)
+      // Three buttons spaced evenly: Listen | Hint | Practice
+      // Each 160px wide, 20px gaps → total 520px centred in W=800
+
+      // ── [BTN] Listen — plays the word via TTS ─────────────────────
       this.listenBtn = makeBtn(
-        W / 2 - 110, 180, 50,
-        0x64748b, 0x475569,  // POLISH: change these hex colours for a different button colour
+        W / 2 - 180, 160, 50,
+        0x64748b, 0x475569,
         '🔊  ฟังตัวอย่าง',
         function () {
-          if (self.currentWord) SpeechTool.speak(self.currentWord.word); // read word aloud
+          if (self.currentWord) SpeechTool.speak(self.currentWord.word);
         }
       );
 
-      // ── [BTN] Practice button — opens the pronunciation modal ─────
-      this.practiceBtn = makeBtn(
-        W / 2 + 110, 180, 50,
-        0xf59e0b, 0xd97706,  // POLISH: warm amber — change for different colour
-        '🎤  พูดคำนี���!',
+      // ── [BTN] Hint — reveals the pronunciation ────────────────────
+      this.hintBtn = makeBtn(
+        W / 2, 160, 50,
+        0x10b981, 0x059669,  // emerald green
+        '💡  คำใบ้',
         function () {
           if (!self.currentWord) return;
-          self.canInteract = false; // disable buttons while modal is open
+          // Fade in the reading text and dim the hint button to show it's been used
+          self.tweens.add({ targets: self.cardCont.readingTxt, alpha: 1, duration: 200 });
+          self.hintBtn.gfx.setAlpha(0.4);
+          self.hintBtn.txt.setAlpha(0.5);
+        }
+      );
+
+      // ── [BTN] Practice — opens the pronunciation modal ────────────
+      this.practiceBtn = makeBtn(
+        W / 2 + 180, 160, 50,
+        0xf59e0b, 0xd97706,
+        '🎤  พูดคำนี้!',
+        function () {
+          if (!self.currentWord) return;
+          self.canInteract = false;
           callbacks.onPractice(self.currentWord, null, function () {
-            self.canInteract = true; // re-enable buttons when modal closes
-            self.onPracticeDone();   // then advance to the next card
+            self.canInteract = true;
+            self.onPracticeDone();
           });
         }
       );
@@ -229,8 +236,10 @@ function createFlashcardGame(words, callbacks) {
 
       // Update the card's text content
       cont.emojiTxt.setText(this.currentWord.emoji || '🔸');
-      cont.readingTxt.setText(this.currentWord.reading || this.currentWord.word);
+      cont.readingTxt.setText(this.currentWord.reading || this.currentWord.word).setAlpha(0); // hidden until hint tapped
       cont.wordTxt.setText(this.currentWord.word).setAlpha(0); // hide Thai word initially
+      // Reset hint button to full opacity for the new card
+      if (this.hintBtn) { this.hintBtn.gfx.setAlpha(1); this.hintBtn.txt.setAlpha(1); }
 
       // Update the "remaining cards" badge
       var remaining = this.pool.length - this.cardIdx - 1;
