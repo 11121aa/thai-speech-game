@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>เกม | ระบบเรียนรู้การออกเสียงด้วย AI</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -295,9 +295,15 @@ var GAME_CBS = {
   }
 };
 
+function restoreTimerPill() {
+  var tp = document.getElementById('hudTimer') && document.getElementById('hudTimer').closest('.hud-pill');
+  if (tp) tp.style.visibility = '';
+}
+
 function finishGame() {
   G.paused = true;
   clearInterval(G.timerHandle);
+  restoreTimerPill();
   MatchingGame.stop();
   ShootingGame.stop();
   AirplaneGame.stop();
@@ -394,9 +400,18 @@ function launchGame() {
   });
   showScreen('screenGame');
 
-  var limit = G.mode === 'matching' ? 120 : G.mode === 'flashcard' ? 180 :
-              G.mode === 'platformer' ? 90  : G.mode === 'crossy'   ? 90  : 60;
-  startTimer(limit);
+  var timerPill = document.getElementById('hudTimer') && document.getElementById('hudTimer').closest('.hud-pill');
+  if (G.mode === 'matching') {
+    // No countdown — score starts at 100k, deducts 100 per flip
+    if (timerPill) timerPill.style.visibility = 'hidden';
+    clearInterval(G.timerHandle);
+    G.timeLeft = 9999;
+  } else {
+    if (timerPill) timerPill.style.visibility = '';
+    var limit = G.mode === 'flashcard' ? 180 :
+                G.mode === 'platformer' ? 90  : G.mode === 'crossy' ? 90 : 60;
+    startTimer(limit);
+  }
 
   if (G.mode === 'matching') {
     document.getElementById('matchingGame').style.display = 'block';
@@ -446,7 +461,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnSetupStart').addEventListener('click', launchGame);
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop();
+    restoreTimerPill();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });

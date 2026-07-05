@@ -817,7 +817,7 @@ a {
   display: grid;
   grid-template-columns: 240px 1fr 280px;
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
 }
 @media (max-width: 991px) {
   .profile-page-grid { grid-template-columns: 1fr; }
@@ -827,6 +827,16 @@ a {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   padding: 1.6rem;
+}
+/* Recordings card (middle column) — flex column so the list can scroll within the card height */
+.profile-page-grid > .profile-column-card:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+}
+#recordingsList {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 .profile-avatar {
   width: 80px;
@@ -1390,4 +1400,98 @@ section.bg-soft-yellow {
   font-size: 0.78rem;
   color: var(--color-text-soft);
   font-weight: 600;
+}
+
+/* ============================================================
+   RESPONSIVE — phones & tablets
+   ============================================================ */
+
+/* Matching + Flashcard games don't use .game-canvas-wrap, so apply
+   canvas scaling here so they shrink on mobile just like the others  */
+#matchingGame,
+#flashcardGame {
+  max-width: 800px;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+#matchingGame canvas,
+#flashcardGame canvas {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* ── Phone  (≤ 575px) ───────────────────────────────────── */
+@media (max-width: 575.98px) {
+
+  /* Game selection: 2 cards per row instead of fixed 220px */
+  .game-mode-hub {
+    gap: 0.6rem;
+    margin: 0.75rem 0;
+  }
+  .game-mode-card {
+    width: calc(50% - 0.3rem);
+    min-height: 120px;
+    padding: 0.9rem 0.5rem;
+    gap: 0.3rem;
+  }
+  .game-mode-card .mode-icon { font-size: 2.2rem !important; }
+  .game-mode-card .mode-title { font-size: 0.9rem; }
+  .game-mode-card .mode-desc  { font-size: 0.7rem; }
+
+  /* HUD bar: phone navbar is ~56px, not 72px */
+  .game-hud-bar {
+    top: 56px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .hud-pill       { font-size: 0.76rem; padding: 0.15rem 0.5rem; }
+  .game-hud-pills { gap: 0.35rem; }
+  .btn-quit       { padding: 0.2rem 0.6rem; font-size: 0.78rem; }
+
+  /* Setup overlay: tighter padding, stacked footer buttons */
+  .setup-panel     { padding: 1rem 1rem 1.2rem; }
+  .setup-footer    { flex-direction: column; }
+  .setup-footer .btn { width: 100%; }
+
+  /* Practice modal: boxes shrink so 2 fit side-by-side on a 375px screen */
+  .mouth-animation-box,
+  .mouth-diagram-box,
+  .camera-mirror {
+    width: 148px;
+    height: 148px;
+  }
+
+  /* Platformer/crossy touch buttons: slightly smaller to leave more game visible */
+  .pf-btn         { width: 62px; height: 62px; font-size: 0.88rem; }
+  .platformer-btns { bottom: 6px; padding: 0 6px; }
+
+  /* Finish screen: shrink giant trophy emoji */
+  .finish-emoji { font-size: 3.5rem; }
+  .finish-card  { padding: 2rem 1.2rem; }
+
+  /* Practice modal: tighter padding so content fits without scrolling */
+  #practiceModal .modal-body { padding: 1rem 0.75rem; }
+
+  /* Profile grid: stack all three columns (overrides the 991px breakpoint) */
+  .profile-page-grid { grid-template-columns: 1fr; }
+  #recordingsList { max-height: 240px; }
+}
+
+/* ── Tablet  (576px – 991px) ────────────────────────────── */
+@media (min-width: 576px) and (max-width: 991.98px) {
+  /* Game cards: let them be 3-per-row (220px each fits in 576px+) */
+
+  /* HUD: header is still ~72px on tablets in landscape */
+
+  /* Profile page: already 1-col at <991px; give recording list a cap */
+  #recordingsList { max-height: 280px; }
+
+  /* Game mode hub: tighten gap a bit on small tablets */
+  .game-mode-hub { gap: 1rem; }
+  .game-mode-card { width: 180px; min-height: 160px; }
 }
