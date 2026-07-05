@@ -88,20 +88,17 @@
       <div id="matchingGame" style="display:none;">
         <div id="matchGrid" class="match-grid"></div>
       </div>
+      <!-- Phaser creates its canvas inside each of these divs -->
       <div id="shootingGame" style="display:none;">
-        <div class="game-canvas-wrap">
-          <canvas id="shootCanvas" width="800" height="450"></canvas>
-        </div>
+        <div class="game-canvas-wrap"></div>
       </div>
       <div id="airplaneGame" style="display:none;">
-        <div class="game-canvas-wrap">
-          <canvas id="airCanvas" width="800" height="380"></canvas>
-        </div>
+        <div class="game-canvas-wrap"></div>
       </div>
-      <!-- Platformer Game -->
+      <!-- Platformer: Phaser canvas + DOM control buttons -->
       <div id="platformerGame" style="display:none;">
         <div class="platformer-wrap">
-          <canvas id="platformCanvas" width="800" height="400"></canvas>
+          <div id="platformerCanvas" class="game-canvas-wrap"></div>
           <div class="platformer-btns">
             <button class="pf-btn" id="pfBtnSlide">↙<br><small>สไลด์</small></button>
             <button class="pf-btn" id="pfBtnJump">↑<br><small>กระโดด</small></button>
@@ -247,6 +244,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Phaser 3 game engine -->
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<!-- One file per Phaser game — open the file to polish that game -->
+<script src="js/game-shooting.js"></script>
+<script src="js/game-airplane.js"></script>
+<script src="js/game-platformer.js"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -279,9 +282,17 @@ function openPractice(word, onCorrect, onClosed) {
   G.paused = true;
   PracticePanel.open(word, {
     onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
-    onClosed: function () { G.paused = false; if (onClosed) onClosed(); }
+    onClosed:  function () { G.paused = false; if (onClosed) onClosed(); }
   });
 }
+
+// Callback bundle passed into each Phaser game so they can
+// award points and open the practice modal without knowing about G.
+var GAME_CBS = {
+  onPoints:  addPts,
+  onPractice: openPractice,
+  onFinish:  function () { finishGame(); }
+};
 
 function finishGame() {
   G.paused = true;
@@ -380,272 +391,6 @@ var MatchingGame = (function () {
   return { init: init, stop: stop };
 })();
 
-/* ===== Shooting Game ===== */
-var ShootingGame = (function () {
-  var ctx, words, wIdx, targets, pops, animId;
-  var W = 800, H = 450, GROUND = H - 80;
-  var TIMEOUT_MS = 5000;
-  var MAX_TARGETS = 4;
-
-  function start(ws) {
-    words = ws; wIdx = 0; targets = []; pops = [];
-    var canvas = document.getElementById('shootCanvas');
-    ctx = canvas.getContext('2d');
-    canvas.onclick = click; canvas.ontouchend = touch;
-    spawn();
-    setTimeout(function () { if (ctx) spawn(); }, 900);
-    setTimeout(function () { if (ctx) spawn(); }, 1800);
-    setTimeout(function () { if (ctx) spawn(); }, 2700);
-    loop();
-  }
-
-  function spawn() {
-    if (!words.length) return;
-    if (targets.filter(function (u) { return !u.done && !u.expired; }).length >= MAX_TARGETS) return;
-    var w = words[wIdx++ % words.length];
-    var bx, t = 0;
-    do { bx = 80 + Math.random() * (W - 160); t++; }
-    while (t < 20 && targets.some(function (u) { return Math.abs(u.baseX - bx) < 130; }));
-    targets.push({
-      x: bx, baseX: bx, y: GROUND, w: w,
-      s: 0, hit: false, done: false, expired: false,
-      born: Date.now(),
-      oscPhase: Math.random() * Math.PI * 2,
-      oscSpeed: 1.2 + Math.random() * 1.4,
-      oscAmp: 28 + Math.random() * 32
-    });
-  }
-
-  function delayedSpawn(ms) {
-    setTimeout(function () { if (ctx) spawn(); }, ms);
-  }
-
-  function click(e) {
-    if (G.paused) return;
-    var c = document.getElementById('shootCanvas'), r = c.getBoundingClientRect();
-    hitTest((e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height));
-  }
-  function touch(e) {
-    e.preventDefault(); if (G.paused) return;
-    var c = document.getElementById('shootCanvas'), r = c.getBoundingClientRect(), t = e.changedTouches[0];
-    hitTest((t.clientX - r.left) * (W / r.width), (t.clientY - r.top) * (H / r.height));
-  }
-
-  function hitTest(mx, my) {
-    for (var i = targets.length - 1; i >= 0; i--) {
-      var t = targets[i];
-      if (t.hit || t.expired) continue;
-      var dx = mx - t.x, dy = my - (t.y - 90 * t.s);
-      if (dx * dx + dy * dy < (52 * t.s) * (52 * t.s)) {
-        t.hit = true;
-        pops.push({ x: t.x, y: t.y - 150, text: '+10', life: 1 });
-        addPts(10);
-        var tRef = t;
-        openPractice(t.w, null, function () {
-          tRef.done = true;
-          delayedSpawn(700);
-        });
-        return;
-      }
-    }
-  }
-
-  function loop() {
-    if (!ctx) return;
-    var now = Date.now();
-    drawBg();
-    var toRemove = [];
-    targets.forEach(function (t) {
-      if (!t.hit && !t.expired) {
-        t.s = Math.min(1, t.s + 0.06);
-        var elapsed = now - t.born;
-        t.x = t.baseX + Math.sin(t.oscPhase + elapsed * 0.001 * t.oscSpeed) * t.oscAmp;
-        if (!G.paused && elapsed >= TIMEOUT_MS) {
-          t.expired = true;
-          pops.push({ x: t.x, y: t.y - 150, text: '⌛', life: 1 });
-        }
-      } else if (t.done || t.expired) {
-        t.s = Math.max(0, t.s - 0.13);
-      }
-      if (t.s > 0) drawTarget(t, now);
-      else if (t.done || t.expired) toRemove.push(t);
-    });
-    toRemove.forEach(function (t) {
-      targets = targets.filter(function (u) { return u !== t; });
-      if (t.expired) delayedSpawn(400);
-    });
-    pops.forEach(function (p) {
-      ctx.globalAlpha = p.life;
-      ctx.font = 'bold 20px Prompt, sans-serif';
-      ctx.fillStyle = p.text === '⌛' ? '#aaa' : '#ff9f1c';
-      ctx.textAlign = 'center';
-      ctx.fillText(p.text, p.x, p.y - (1 - p.life) * 30);
-      ctx.globalAlpha = 1; p.life -= 0.04;
-    });
-    pops = pops.filter(function (p) { return p.life > 0; });
-    animId = requestAnimationFrame(loop);
-  }
-
-  function drawBg() {
-    var g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#87ceeb'); g.addColorStop(0.7, '#b8dff5');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#5dba5d'; ctx.fillRect(0, GROUND, W, H - GROUND);
-    ctx.fillStyle = '#4caf50'; ctx.fillRect(0, GROUND, W, 10);
-  }
-
-  function drawTarget(t, now) {
-    var elapsed = now - t.born;
-    var timeLeft = t.hit ? 5 : Math.max(0, TIMEOUT_MS - elapsed) / 1000;
-    var shakeX = (timeLeft < 1 && !t.hit && !t.expired) ? Math.sin(now * 0.03) * 5 : 0;
-    ctx.save();
-    if (t.hit && !t.done) ctx.globalAlpha = 0.5;
-    ctx.translate(t.x + shakeX, t.y);
-    ctx.scale(t.s, t.s);
-    ctx.fillStyle = '#7d6b5a'; ctx.fillRect(-5, -90, 10, 90);
-    [{ r: 46, c: '#e74c3c' }, { r: 37, c: '#fff' }, { r: 27, c: '#2980b9' }, { r: 18, c: '#fff' }, { r: 10, c: '#f1c40f' }].forEach(function (rg) {
-      ctx.beginPath(); ctx.arc(0, -90, rg.r, 0, Math.PI * 2);
-      ctx.fillStyle = rg.c; ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.stroke();
-    });
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(-46, -90); ctx.lineTo(46, -90); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, -136); ctx.lineTo(0, -44); ctx.stroke();
-    ctx.font = 'bold 14px Prompt,sans-serif'; ctx.textAlign = 'center';
-    var bw = Math.max(60, ctx.measureText(t.w.word).width + 18);
-    ctx.fillStyle = t.hit ? '#ddd' : '#fff';
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(-bw / 2, -158, bw, 28, 6); ctx.fill(); }
-    else { ctx.fillRect(-bw / 2, -158, bw, 28); }
-    ctx.fillStyle = '#2b2438'; ctx.fillText(t.w.word, 0, -137);
-    if (t.w.emoji) { ctx.font = '20px serif'; ctx.fillText(t.w.emoji, 0, -170); }
-    if (!t.hit && !t.expired) {
-      var frac = timeLeft / 5;
-      ctx.strokeStyle = frac > 0.5 ? '#27ae60' : frac > 0.25 ? '#f39c12' : '#e74c3c';
-      ctx.lineWidth = 5; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.arc(0, -90, 60, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
-    }
-    if (t.hit && !t.done) { ctx.font = '26px serif'; ctx.fillText('🎤', 0, -82); }
-    ctx.globalAlpha = 1; ctx.restore();
-  }
-
-  function stop() {
-    cancelAnimationFrame(animId); animId = null; ctx = null;
-    var c = document.getElementById('shootCanvas');
-    if (c) { c.onclick = null; c.ontouchend = null; }
-  }
-  return { start: start, stop: stop };
-})();
-
-/* ===== Airplane Game — Flappy Bird style ===== */
-var AirplaneGame = (function () {
-  var ctx, words, wIdx, bubbles, clouds, planeY, planeVY, animId, scrollT, progress;
-  var W = 800, H = 380, GROUND = H - 50, TOTAL = 2400;
-  var PLANE_X = 130, GRAVITY = 0.18, FLAP = -7;
-
-  function start(ws) {
-    words = ws; wIdx = 0; bubbles = []; scrollT = 0; progress = 0;
-    planeY = H / 2; planeVY = 0;
-    clouds = [];
-    for (var i = 0; i < 5; i++) clouds.push({ x: 60 + Math.random() * W * 1.8, y: 25 + Math.random() * 110, rw: 65 + Math.random() * 70, spd: 0.6 + Math.random() * 0.7 });
-    var canvas = document.getElementById('airCanvas');
-    ctx = canvas.getContext('2d');
-    canvas.onclick = flap; canvas.ontouchend = function (e) { e.preventDefault(); flap(); };
-    spawnBubble(); spawnBubble();
-    loop();
-  }
-
-  function flap() { if (!G.paused) { planeVY = FLAP; } }
-
-  function spawnBubble() {
-    if (!words.length) return;
-    bubbles.push({ x: W + 60 + bubbles.length * 120, y: 70 + Math.random() * (GROUND - 150), w: words[wIdx++ % words.length], hit: false });
-  }
-
-  function loop() {
-    if (!ctx) return;
-    if (!G.paused) {
-      scrollT++;
-      progress = Math.min(TOTAL, progress + 2);
-      planeVY += GRAVITY;
-      planeY += planeVY;
-      if (planeY >= GROUND - 28) { planeY = GROUND - 28; planeVY = 0; }
-      if (planeY < 18) { planeY = 18; planeVY = 0; }
-      clouds.forEach(function (c) { c.x -= c.spd; if (c.x < -c.rw - 40) c.x = W + c.rw; });
-      bubbles.forEach(function (b) { if (!b.hit) b.x -= 2.2; });
-      bubbles = bubbles.filter(function (b) { return b.x > -80; });
-      for (var i = bubbles.length - 1; i >= 0; i--) {
-        var b = bubbles[i];
-        if (b.hit) continue;
-        var dx = PLANE_X - b.x, dy = planeY - b.y;
-        if (dx * dx + dy * dy < 46 * 46) {
-          b.hit = true;
-          openPractice(b.w, null, function () {
-            bubbles = bubbles.filter(function (u) { return !u.hit; });
-            spawnBubble();
-          });
-          break;
-        }
-      }
-      if (scrollT % 130 === 0 && bubbles.length < 4) spawnBubble();
-      if (progress >= TOTAL) { finishGame(); return; }
-    }
-    draw();
-    animId = requestAnimationFrame(loop);
-  }
-
-  function draw() {
-    var g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#87ceeb'); g.addColorStop(1, '#c5e8f7');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    clouds.forEach(function (c) {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rw, 25, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x - c.rw * 0.35, c.y + 10, c.rw * 0.55, 20, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x + c.rw * 0.3, c.y + 8, c.rw * 0.5, 18, 0, 0, Math.PI * 2); ctx.fill();
-    });
-    ctx.fillStyle = '#5dba5d'; ctx.fillRect(0, GROUND, W, H - GROUND);
-    var pw = (progress / TOTAL) * (W - 40);
-    ctx.fillStyle = '#ddd'; ctx.fillRect(20, H - 15, W - 40, 7);
-    ctx.fillStyle = '#2ec4b6'; ctx.fillRect(20, H - 15, pw, 7);
-    ctx.font = '16px serif'; ctx.fillText('🏁', 18 + pw, H - 6);
-    bubbles.forEach(drawBubble);
-    drawPlane(PLANE_X, planeY, planeVY);
-    if (scrollT < 80) {
-      ctx.fillStyle = 'rgba(43,36,56,0.55)';
-      ctx.font = 'bold 18px Prompt,sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('แตะหน้าจอเพื่อบินขึ้น! ✈️', W / 2, 45);
-    }
-  }
-
-  function drawPlane(x, y, vy) {
-    ctx.save(); ctx.translate(x, y);
-    var tilt = Math.max(-0.45, Math.min(0.45, vy * 0.05));
-    ctx.rotate(tilt);
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, 42, 14, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2ec4b6';
-    ctx.beginPath(); ctx.moveTo(5, -2); ctx.lineTo(-12, -26); ctx.lineTo(22, -2); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-30, 2); ctx.lineTo(-42, -12); ctx.lineTo(-26, 2); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#87ceeb'; ctx.beginPath(); ctx.ellipse(12, -4, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff9f1c'; ctx.beginPath(); ctx.moveTo(42, 0); ctx.lineTo(54, -3); ctx.lineTo(42, -8); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-
-  function drawBubble(b) {
-    ctx.save(); ctx.translate(b.x, b.y);
-    ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.strokeStyle = '#2ec4b6'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(0, 0, 32, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.font = '17px serif'; ctx.textAlign = 'center'; ctx.fillText(b.w.emoji || '🔸', 0, -5);
-    ctx.font = 'bold 11px Prompt,sans-serif'; ctx.fillStyle = '#2b2438'; ctx.fillText(b.w.word, 0, 12);
-    ctx.restore();
-  }
-
-  function stop() {
-    cancelAnimationFrame(animId); animId = null; ctx = null; scrollT = 0;
-    var c = document.getElementById('airCanvas');
-    if (c) { c.onclick = null; c.ontouchend = null; }
-  }
-  return { start: start, stop: stop };
-})();
 
 /* ===== Flashcard Game ===== */
 var FlashcardGame = (function () {
@@ -722,243 +467,6 @@ var FlashcardGame = (function () {
   return { start: start, stop: stop, practice: practice, speak: speak };
 })();
 
-/* ===== Platformer Game — Mario-style side scroller ===== */
-var PlatformerGame = (function () {
-  var ctx, words, wIdx, animId, scrollX;
-  var W = 800, H = 400;
-  var GROUND_Y = H - 55;
-  var PLAYER_X = 110, PW = 32, PH = 62, PH_SLIDE = 26;
-  var GRAVITY = 0.52, JUMP_VY = -13.5, SCROLL = 3.8;
-  var player, platforms, collectibles, pops, clouds;
-  var nextPlatformX, nextCoinX, nextWordX;
-  var keyHandler, jumpHandler, slideHandler, jumpTouchHandler, slideTouchHandler;
-
-  function start(ws) {
-    words = ws; wIdx = 0; scrollX = 0;
-    player = { y: GROUND_Y - PH, vy: 0, h: PH, onGround: true, sliding: false, slideTimer: 0, legPhase: 0 };
-    platforms = []; collectibles = []; pops = [];
-    clouds = [
-      { x: 200, y: 55, rw: 75 }, { x: 480, y: 35, rw: 95 },
-      { x: 700, y: 70, rw: 60 }, { x: 1050, y: 45, rw: 80 }
-    ];
-    nextPlatformX = W + 180; nextCoinX = W + 80; nextWordX = W + 380;
-    for (var i = 0; i < 6; i++) spawnCoin(W + 60 + i * 130);
-    var canvas = document.getElementById('platformCanvas');
-    ctx = canvas.getContext('2d');
-    keyHandler = function (e) {
-      if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); doJump(); }
-      if (e.code === 'ArrowDown' || e.key === 's') { doSlide(); }
-    };
-    jumpHandler = function () { doJump(); };
-    slideHandler = function () { doSlide(); };
-    jumpTouchHandler = function (e) { e.preventDefault(); doJump(); };
-    slideTouchHandler = function (e) { e.preventDefault(); doSlide(); };
-    document.addEventListener('keydown', keyHandler);
-    var bj = document.getElementById('pfBtnJump');
-    var bs = document.getElementById('pfBtnSlide');
-    bj.addEventListener('mousedown', jumpHandler);
-    bj.addEventListener('touchstart', jumpTouchHandler, { passive: false });
-    bs.addEventListener('mousedown', slideHandler);
-    bs.addEventListener('touchstart', slideTouchHandler, { passive: false });
-    loop();
-  }
-
-  function doJump() {
-    if (G.paused) return;
-    if (player.onGround) {
-      player.vy = JUMP_VY; player.onGround = false;
-      player.sliding = false; player.h = PH;
-    }
-  }
-
-  function doSlide() {
-    if (G.paused || !player.onGround) return;
-    player.sliding = true; player.h = PH_SLIDE; player.slideTimer = 48;
-  }
-
-  function spawnCoin(x, y) {
-    collectibles.push({ x: x, y: y !== undefined ? y : GROUND_Y - 22 - Math.random() * 55, type: 'coin', collected: false, phase: Math.random() * Math.PI * 2 });
-  }
-
-  function spawnWord(x) {
-    if (!words.length) return;
-    collectibles.push({ x: x, y: GROUND_Y - 90 - Math.random() * 70, type: 'word', w: words[wIdx++ % words.length], collected: false });
-  }
-
-  function spawnPlatform(x) {
-    var py = GROUND_Y - 115 - Math.random() * 65;
-    var pw = 110 + Math.random() * 100;
-    platforms.push({ x: x, y: py, w: pw });
-    var n = 2 + Math.floor(Math.random() * 3);
-    for (var i = 0; i < n; i++) spawnCoin(x + 18 + i * 30, py - 25);
-  }
-
-  function update() {
-    scrollX += SCROLL;
-    player.vy += GRAVITY; player.y += player.vy;
-    if (player.sliding && --player.slideTimer <= 0) { player.sliding = false; player.h = PH; }
-    // Ground
-    if (player.y + player.h >= GROUND_Y) { player.y = GROUND_Y - player.h; player.vy = 0; player.onGround = true; }
-    else { player.onGround = false; }
-    // Platforms (land from above only)
-    platforms.forEach(function (p) {
-      var sx = p.x - scrollX;
-      if (PLAYER_X + PW > sx && PLAYER_X < sx + p.w) {
-        var feet = player.y + player.h, prev = feet - player.vy;
-        if (player.vy >= 0 && feet >= p.y && prev <= p.y + 4) {
-          player.y = p.y - player.h; player.vy = 0; player.onGround = true;
-        }
-      }
-    });
-    if (player.onGround && !player.sliding) player.legPhase += 0.26;
-    clouds.forEach(function (c) { c.x -= 0.5; if (c.x < -120) c.x = W + 100; });
-    platforms = platforms.filter(function (p) { return p.x - scrollX > -220; });
-    collectibles = collectibles.filter(function (c) { return c.x - scrollX > -70; });
-    if (scrollX + W > nextPlatformX) { spawnPlatform(nextPlatformX); nextPlatformX += 260 + Math.random() * 220; }
-    if (scrollX + W > nextCoinX)     { spawnCoin(nextCoinX);         nextCoinX     += 85  + Math.random() * 90; }
-    if (scrollX + W > nextWordX)     { spawnWord(nextWordX);         nextWordX     += 300 + Math.random() * 260; }
-    // Collect
-    var px = PLAYER_X, py = player.y, ph = player.h;
-    collectibles.forEach(function (c) {
-      if (c.collected) return;
-      var cx = c.x - scrollX;
-      if (c.type === 'coin') {
-        var nx = Math.max(px, Math.min(cx, px + PW)), ny = Math.max(py, Math.min(c.y, py + ph));
-        if ((cx-nx)*(cx-nx)+(c.y-ny)*(c.y-ny) < 13*13) {
-          c.collected = true; addPts(5);
-          pops.push({ x: cx, y: c.y, text: '+5', life: 1 });
-        }
-      } else {
-        var bw = 46;
-        if (px < cx+bw && px+PW > cx-bw && py < c.y+28 && py+ph > c.y-28) {
-          c.collected = true;
-          openPractice(c.w, null, null);
-        }
-      }
-    });
-    pops.forEach(function (p) { p.y -= 1.4; p.life -= 0.022; });
-    pops = pops.filter(function (p) { return p.life > 0; });
-  }
-
-  function draw() {
-    // Sky
-    var sg = ctx.createLinearGradient(0, 0, 0, H);
-    sg.addColorStop(0, '#5ba3e0'); sg.addColorStop(1, '#aad4f5');
-    ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
-    // Parallax hills
-    ctx.fillStyle = '#81c784';
-    var hoff = ((-scrollX * 0.15) % 200 + 200) % 200;
-    for (var hx = hoff - 110; hx < W + 110; hx += 200) {
-      ctx.beginPath(); ctx.arc(hx, GROUND_Y + 12, 100, Math.PI, 0); ctx.fill();
-    }
-    // Clouds
-    clouds.forEach(function (c) {
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rw, 22, 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x-c.rw*0.38, c.y+9, c.rw*0.58, 17, 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(c.x+c.rw*0.32, c.y+7, c.rw*0.48, 15, 0, 0, Math.PI*2); ctx.fill();
-    });
-    // Ground
-    ctx.fillStyle = '#4caf50'; ctx.fillRect(0, GROUND_Y, W, 8);
-    ctx.fillStyle = '#388e3c'; ctx.fillRect(0, GROUND_Y+2, W, 3);
-    ctx.fillStyle = '#795548'; ctx.fillRect(0, GROUND_Y+8, W, H-GROUND_Y-8);
-    ctx.fillStyle = '#66bb6a';
-    var gd = ((-scrollX)%36+36)%36;
-    for (var gx = gd; gx < W; gx += 36) ctx.fillRect(gx, GROUND_Y+1, 6, 3);
-    // Platforms
-    platforms.forEach(function (p) {
-      var sx = p.x - scrollX;
-      if (sx > W+10 || sx+p.w < -10) return;
-      ctx.fillStyle = '#43a047'; ctx.fillRect(sx, p.y, p.w, 10);
-      ctx.fillStyle = '#795548'; ctx.fillRect(sx, p.y+10, p.w, 12);
-      ctx.strokeStyle = '#2e7d32'; ctx.lineWidth = 1.5; ctx.strokeRect(sx, p.y, p.w, 22);
-    });
-    // Collectibles
-    var now = Date.now();
-    collectibles.forEach(function (c) {
-      if (c.collected) return;
-      var cx = c.x - scrollX;
-      if (cx < -70 || cx > W+70) return;
-      if (c.type === 'coin') {
-        var spin = Math.abs(Math.sin(now*0.004+(c.phase||0)));
-        ctx.save(); ctx.translate(cx, c.y);
-        ctx.fillStyle = '#FFD700'; ctx.strokeStyle = '#c8a000'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.ellipse(0, 0, 11*(0.15+spin*0.85), 11, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        if (spin > 0.55) { ctx.fillStyle='#FFF'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.fillText('✦',0,3); }
-        ctx.restore();
-      } else {
-        var bob = Math.sin(now*0.003+cx*0.01)*5;
-        ctx.save(); ctx.translate(cx, c.y+bob);
-        ctx.font = 'bold 13px Prompt,sans-serif';
-        var bww = Math.max(72, ctx.measureText(c.w.word).width+24);
-        ctx.shadowColor='#a78bfa'; ctx.shadowBlur=12;
-        ctx.fillStyle='#fff'; ctx.strokeStyle='#8a5cf6'; ctx.lineWidth=2.5;
-        if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(-bww/2,-22,bww,44,10); ctx.fill(); ctx.stroke(); }
-        else { ctx.fillRect(-bww/2,-22,bww,44); ctx.strokeRect(-bww/2,-22,bww,44); }
-        ctx.shadowBlur=0;
-        ctx.font='16px serif'; ctx.textAlign='center'; ctx.fillText(c.w.emoji||'🔸',0,-5);
-        ctx.font='bold 12px Prompt,sans-serif'; ctx.fillStyle='#2b2438'; ctx.fillText(c.w.word,0,13);
-        ctx.restore();
-      }
-    });
-    drawPlayer();
-    pops.forEach(function (p) {
-      ctx.globalAlpha=p.life; ctx.font='bold 17px Prompt,sans-serif';
-      ctx.fillStyle='#ff9f1c'; ctx.textAlign='center'; ctx.fillText(p.text,p.x,p.y);
-      ctx.globalAlpha=1;
-    });
-    if (scrollX < 200) {
-      ctx.fillStyle='rgba(43,36,56,0.52)'; ctx.font='bold 16px Prompt,sans-serif'; ctx.textAlign='center';
-      ctx.fillText('↑ กระโดด   ↙ สไลด์   เก็บเหรียญ 🪙 และพูดคำศัพท์ 💬', W/2, 30);
-    }
-  }
-
-  function drawPlayer() {
-    ctx.save(); ctx.translate(PLAYER_X + PW/2, player.y);
-    if (player.sliding) {
-      ctx.fillStyle = '#d63031'; ctx.fillRect(-16, 0, 32, 12);
-      ctx.fillStyle = '#ffba8a';
-      ctx.beginPath(); ctx.ellipse(4, 6, 10, 8, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#0984e3'; ctx.fillRect(-16, 12, 32, player.h-12);
-      ctx.fillStyle = '#5d4037'; ctx.fillRect(-16, player.h-6, 32, 6);
-    } else {
-      var sw = player.onGround ? Math.sin(player.legPhase)*7 : 4;
-      // Hat
-      ctx.fillStyle = '#d63031'; ctx.fillRect(-11, 0, 22, 8);
-      ctx.fillRect(-15, 7, 30, 5);
-      // Face
-      ctx.fillStyle = '#ffba8a';
-      ctx.beginPath(); ctx.ellipse(0, 19, 12, 12, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#2d3436';
-      ctx.beginPath(); ctx.arc(4, 16, 2.2, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#5d4037';
-      ctx.beginPath(); ctx.ellipse(-4, 23, 5, 3, 0.3, 0, Math.PI); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(5, 23, 5, 3, -0.3, 0, Math.PI); ctx.fill();
-      // Overalls
-      ctx.fillStyle = '#0984e3'; ctx.fillRect(-12, 29, 24, 16);
-      ctx.fillStyle = '#fdcb6e'; ctx.fillRect(-8,31,5,5); ctx.fillRect(4,31,5,5);
-      // Legs
-      ctx.fillStyle = '#d63031';
-      ctx.fillRect(-12, 44, 10, 12+sw); ctx.fillRect(2, 44, 10, 12-sw);
-      ctx.fillStyle = '#5d4037';
-      ctx.fillRect(-14, 55+sw, 13, 7); ctx.fillRect(0, 55-sw, 13, 7);
-    }
-    ctx.restore();
-  }
-
-  function loop() { if (!ctx) return; if (!G.paused) update(); draw(); animId = requestAnimationFrame(loop); }
-
-  function stop() {
-    cancelAnimationFrame(animId); animId = null; ctx = null;
-    if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
-    var bj = document.getElementById('pfBtnJump'), bs = document.getElementById('pfBtnSlide');
-    if (bj && jumpHandler) { bj.removeEventListener('mousedown', jumpHandler); bj.removeEventListener('touchstart', jumpTouchHandler); }
-    if (bs && slideHandler) { bs.removeEventListener('mousedown', slideHandler); bs.removeEventListener('touchstart', slideTouchHandler); }
-    jumpHandler = slideHandler = jumpTouchHandler = slideTouchHandler = null;
-  }
-
-  return { start: start, stop: stop };
-})();
 
 /* ===== Setup overlay helpers ===== */
 var _allWords = [], _setupMode = null, _setupCam = null;
@@ -1025,16 +533,16 @@ function launchGame() {
     MatchingGame.init(pool);
   } else if (G.mode === 'shooting') {
     document.getElementById('shootingGame').style.display = 'block';
-    ShootingGame.start(pool);
+    ShootingGame.start(pool, GAME_CBS);   // Phaser game
   } else if (G.mode === 'flashcard') {
     document.getElementById('flashcardGame').style.display = 'block';
     FlashcardGame.start(pool);
   } else if (G.mode === 'platformer') {
     document.getElementById('platformerGame').style.display = 'block';
-    PlatformerGame.start(pool);
+    PlatformerGame.start(pool, GAME_CBS); // Phaser game
   } else {
     document.getElementById('airplaneGame').style.display = 'block';
-    AirplaneGame.start(pool);
+    AirplaneGame.start(pool, GAME_CBS);   // Phaser game
   }
 }
 
