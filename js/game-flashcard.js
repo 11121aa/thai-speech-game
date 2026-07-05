@@ -299,7 +299,7 @@ function createFlashcardGame(words, callbacks) {
     parent: 'flashcardGame', // HTML div id to inject the canvas into
     width:  W,
     height: H,
-    scale:  { mode: Phaser.Scale.NONE },
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene:  FcScene,
     audio:  { noAudio: true }
   });

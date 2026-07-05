@@ -788,7 +788,8 @@ a {
   margin: 0 auto;
   cursor: crosshair;
 }
-.game-canvas-wrap canvas { display: block; width: 100%; height: auto; }
+/* Phaser.Scale.FIT handles canvas sizing — just cap it and block overflow */
+.game-canvas-wrap canvas { display: block; max-width: 100%; }
 
 /* ============ Finish screen ============ */
 .finish-screen {
@@ -1016,7 +1017,7 @@ a {
   box-shadow: var(--shadow-soft);
   cursor: pointer;
 }
-.platformer-wrap canvas { display: block; width: 100%; height: auto; }
+.platformer-wrap canvas { display: block; max-width: 100%; }
 .platformer-btns {
   position: absolute;
   bottom: 14px;
@@ -1419,8 +1420,7 @@ section.bg-soft-yellow {
 #matchingGame canvas,
 #flashcardGame canvas {
   display: block;
-  width: 100% !important;
-  height: auto !important;
+  max-width: 100%;
 }
 
 /* ── Phone  (≤ 575px) ───────────────────────────────────── */

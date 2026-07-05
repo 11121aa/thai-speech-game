@@ -319,7 +319,7 @@ function createMatchingGame(words, callbacks) {
     parent: 'matchingGame', // HTML div id to inject the canvas into
     width:  W,
     height: H,
-    scale:  { mode: Phaser.Scale.NONE },
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene:  MatchScene,
     audio:  { noAudio: true }
   });

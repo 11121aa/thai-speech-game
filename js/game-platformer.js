@@ -602,7 +602,7 @@ function createPlatformerGame(words, callbacks) {
     parent: 'platformerGame',    // ID of the HTML div to inject the canvas into
     width:  W,                   // canvas width in pixels
     height: H,                   // canvas height in pixels
-    scale:  { mode: Phaser.Scale.NONE }, // don't auto-resize the canvas
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene:  PlatScene,           // the scene class defined above
     audio:  { noAudio: false }   // audio enabled — PixelJump and CoinSFX are used
   });

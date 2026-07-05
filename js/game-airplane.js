@@ -359,7 +359,7 @@ function createAirplaneGame(words, callbacks) {
     parent: 'airplaneGame',    // HTML div id to inject the canvas into
     width:  W,
     height: H,
-    scale:  { mode: Phaser.Scale.NONE }, // don't auto-resize
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene:  AirScene,
     audio:  { noAudio: true }  // no sound effects
   });
