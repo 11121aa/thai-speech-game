@@ -23,12 +23,38 @@ const Recorder = (function () {
     render();
   }
 
+  // iOS Safari only supports audio/mp4; Chrome/Android supports audio/webm.
+  // Pick the first format the current browser actually supports.
+  function getSupportedMimeType() {
+    var candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+      "audio/ogg"
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      if (typeof MediaRecorder !== "undefined" &&
+          MediaRecorder.isTypeSupported(candidates[i])) {
+        return candidates[i];
+      }
+    }
+    return ""; // let the browser decide (last resort)
+  }
+
+  function mimeToExt(mimeType) {
+    if (mimeType.indexOf("mp4")  !== -1) return "mp4";
+    if (mimeType.indexOf("ogg")  !== -1) return "ogg";
+    return "webm";
+  }
+
   function startRecording(canvas, onStop, onError) {
     const rafHolder = { id: null };
     let audioCtx = null;
     let mediaStream = null;
     let mediaRecorder = null;
     const chunks = [];
+    const mimeType = getSupportedMimeType();
 
     navigator.mediaDevices
       .getUserMedia({ audio: true })
@@ -36,6 +62,9 @@ const Recorder = (function () {
         mediaStream = stream;
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AudioContextClass();
+        // iOS suspends AudioContext until a user gesture — resume immediately
+        if (audioCtx.state === "suspended") audioCtx.resume();
+
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;
@@ -43,18 +72,23 @@ const Recorder = (function () {
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         if (canvas) drawWaveform(canvas, analyser, dataArray, rafHolder);
 
-        mediaRecorder = new MediaRecorder(stream);
+        // Pass mimeType only when the browser declared support (empty string = browser default)
+        mediaRecorder = mimeType
+          ? new MediaRecorder(stream, { mimeType: mimeType })
+          : new MediaRecorder(stream);
+
+        // Use the recorder's actual mimeType (may differ from what we requested)
+        const actualMime = mediaRecorder.mimeType || mimeType || "audio/webm";
+
         mediaRecorder.ondataavailable = function (e) {
           if (e.data.size > 0) chunks.push(e.data);
         };
         mediaRecorder.onstop = function () {
           if (rafHolder.id) cancelAnimationFrame(rafHolder.id);
-          mediaStream.getTracks().forEach(function (t) {
-            t.stop();
-          });
+          mediaStream.getTracks().forEach(function (t) { t.stop(); });
           if (audioCtx.state !== "closed") audioCtx.close();
-          const blob = new Blob(chunks, { type: "audio/webm" });
-          onStop(blob);
+          const blob = new Blob(chunks, { type: actualMime });
+          onStop(blob, actualMime);
         };
         mediaRecorder.start();
       })
@@ -79,10 +113,12 @@ const Recorder = (function () {
     };
   }
 
-  async function uploadAndSavePractice(blob, wordId, userId) {
-    const path = userId + "/" + crypto.randomUUID() + ".webm";
+  async function uploadAndSavePractice(blob, wordId, userId, mimeType) {
+    const mime = mimeType || blob.type || "audio/webm";
+    const ext  = mimeToExt(mime);
+    const path = userId + "/" + crypto.randomUUID() + "." + ext;
     const { error: uploadError } = await sb.storage.from("practice-audio").upload(path, blob, {
-      contentType: "audio/webm"
+      contentType: mime
     });
     if (uploadError) throw uploadError;
     const { data: inserted, error: insertError } = await sb

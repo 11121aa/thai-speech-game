@@ -175,7 +175,7 @@ const PracticePanel = (function () {
 
       recordController = Recorder.startRecording(
         el("ppWaveCanvas"),
-        async function (blob) {
+        async function (blob, mimeType) {
           resetMicButton();
           const btn = el("ppBtnMic");
           btn.disabled = true;
@@ -188,7 +188,7 @@ const PracticePanel = (function () {
           }, 1000);
           try {
             const session = await Auth.getSession();
-            const result = await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id);
+            const result = await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id, mimeType);
             lastPracticeId = result.id;
             showPlayback(blob);
           } catch (err) {
