@@ -1017,6 +1017,7 @@ a {
   box-shadow: var(--shadow-soft);
   cursor: pointer;
 }
+#platformerCanvas { display: block; width: 100%; }
 .platformer-wrap canvas { display: block; max-width: 100%; }
 .platformer-btns {
   position: absolute;
@@ -1050,10 +1051,13 @@ a {
   touch-action: none;
   transition: transform 0.1s ease, background 0.1s ease;
 }
+/* Distinct colours per button so they're easy to find on mobile */
+#pfBtnJump  { background: rgba(39, 174, 96, 0.88);  border-color: rgba(39,174,96,0.95);  color: #fff; }
+#pfBtnSlide { background: rgba(52, 152, 219, 0.88); border-color: rgba(52,152,219,0.95); color: #fff; }
 .pf-btn small { font-size: 0.75rem; font-weight: 600; }
 .pf-btn:active {
-  transform: scale(0.9);
-  background: rgba(255, 255, 255, 0.96);
+  transform: scale(0.88);
+  filter: brightness(1.15);
 }
 
 /* ============ Flashcard game ============ */
