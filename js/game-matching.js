@@ -88,9 +88,10 @@ function createMatchingGame(words, callbacks) {
 
       // ── Draw the background ────────────��──────────────────────────
       // 20 horizontal gradient bands from off-white at the top to near-white at the bottom
-      this.sfxFlip    = this.sound.add('FlipCard',   { volume: 0.6 });
-      this.sfxWrong   = this.sound.add('WrongSFX',   { volume: 0.7 });
-      this.sfxCorrect = this.sound.add('CorrectSFX', { volume: 0.75 });
+      var ca = this.cache.audio;
+      this.sfxFlip    = ca.exists('FlipCard')   ? this.sound.add('FlipCard',   { volume: 0.6  }) : null;
+      this.sfxWrong   = ca.exists('WrongSFX')   ? this.sound.add('WrongSFX',   { volume: 0.7  }) : null;
+      this.sfxCorrect = ca.exists('CorrectSFX') ? this.sound.add('CorrectSFX', { volume: 0.75 }) : null;
 
       var bg = this.add.graphics();
       for (var b = 0; b < 20; b++) {
@@ -336,12 +337,13 @@ function createMatchingGame(words, callbacks) {
 
   // Create and return the Phaser.Game that runs MatchScene
   return new Phaser.Game({
-    type:   Phaser.AUTO,
-    parent: 'matchingGame', // HTML div id to inject the canvas into
-    width:  W,
-    height: H,
-    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
-    scene:  MatchScene
+    type:            Phaser.AUTO,
+    parent:          'matchingGame',
+    width:           W,
+    height:          H,
+    backgroundColor: '#f0f4f8',
+    scale:           { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
+    scene:           MatchScene
   });
 }
 
