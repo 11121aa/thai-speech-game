@@ -36,10 +36,12 @@ function createShootingGame(words, callbacks) {
 
   // ── [PROJ] Projectile settings ────────────────────────────────
   var PROJ_SPD   = 9;   // cannonball travel speed in pixels per frame (~540 px/s at 60fps)
-  var PROJ_HIT_R = 50;  // pixel radius — projectile must come within this distance of a target centre to hit
+  var PROJ_HIT_R = 36;  // pixel radius — projectile must come within this distance of a target centre to hit
+
+  var RELOAD_MS  = 2000; // milliseconds between shots (reload time)
 
   // ── [RINGS] Bullseye ring colours from outer to inner ─────────
-  var RING_R = [46, 37, 27, 18, 10];
+  var RING_R = [32, 25, 18, 12, 7];   // smaller targets — harder to hit
   var RING_C = [0xe74c3c, 0xffffff, 0x2980b9, 0xffffff, 0xf1c40f];
 
   // ── Scene ─────────────────────────────────────────────────────
@@ -49,13 +51,14 @@ function createShootingGame(words, callbacks) {
     initialize: function () {
       Phaser.Scene.call(this, { key: 'shooting' });
 
-      this.targets     = [];           // active bullseye targets
-      this.projectiles = [];           // cannonballs currently in flight: { x, y, vx, vy }
-      this.wordIdx     = 0;
-      this.aimAngle    = -Math.PI / 2; // starts pointing straight up
-      this.aimDir      = 1;            // +1 = sweeping right, -1 = sweeping left
-      this.isPaused    = false;
-      this.trail       = null;         // { angle, life } — fading line after a shot
+      this.targets      = [];           // active bullseye targets
+      this.projectiles  = [];           // cannonballs currently in flight: { x, y, vx, vy }
+      this.wordIdx      = 0;
+      this.aimAngle     = -Math.PI / 2; // starts pointing straight up
+      this.aimDir       = 1;            // +1 = sweeping right, -1 = sweeping left
+      this.isPaused     = false;
+      this.trail        = null;         // { angle, life } — fading line after a shot
+      this.reloadUntil  = 0;           // timestamp when reload finishes (0 = ready to fire)
     },
 
     // preload() runs before create() — load all assets (audio, images, etc.)
@@ -133,8 +136,8 @@ function createShootingGame(words, callbacks) {
 
       do {
         angle = -Math.PI + Math.random() * Math.PI; // upper semicircle
-        // [TUNE] Targets are 260–390px away — further than before so the cannonball has travel time
-        var dist = 260 + Math.random() * 130;
+        // [TUNE] Targets are 320–430px away — far enough that reload time feels meaningful
+        var dist = 320 + Math.random() * 110;
         tx = CANNON_X + Math.cos(angle) * dist;
         ty = CANNON_Y + Math.sin(angle) * dist;
         tries++;
@@ -145,13 +148,13 @@ function createShootingGame(words, callbacks) {
           })) && tries < 30
       );
 
-      var label = this.add.text(tx, ty - 58, word.word, {
-        fontFamily: 'Prompt, sans-serif', fontSize: '14px', fontStyle: 'bold',
-        color: '#2b2438', backgroundColor: '#ffffffcc', padding: { x: 8, y: 3 }
+      var label = this.add.text(tx, ty - 40, word.word, {
+        fontFamily: 'Prompt, sans-serif', fontSize: '13px', fontStyle: 'bold',
+        color: '#2b2438', backgroundColor: '#ffffffcc', padding: { x: 6, y: 2 }
       }).setOrigin(0.5, 1).setDepth(2);
 
-      var emoji = this.add.text(tx, ty - 58 - label.height - 2,
-        word.emoji || '🎯', { fontSize: '20px' }).setOrigin(0.5, 1).setDepth(2);
+      var emoji = this.add.text(tx, ty - 40 - label.height - 2,
+        word.emoji || '🎯', { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(2);
 
       this.targets.push({
         x: tx, y: ty, angle: angle, word: word,
@@ -162,23 +165,20 @@ function createShootingGame(words, callbacks) {
     },
 
     // ── Fire the cannon ───────────────────────────────────────────
-    // Creates a real projectile instead of instant hitscan — the ball travels across the screen
     fire: function () {
-      // Play the cannon fire sound effect
-      this.sfxCannon.play();
+      if (this.time.now < this.reloadUntil) return; // still reloading — ignore the tap
 
-      // Keep a fading aim-line trail so the player can see where they fired
+      this.sfxCannon.play();
+      this.reloadUntil = this.time.now + RELOAD_MS; // start 2-second reload
       this.trail = { angle: this.aimAngle, life: 1.0 };
 
-      // Spawn a cannonball just past the muzzle tip
-      // The muzzle is at CANNON + (cos/sin) * (BARREL_LEN + muzzle_radius=9)
       var cos = Math.cos(this.aimAngle);
       var sin = Math.sin(this.aimAngle);
       this.projectiles.push({
         x:  CANNON_X + cos * (BARREL_LEN + 9),
         y:  CANNON_Y + sin * (BARREL_LEN + 9),
-        vx: cos * PROJ_SPD,   // horizontal speed component
-        vy: sin * PROJ_SPD    // vertical speed component
+        vx: cos * PROJ_SPD,
+        vy: sin * PROJ_SPD
       });
     },
 
@@ -228,7 +228,7 @@ function createShootingGame(words, callbacks) {
             // ── HIT! ──────────────────────────────────────────────
             t.hit = true;
             callbacks.onPoints(10);
-            self.showPop(t.x, t.y - 65, '+10 ⭐');
+            self.showPop(t.x, t.y - 48, '+10 ⭐');
             self.isPaused = true;
             var ref = t;
             callbacks.onPractice(t.word, null, function () {
@@ -261,14 +261,21 @@ function createShootingGame(words, callbacks) {
         g.fillCircle(proj.x - 2, proj.y - 2, 3); // small highlight spot
       });
 
-      // ── Dashed aim line ────────────────────────────────────────
-      var aimLen = 360;
+      // ── Reload state ───────────────────────────────────────────
+      var reloading   = time < this.reloadUntil;
+      var reloadFrac  = reloading
+        ? Math.min(1, (time - (this.reloadUntil - RELOAD_MS)) / RELOAD_MS)
+        : 1; // 0→1 as reload progresses; 1 = ready
+
+      // ── Dashed aim line (dimmed while reloading) ───────────────
+      var aimAlpha = reloading ? 0.25 : 0.65;
+      var aimLen   = 360;
       var aex = CANNON_X + Math.cos(this.aimAngle) * aimLen;
       var aey = CANNON_Y + Math.sin(this.aimAngle) * aimLen;
       for (var s = 0; s < 12; s++) {
         if (s % 2 === 0) {
           var t0 = s / 12, t1 = (s + 0.65) / 12;
-          g.lineStyle(2, 0xffffff, 0.65);
+          g.lineStyle(2, 0xffffff, aimAlpha);
           g.lineBetween(
             CANNON_X + (aex - CANNON_X) * t0, CANNON_Y + (aey - CANNON_Y) * t0,
             CANNON_X + (aex - CANNON_X) * t1, CANNON_Y + (aey - CANNON_Y) * t1
@@ -276,15 +283,32 @@ function createShootingGame(words, callbacks) {
         }
       }
 
-      // Crosshair at aim tip
-      g.lineStyle(2.5, 0xff4444, 0.92);
+      // Crosshair at aim tip (grey while reloading, red when ready)
+      var chColor = reloading ? 0x888888 : 0xff4444;
+      var chAlpha = reloading ? 0.4 : 0.92;
+      g.lineStyle(2.5, chColor, chAlpha);
       g.lineBetween(aex - 10, aey, aex + 10, aey);
       g.lineBetween(aex, aey - 10, aex, aey + 10);
-      g.fillStyle(0xff4444, 0.3);
+      g.fillStyle(chColor, reloading ? 0.12 : 0.3);
       g.fillCircle(aex, aey, 8);
 
       // Draw the cannon
       this.drawCannon(g);
+
+      // ── Reload arc around the cannon base ──────────────────────
+      if (reloading) {
+        // Grey background ring
+        g.lineStyle(5, 0x444444, 0.35);
+        g.strokeCircle(CANNON_X, CANNON_Y, 28);
+        // Filling orange arc that grows as reload completes
+        g.lineStyle(5, 0xff9900, 0.9);
+        g.beginPath();
+        g.arc(CANNON_X, CANNON_Y, 28,
+              -Math.PI / 2,
+              -Math.PI / 2 + reloadFrac * Math.PI * 2,
+              false, 0.02);
+        g.strokePath();
+      }
 
       // ── Update and draw targets ───────────────────────────────────
       var toRemove = [];
@@ -295,7 +319,7 @@ function createShootingGame(words, callbacks) {
           t.s = Math.min(1, t.s + 0.05); // pop-in animation
           if (elapsed >= TIMEOUT_MS) {
             t.expired = true;
-            self.showPop(t.x, t.y - 65, '⌛');
+            self.showPop(t.x, t.y - 48, '⌛');
             self.time.delayedCall(400, function () { self.spawnTarget(); });
           }
         } else if (t.done || t.expired) {
@@ -365,15 +389,15 @@ function createShootingGame(words, callbacks) {
         g.fillCircle(cx, cy, RING_R[ri] * t.s);
       }
       g.lineStyle(1, 0x00000022);
-      g.lineBetween(cx - 46 * t.s, cy, cx + 46 * t.s, cy);
-      g.lineBetween(cx, cy - 46 * t.s, cx, cy + 46 * t.s);
+      g.lineBetween(cx - 32 * t.s, cy, cx + 32 * t.s, cy);
+      g.lineBetween(cx, cy - 32 * t.s, cx, cy + 32 * t.s);
 
-      // Countdown arc (green → yellow → red)
+      // Countdown arc (green → yellow → red) just outside the outermost ring
       if (!t.hit && !t.expired && t.s > 0.3) {
         var arcColor = frac > 0.5 ? 0x27ae60 : frac > 0.25 ? 0xf39c12 : 0xe74c3c;
-        g.lineStyle(5 * t.s, arcColor);
+        g.lineStyle(4 * t.s, arcColor);
         g.beginPath();
-        g.arc(cx, cy, 58 * t.s, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2, false, 0.02);
+        g.arc(cx, cy, 40 * t.s, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2, false, 0.02);
         g.strokePath();
       }
 
