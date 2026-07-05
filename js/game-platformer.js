@@ -273,7 +273,11 @@ function createPlatformerGame(words, callbacks) {
         if (px < cx + bw && px + PW > cx - bw && py < wi.y + 28 && py + ph > wi.y - 28) {
           wi.collected = true;
           self.isPaused = true;
-          callbacks.onPractice(wi.word, null, function () { self.isPaused = false; });
+          callbacks.onPractice(wi.word, null, function () {
+            self.isPaused = false;
+            p.invincible = 180; // 3 s immunity after word practice
+            self.showPop(PLAYER_X + PW / 2, p.y - 20, '🛡️ คุ้มกัน!');
+          });
         }
       });
 

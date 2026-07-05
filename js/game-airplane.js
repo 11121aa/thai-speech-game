@@ -36,17 +36,18 @@ function createAirplaneGame(words, callbacks) {
     initialize: function () {
       Phaser.Scene.call(this, { key: 'flappy' });
       // Raw game state (no Phaser objects here — those live in create/doRestart)
-      this.state      = 'waiting'; // 'waiting' | 'playing' | 'dead'
-      this.birdY      = H / 2;
-      this.birdVY     = 0;
-      this.pipes      = [];
-      this.clouds     = [];
-      this.score      = 0;
-      this.pipeCount  = 0;
-      this.wordIdx    = 0;
-      this.frameCount = 0;
-      this.scrollOff  = 0;
-      this.isPaused   = false;
+      this.state        = 'waiting'; // 'waiting' | 'playing' | 'dead'
+      this.birdY        = H / 2;
+      this.birdVY       = 0;
+      this.pipes        = [];
+      this.clouds       = [];
+      this.score        = 0;
+      this.pipeCount    = 0;
+      this.wordIdx      = 0;
+      this.frameCount   = 0;
+      this.scrollOff    = 0;
+      this.isPaused     = false;
+      this.immuneFrames = 0; // >0 = invincible (flashes, can't die from pipes/ground)
     },
 
     create: function () {
@@ -127,15 +128,16 @@ function createAirplaneGame(words, callbacks) {
         if (p.emojiLabel) p.emojiLabel.destroy();
       });
       // Reset all state
-      this.state      = 'waiting';
-      this.birdY      = H / 2;
-      this.birdVY     = 0;
-      this.pipes      = [];
-      this.score      = 0;
-      this.pipeCount  = 0;
-      this.wordIdx    = 0;
-      this.frameCount = 0;
-      this.scrollOff  = 0;
+      this.state        = 'waiting';
+      this.birdY        = H / 2;
+      this.birdVY       = 0;
+      this.pipes        = [];
+      this.score        = 0;
+      this.pipeCount    = 0;
+      this.wordIdx      = 0;
+      this.frameCount   = 0;
+      this.scrollOff    = 0;
+      this.immuneFrames = 0;
       // Reset UI
       this.scoreTxt.setText('0');
       this.waitTxt.setVisible(true);
@@ -261,13 +263,21 @@ function createAirplaneGame(words, callbacks) {
       // Physics
       this.birdVY += GRAVITY;
       this.birdY  += this.birdVY;
-      this.scrollOff = (this.scrollOff + SCROLL_SPD) % 80;
+      this.scrollOff    = (this.scrollOff + SCROLL_SPD) % 80;
+      if (this.immuneFrames > 0) this.immuneFrames--;
 
       // Ceiling: bounce off gently (don't die)
       if (this.birdY - BIRD_R < 0) { this.birdY = BIRD_R; this.birdVY = 0; }
 
-      // Ground → die
-      if (this.birdY + BIRD_R > GROUND_Y) { this.killBird(); return; }
+      // Ground — immune: bounce back up; not immune: die
+      if (this.birdY + BIRD_R > GROUND_Y) {
+        if (this.immuneFrames > 0) {
+          this.birdY  = GROUND_Y - BIRD_R;
+          this.birdVY = FLAP_VY * 0.55; // auto-flap when immune
+        } else {
+          this.killBird(); return;
+        }
+      }
 
       // Move pipes + detect score
       this.pipes.forEach(function (p) {
@@ -304,9 +314,10 @@ function createAirplaneGame(words, callbacks) {
         if (this.birdY + BIRD_R < p.x - hW) continue; // pipe not reached yet (wrong axis?)
         // Check horizontal overlap
         if (BIRD_X + BIRD_R > p.x - hW && BIRD_X - BIRD_R < p.x + hW) {
-          // Check vertical: hit top or bottom pipe?
-          if (this.birdY - BIRD_R < p.gapY - hG ||
-              this.birdY + BIRD_R > p.gapY + hG) {
+          // Check vertical: hit top or bottom pipe? (skip when immune)
+          if (this.immuneFrames === 0 &&
+              (this.birdY - BIRD_R < p.gapY - hG ||
+               this.birdY + BIRD_R > p.gapY + hG)) {
             this.killBird();
             dead = true;
             break;
@@ -320,11 +331,12 @@ function createAirplaneGame(words, callbacks) {
               if (p.wordLabel)  { p.wordLabel.destroy();  p.wordLabel  = null; }
               if (p.emojiLabel) { p.emojiLabel.destroy(); p.emojiLabel = null; }
               this.isPaused = true;
-              var pRef = p;
               callbacks.onPractice(p.wordObj, null, function () {
-                self.isPaused = false;
+                self.isPaused     = false;
+                self.immuneFrames = 120; // 2 s immunity after word practice
                 callbacks.onPoints(5);
-                self.showPop(BIRD_X, self.birdY - 40, '+5 ⭐ ออกเสียงได้!');
+                self.showPop(BIRD_X, self.birdY - 50, '+5 ⭐ ออกเสียงได้!');
+                self.showPop(BIRD_X, self.birdY - 20, '🛡️ คุ้มกัน!');
               });
             }
           }
@@ -406,6 +418,18 @@ function createAirplaneGame(words, callbacks) {
       var x  = BIRD_X;
       var y  = this.birdY;
       var vy = this.birdVY;
+
+      // Flash every 6 frames during immunity (same pattern as platformer)
+      if (this.immuneFrames > 0 && Math.floor(this.immuneFrames / 6) % 2 === 1) return;
+
+      // Golden shield glow when immune
+      if (this.immuneFrames > 0) {
+        var sa = 0.55 * (this.immuneFrames / 120);
+        g.fillStyle(0xffd700, sa);
+        g.fillCircle(x, y, BIRD_R + 14);
+        g.lineStyle(2.5, 0xffd700, Math.min(1, sa * 2));
+        g.strokeCircle(x, y, BIRD_R + 14);
+      }
 
       // Tilt: nose down when falling, nose up briefly after flap
       var tilt     = Phaser.Math.Clamp(vy * 0.065, -0.55, 0.7);
