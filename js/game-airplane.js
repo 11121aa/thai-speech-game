@@ -1,388 +1,521 @@
 // ============================================================
-//  AIRPLANE GAME — Phaser 3  (Flappy-Bird style)
+//  FLYING GAME — Phaser 3  (Flappy Bird style)
 // ============================================================
-//  POLISH GUIDE (search for the label to find where to edit):
-//    [TUNE]    Gravity, flap strength, speed   (~line 18)
-//    [SKY]     Sky / ground colours            (~drawBg)
-//    [CLOUDS]  Cloud count & shape             (~create / drawCloud)
-//    [PLANE]   Plane colours & shape           (~drawPlane)
-//    [BUBBLE]  Bubble size, colours            (~spawnBubble / drawBubble)
-//    [POP]     Score pop style                 (~showPop)
+//  [TUNE]    Gravity, flap, pipe speed & gap       (~constants)
+//  [PIPES]   Pipe colours, cap size                (~drawPipe)
+//  [BIRD]    Bird colours & shape                  (~drawBird)
+//  [BUBBLE]  Word bubble appearance                (~drawBubble)
 // ============================================================
 //  How the game works:
-//    - The plane falls due to gravity every frame
-//    - Tap (click / touch) to flap upward
-//    - Word bubbles float from right to left
-//    - Fly into a bubble → pronunciation practice modal opens
-//    - Complete all words (fill the progress bar) → game ends
+//    - Tap / Space to flap upward; gravity pulls the bird down
+//    - Fly through the gap between pipe pairs to score +1 ⭐
+//    - Every 5th gap has a golden word bubble in the center
+//    - Fly INTO the bubble → practice modal → +5 ⭐ bonus
+//    - Hit a pipe, the ceiling, or the ground → die
+//    - Tap again after death to restart
 // ============================================================
 
-// createAirplaneGame is called with:
-//   words     = array of word objects { word, emoji, reading, ... }
-//   callbacks = { onPoints, onPractice, onFinish, onTime }
 function createAirplaneGame(words, callbacks) {
 
-  // ── [TUNE] Numbers you can change to adjust feel ─────────────
-  var GRAVITY     =  0.19;  // downward pull each frame — higher = heavier plane
-  var FLAP_VY     = -7.5;   // upward speed boost when the player taps — more negative = stronger flap
-  var BUBBLE_SPD  =  2.4;   // how fast bubbles scroll left (px per frame)
-  var TOTAL_PROG  = 2400;   // total "distance" to travel before the game ends (finish condition)
-  var CLOUD_COUNT =  5;     // how many clouds are on screen at once
-  var W = 800, H = 380;     // canvas size in pixels
-  var GROUND_Y = H - 50;    // Y position of the ground strip (measured from top)
-  var PLANE_X  = 130;       // fixed horizontal position of the plane (world scrolls, plane stays)
+  // ── [TUNE] ──────────────────────────────────────────────────
+  var GRAVITY    = 0.32;   // downward pull per frame
+  var FLAP_VY    = -7.0;   // upward boost on tap
+  var SCROLL_SPD = 2.4;    // pipe scroll speed (px/frame)
+  var PIPE_GAP   = 150;    // vertical gap height (px)
+  var PIPE_DIST  = 240;    // horizontal distance between pipe pairs (px)
+  var PIPE_W     = 60;     // pipe width (px)
+  var BIRD_X     = 140;    // fixed horizontal position of the bird
+  var BIRD_R     = 13;     // bird hitbox radius
+  var WORD_EVERY = 5;      // every Nth pipe has a word bubble
+  var W = 800, H = 480;
+  var GROUND_Y   = H - 58;
 
-  // ── Scene class ───────────────────────────────────────────────
-  var AirScene = new Phaser.Class({
-    Extends: Phaser.Scene, // inherit all standard Phaser scene behaviour
+  var FlapScene = new Phaser.Class({
+    Extends: Phaser.Scene,
 
-    // initialize() — sets up starting values before the scene runs
     initialize: function () {
-      Phaser.Scene.call(this, { key: 'airplane' }); // register this scene
-
-      this.isPaused = false;  // true when the practice modal is open (game freezes)
-      this.planeY   = H / 2;  // plane starts vertically centred
-      this.planeVY  = 0;      // vertical velocity (positive = falling down)
-      this.progress = 0;      // how far the player has flown (increases every frame)
-      this.wordIdx  = 0;      // index into the words array — cycles through all words
-      this.bubbles  = [];     // array of active bubble objects on screen
-      this.clouds   = [];     // array of cloud objects in the background
+      Phaser.Scene.call(this, { key: 'flappy' });
+      // Raw game state (no Phaser objects here — those live in create/doRestart)
+      this.state      = 'waiting'; // 'waiting' | 'playing' | 'dead'
+      this.birdY      = H / 2;
+      this.birdVY     = 0;
+      this.pipes      = [];
+      this.clouds     = [];
+      this.score      = 0;
+      this.pipeCount  = 0;
+      this.wordIdx    = 0;
+      this.frameCount = 0;
+      this.scrollOff  = 0;
+      this.isPaused   = false;
     },
 
-    // create() — runs once when the scene starts; sets up everything
     create: function () {
-      var self = this; // save reference so inner callbacks can access the scene
+      var self = this;
+      this.birdY = H / 2;
 
-      // ── Graphics layers ─────────────────────────────────────────
-      // bgGfx is drawn once (static sky + ground)
-      // dynGfx is cleared and redrawn every frame (plane, bubbles, clouds)
-      this.bgGfx  = this.add.graphics();
-      this.dynGfx = this.add.graphics();
+      // Static background drawn once
+      this.bgGfx = this.add.graphics().setDepth(0);
+      this.drawBg();
 
-      this.drawBg(); // paint the static sky gradient and ground
-
-      // ── Progress bar at the bottom of the screen ─────────────────
-      // The bar fills from left to right as the player flies forward
-      this.progTrack = this.add.graphics(); // the grey background track
-      this.progFill  = this.add.graphics(); // the teal fill that grows over time
-      this.progTrack.fillStyle(0xcccccc);
-      this.progTrack.fillRect(20, H - 14, W - 40, 7); // draw the grey track once
-      // A flag emoji marks the end of the bar (the goal)
-      this.progFlagText = this.add.text(20, H - 6, '🏁', { fontSize: '14px' }).setOrigin(0, 1);
-
-      // ── [CLOUDS] Create background clouds with random properties ──
-      for (var i = 0; i < CLOUD_COUNT; i++) {
+      // Cloud layer
+      this.cloudGfx = this.add.graphics().setDepth(1);
+      for (var i = 0; i < 5; i++) {
         this.clouds.push({
-          x:   60 + Math.random() * W * 1.8,          // random starting X across the screen
-          y:   25 + Math.random() * 110,               // random height in the upper sky
-          rw:  65 + Math.random() * 70,                // random half-width (bigger = fluffier)
-          spd: 0.55 + Math.random() * 0.6              // random drift speed (clouds move at different rates)
+          x:   Math.random() * W,
+          y:   20 + Math.random() * 100,
+          rw:  55 + Math.random() * 60,
+          spd: 0.38 + Math.random() * 0.5
         });
       }
 
-      // ── Tap / click to flap ──────────────────────────────────────
-      // Every time the player clicks or taps, apply the flap velocity upward
-      this.input.on('pointerdown', function () {
-        if (!self.isPaused) {
-          self.planeVY = FLAP_VY; // set upward speed (negative Y = up)
-        }
-      });
+      // Main dynamic layer (pipes, bird, ground, bubbles)
+      this.gfx = this.add.graphics().setDepth(2);
 
-      // ── On-screen hint text (auto-fades after 3 seconds) ─────────
-      this.hintText = this.add.text(W / 2, 45, 'แตะหน้าจอเพื่อบินขึ้น! ✈️', {
+      // Score (top centre)
+      this.scoreTxt = this.add.text(W / 2, 18, '0', {
         fontFamily: 'Prompt, sans-serif',
-        fontSize:   '18px',
-        fontStyle:  'bold',
-        color:      '#2b2438',
-        backgroundColor: '#ffffffaa',
-        padding:    { x: 10, y: 5 }
-      }).setOrigin(0.5).setDepth(10);
-      this.time.delayedCall(3000, function () { // after 3 seconds...
-        self.tweens.add({ targets: self.hintText, alpha: 0, duration: 600,
-          onComplete: function () { self.hintText.destroy(); self.hintText = null; }
-        });
-      });
+        fontSize: '46px', fontStyle: 'bold',
+        color: '#ffffff', stroke: '#1a1a2e', strokeThickness: 6
+      }).setOrigin(0.5, 0).setDepth(10);
 
-      // Pre-spawn 2 bubbles so the player isn't greeted with an empty screen
-      this.spawnBubble();
-      this.spawnBubble();
+      // Wait screen
+      this.waitTxt = this.add.text(W / 2, H / 2 - 18,
+        '🐦  แตะเพื่อเริ่มเกม!', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '28px', fontStyle: 'bold',
+          color: '#ffffff', stroke: '#2b2438', strokeThickness: 5,
+          backgroundColor: '#00000044', padding: { x: 18, y: 10 }
+        }).setOrigin(0.5).setDepth(10);
+
+      // Dead screen elements (hidden until death)
+      this.deadPanel   = this.add.graphics().setDepth(9);
+      this.deadTitle   = this.add.text(W / 2, H / 2 - 58, '💀  เกมจบแล้ว!', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '38px', fontStyle: 'bold',
+        color: '#e74c3c', stroke: '#ffffff', strokeThickness: 5
+      }).setOrigin(0.5).setDepth(10).setVisible(false);
+      this.deadScore   = this.add.text(W / 2, H / 2 + 2, '', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '26px', fontStyle: 'bold',
+        color: '#2b2438', stroke: '#ffffff', strokeThickness: 4
+      }).setOrigin(0.5).setDepth(10).setVisible(false);
+      this.deadRestart = this.add.text(W / 2, H / 2 + 56, '🔄  แตะเพื่อเล่นใหม่', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '20px', fontStyle: 'bold',
+        color: '#ffffff', stroke: '#2b2438', strokeThickness: 4,
+        backgroundColor: '#2b243899', padding: { x: 16, y: 8 }
+      }).setOrigin(0.5).setDepth(10).setVisible(false);
+
+      // Input — tap to flap or restart
+      this.input.on('pointerdown', function () { self.onTap(); });
+      this.input.keyboard.on('keydown-SPACE', function () { self.onTap(); });
     },
 
-    // ── [SKY] Draw the static background ─────────────────────────
-    // Called once in create() — sky gradient bands + solid ground strip
+    onTap: function () {
+      if (this.isPaused) return;
+      if (this.state === 'waiting') {
+        this.state = 'playing';
+        this.birdVY = FLAP_VY;
+        this.waitTxt.setVisible(false);
+      } else if (this.state === 'playing') {
+        this.birdVY = FLAP_VY;
+      } else if (this.state === 'dead') {
+        this.doRestart();
+      }
+    },
+
+    doRestart: function () {
+      // Destroy any live pipe labels
+      this.pipes.forEach(function (p) {
+        if (p.wordLabel)  p.wordLabel.destroy();
+        if (p.emojiLabel) p.emojiLabel.destroy();
+      });
+      // Reset all state
+      this.state      = 'waiting';
+      this.birdY      = H / 2;
+      this.birdVY     = 0;
+      this.pipes      = [];
+      this.score      = 0;
+      this.pipeCount  = 0;
+      this.wordIdx    = 0;
+      this.frameCount = 0;
+      this.scrollOff  = 0;
+      // Reset UI
+      this.scoreTxt.setText('0');
+      this.waitTxt.setVisible(true);
+      this.deadPanel.clear();
+      this.deadTitle.setVisible(false);
+      this.deadScore.setVisible(false);
+      this.deadRestart.setVisible(false);
+    },
+
+    // ── [SKY] Static background ──────────────────────────────────
     drawBg: function () {
-      var g     = this.bgGfx;
-      var bands = 20; // divide the sky into 20 horizontal colour bands for a smooth gradient
+      var g = this.bgGfx;
+      var bands = 24;
       for (var i = 0; i < bands; i++) {
-        var t  = i / bands; // t = 0.0 at the top, ~1.0 at the bottom
-        // Mix from a lighter top colour to a slightly darker/whiter bottom colour
-        var r  = Math.round(Phaser.Math.Linear(135, 197, t));
-        var gv = Math.round(Phaser.Math.Linear(206, 232, t));
-        var b  = Math.round(Phaser.Math.Linear(235, 247, t));
+        var t  = i / bands;
+        var r  = Math.round(Phaser.Math.Linear(80,  172, t));
+        var gv = Math.round(Phaser.Math.Linear(168, 220, t));
+        var b  = Math.round(Phaser.Math.Linear(230, 246, t));
         g.fillStyle(Phaser.Display.Color.GetColor(r, gv, b));
         g.fillRect(0, i * (GROUND_Y / bands), W, GROUND_Y / bands + 1);
       }
-      // Green ground strip at the bottom
-      g.fillStyle(0x5dba5d);
-      g.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+      // Ground — brown dirt base + grass top
+      g.fillStyle(0x8d6e40); g.fillRect(0, GROUND_Y,     W, H - GROUND_Y);
+      g.fillStyle(0x5cb85c); g.fillRect(0, GROUND_Y,     W, 12);
+      g.fillStyle(0x4aaa4a); g.fillRect(0, GROUND_Y + 2, W, 5);
     },
 
-    // ── Spawn a word bubble ────────────────────────────────────────
-    // [BUBBLE] Change the radius (32) or shift the Y range to adjust placement
-    spawnBubble: function () {
-      if (!words.length) return; // do nothing if there are no words to practice
+    spawnPipe: function () {
+      this.pipeCount++;
+      var isWord = (this.pipeCount % WORD_EVERY === 0) && words.length > 0;
 
-      // Pick the next word (cycles back to start when all words are used)
-      var word = words[this.wordIdx++ % words.length];
+      var minY = PIPE_GAP / 2 + 48;
+      var maxY = GROUND_Y - PIPE_GAP / 2 - 28;
+      var gapY = minY + Math.random() * (maxY - minY);
 
-      // Place the bubble at a random height within the safe flying zone
-      var y = 70 + Math.random() * (GROUND_Y - 150);
+      var wordObj = null, wordLabel = null, emojiLabel = null;
+      if (isWord) {
+        wordObj = words[this.wordIdx++ % words.length];
+        wordLabel = this.add.text(W + 90, gapY + 14, wordObj.word, {
+          fontFamily: 'Prompt, sans-serif', fontSize: '13px', fontStyle: 'bold',
+          color: '#2b2438'
+        }).setOrigin(0.5, 0).setDepth(5);
+        emojiLabel = this.add.text(W + 90, gapY - 12, wordObj.emoji || '🔸', {
+          fontSize: '20px'
+        }).setOrigin(0.5, 1).setDepth(5);
+      }
 
-      // Create the word text label (positioned below the bubble centre)
-      var label = this.add.text(W + 60, y + 16, word.word, {
-        fontFamily: 'Prompt, sans-serif',
-        fontSize:   '11px',
-        fontStyle:  'bold',
-        color:      '#2b2438'
-      }).setOrigin(0.5, 0).setDepth(3);
-
-      // Create the emoji label (positioned above the word text)
-      var emojiTxt = this.add.text(W + 60, y - 6, word.emoji || '🔸', {
-        fontSize: '17px'
-      }).setOrigin(0.5, 1).setDepth(3);
-
-      // Store the bubble as an object in the bubbles array
-      this.bubbles.push({
-        x:     W + 60,    // start just off the right edge of the screen
-        y:     y,         // vertical centre of the bubble
-        hit:   false,     // true once the plane has touched this bubble
-        word:  word,      // the word object (used when opening the practice modal)
-        label: label,     // reference to the Phaser Text for the word
-        emoji: emojiTxt   // reference to the Phaser Text for the emoji
+      this.pipes.push({
+        x: W + 90,
+        gapY: gapY,
+        passed: false,
+        wordObj: wordObj,
+        wordLabel: wordLabel,
+        emojiLabel: emojiLabel,
+        wordHit: false
       });
     },
 
-    // ── Per-frame update ──────────────────────────────────────────
-    // Runs ~60 times per second; handles all movement and collision
-    update: function () {
-      if (this.isPaused) return; // freeze everything when modal is open
+    killBird: function () {
+      if (this.state === 'dead') return;
+      this.state  = 'dead';
+      this.birdVY = -3; // small bounce before falling
+
+      // Show game-over panel
+      var px = W / 2 - 195, pw = 390, py = H / 2 - 80, ph = 158;
+      this.deadPanel.fillStyle(0x000000, 0.45);
+      this.deadPanel.fillRect(0, 0, W, H);
+      this.deadPanel.fillStyle(0xffffff, 0.94);
+      this.deadPanel.fillRoundedRect(px, py, pw, ph, 18);
+
+      this.deadTitle.setVisible(true);
+      this.deadScore.setText('คะแนน: ' + this.score + ' ⭐').setVisible(true);
+      this.deadRestart.setVisible(true);
+    },
+
+    update: function (time) {
+      if (this.isPaused) return;
       var self = this;
+      var g    = this.gfx;
+      var cg   = this.cloudGfx;
+      g.clear();
+      cg.clear();
 
-      // ── Apply gravity and update the plane's vertical position ───
-      this.planeVY += GRAVITY;       // gravity increases downward speed each frame
-      this.planeY  += this.planeVY;  // move the plane by its current vertical velocity
-
-      // Clamp the plane to stay within the screen (bounce off ceiling and ground)
-      if (this.planeY > GROUND_Y - 28) { this.planeY = GROUND_Y - 28; this.planeVY = 0; }
-      if (this.planeY < 18)            { this.planeY = 18;            this.planeVY = 0; }
-
-      // ── Advance the progress counter ─────────────────────────────
-      this.progress += 2; // progress increases by 2 units each frame
-      if (this.progress >= TOTAL_PROG) {
-        callbacks.onFinish(); // player has reached the end of the level
-        return;               // stop further updates this frame
-      }
-
-      // ── Move clouds slowly to the left ───────────────────────────
+      // Clouds (all states)
       this.clouds.forEach(function (c) {
-        c.x -= c.spd; // each cloud has its own random speed
-        if (c.x < -c.rw - 40) c.x = W + c.rw; // wrap back to the right when off-screen
+        c.x -= c.spd;
+        if (c.x < -c.rw - 40) c.x = W + c.rw;
+        cg.fillStyle(0xffffff, 0.82);
+        cg.fillEllipse(c.x,               c.y,     c.rw * 2,    46);
+        cg.fillEllipse(c.x - c.rw * 0.38, c.y + 9, c.rw * 1.1, 34);
+        cg.fillEllipse(c.x + c.rw * 0.3,  c.y + 7, c.rw,       28);
       });
 
-      // ── Scroll all bubbles left and auto-spawn new ones ──────────
-      var activeBubbles = this.bubbles.filter(function (b) { return !b.hit; }); // count unhit bubbles
-      this.bubbles.forEach(function (b) {
-        if (!b.hit) {
-          b.x       -= BUBBLE_SPD; // move the bubble data leftward
-          b.label.x  = b.x;        // sync the word text position
-          b.emoji.x  = b.x;        // sync the emoji position
-        }
-      });
-
-      // Remove bubbles that have scrolled fully off the left side
-      this.bubbles = this.bubbles.filter(function (b) {
-        if (b.x < -80) {
-          b.label.destroy(); // clean up Phaser Text objects to avoid memory leaks
-          b.emoji.destroy();
-          return false; // remove from array
-        }
-        return true; // keep
-      });
-
-      // Keep at least 3 active bubbles on screen at all times
-      if (activeBubbles.length < 3) this.spawnBubble();
-
-      // ── Collision: check if the plane has flown into a bubble ────
-      for (var i = this.bubbles.length - 1; i >= 0; i--) {
-        var b = this.bubbles[i];
-        if (b.hit) continue; // skip bubbles that were already collected
-
-        // Calculate distance between plane centre and bubble centre
-        var dx = PLANE_X - b.x;
-        var dy = this.planeY - b.y;
-        // If distance < 46px (circle radius check: dx²+dy² < r²), it's a hit
-        if (dx * dx + dy * dy < 46 * 46) {
-          b.hit = true;
-          b.label.destroy(); // remove the label from screen immediately on hit
-          b.emoji.destroy();
-
-          this.isPaused = true; // freeze the game while the modal is open
-          var bRef = b; // save bubble reference for the callback closure
-          callbacks.onPractice(b.word, null, function () {
-            self.isPaused = false; // unfreeze when player closes the modal
-            // Remove the collected bubble from the array
-            self.bubbles = self.bubbles.filter(function (u) { return u !== bRef; });
-            self.spawnBubble(); // immediately add a new bubble to replace it
-          });
-          break; // only process one collision per frame
-        }
+      // ── WAITING ──────────────────────────────────────────────────
+      if (this.state === 'waiting') {
+        this.birdY = H / 2 + Math.sin(time * 0.003) * 14;
+        this.drawBird(g, time);
+        this.drawGround(g);
+        return;
       }
 
-      // ── Redraw everything and update the progress bar ─────────────
-      this.draw();
-      this.updateProgress();
-    },
-
-    // ── Redraw the progress bar fill based on current progress ─────
-    updateProgress: function () {
-      // Calculate how wide the fill should be (0 = empty, W-40 = full)
-      var pw = Math.min(1, this.progress / TOTAL_PROG) * (W - 40);
-      this.progFill.clear();
-      this.progFill.fillStyle(0x2ec4b6); // teal fill colour
-      this.progFill.fillRect(20, H - 14, pw, 7);
-      this.progFlagText.x = 20 + pw; // flag emoji follows the tip of the bar
-    },
-
-    // ── Draw every visible game object ─────────────────────────────
-    draw: function () {
-      var g = this.dynGfx;
-      g.clear(); // erase everything drawn last frame
-
-      // Draw clouds first (furthest back visually)
-      this.clouds.forEach(function (c) { this.drawCloud(g, c); }, this);
-
-      // Draw unhit bubbles
-      this.bubbles.forEach(function (b) { if (!b.hit) this.drawBubble(g, b); }, this);
-
-      // Draw the plane on top of everything
-      this.drawPlane(g, PLANE_X, this.planeY, this.planeVY);
-    },
-
-    // ── [CLOUDS] Draw one fluffy cloud ─────────────────────────────
-    // Each cloud is 3 overlapping ellipses for a layered, puffy look
-    drawCloud: function (g, c) {
-      g.fillStyle(0xffffff, 0.85); // white, slightly transparent
-      g.fillEllipse(c.x,               c.y,      c.rw * 2,    50); // main body
-      g.fillEllipse(c.x - c.rw * 0.36, c.y + 10, c.rw * 1.1, 40); // left bump
-      g.fillEllipse(c.x + c.rw * 0.3,  c.y + 8,  c.rw,       36); // right bump
-    },
-
-    // ── [BUBBLE] Draw one word bubble ──────────────────────────────
-    // White circle with a teal border — POLISH: change fillStyle or radius (32)
-    drawBubble: function (g, b) {
-      g.fillStyle(0xffffff, 0.93);   // nearly opaque white fill
-      g.lineStyle(2.5, 0x2ec4b6);    // teal border
-      g.fillCircle(  b.x, b.y, 32); // filled circle, radius 32
-      g.strokeCircle(b.x, b.y, 32); // outline on top
-    },
-
-    // ── [PLANE] Draw the airplane ─────────────────────────────────
-    // The plane tilts up/down based on its current vertical velocity (vy)
-    // Because Phaser Graphics can't rotate-around-a-point natively,
-    // we rotate each part manually using cos/sin math
-    drawPlane: function (g, x, y, vy) {
-      // tilt angle: positive vy (falling) tilts nose down, negative (rising) tilts up
-      // Phaser.Math.Clamp limits the angle to ±0.45 radians so it doesn't over-rotate
-      var tilt = Phaser.Math.Clamp(vy * 0.05, -0.45, 0.45);
-      var cos  = Math.cos(tilt); // pre-calculate rotation values
-      var sin  = Math.sin(tilt);
-
-      // Helper function: draw a rotated rectangle relative to the plane's centre (x, y)
-      // rx, ry = offset from plane centre; rw, rh = rectangle size; color = fill colour
-      function rRect(rx, ry, rw, rh, color) {
-        g.fillStyle(color);
-        // Rotate each of the 4 corners using 2D rotation formula:
-        //   new_x = rx*cos - ry*sin + x
-        //   new_y = rx*sin + ry*cos + y
-        var corners = [
-          [rx,      ry     ],
-          [rx + rw, ry     ],
-          [rx + rw, ry + rh],
-          [rx,      ry + rh]
-        ].map(function (p) {
-          return { x: x + p[0]*cos - p[1]*sin,
-                   y: y + p[0]*sin + p[1]*cos };
+      // ── DEAD ─────────────────────────────────────────────────────
+      if (this.state === 'dead') {
+        this.birdVY += GRAVITY;
+        this.birdY  += this.birdVY;
+        if (this.birdY + BIRD_R > GROUND_Y) { this.birdY = GROUND_Y - BIRD_R; this.birdVY = 0; }
+        this.pipes.forEach(function (p) { self.drawPipe(g, p); });
+        this.pipes.forEach(function (p) {
+          if (p.wordObj && !p.wordHit && p.wordLabel) self.drawBubble(g, p.x, p.gapY);
         });
-        g.fillPoints(corners, true); // draw as a filled polygon
+        this.drawGround(g);
+        this.drawBird(g, time);
+        return;
       }
 
-      // White oval fuselage (the main body of the plane)
-      g.fillStyle(0xffffff);
-      g.fillEllipse(
-        x + -0 * cos - 0 * sin, // centre x (no offset)
-        y + -0 * sin + 0 * cos, // centre y (no offset)
-        84, 28
-      );
+      // ── PLAYING ──────────────────────────────────────────────────
 
-      rRect(5, -2, -17, -24, 0x2ec4b6);   // upper wing (teal) — POLISH: change first colour arg
-      rRect(-30, 2, -12, -14, 0x2ec4b6);  // tail fin (teal)
+      // Spawn pipes on a regular interval
+      this.frameCount++;
+      var spawnEvery = Math.round(PIPE_DIST / SCROLL_SPD); // frames between pipes
+      if (this.frameCount % spawnEvery === 1) this.spawnPipe();
 
-      // Round window
-      g.fillStyle(0x87ceeb); // light blue (sky colour)
-      g.fillEllipse(x + 12*cos, y + 12*sin, 16, 12);
+      // Physics
+      this.birdVY += GRAVITY;
+      this.birdY  += this.birdVY;
+      this.scrollOff = (this.scrollOff + SCROLL_SPD) % 80;
 
-      rRect(42, -8, 12, 8, 0xff9f1c); // engine nozzle (orange) — POLISH: change for engine colour
+      // Ceiling: bounce off gently (don't die)
+      if (this.birdY - BIRD_R < 0) { this.birdY = BIRD_R; this.birdVY = 0; }
+
+      // Ground → die
+      if (this.birdY + BIRD_R > GROUND_Y) { this.killBird(); return; }
+
+      // Move pipes + detect score
+      this.pipes.forEach(function (p) {
+        p.x -= SCROLL_SPD;
+        if (p.wordLabel)  p.wordLabel.x  = p.x;
+        if (p.emojiLabel) p.emojiLabel.x = p.x;
+
+        if (!p.passed && p.x + PIPE_W / 2 < BIRD_X) {
+          p.passed = true;
+          self.score++;
+          callbacks.onPoints(1);
+          self.scoreTxt.setText('' + self.score);
+          self.showPop(BIRD_X, self.birdY - 34, '+1 ⭐');
+        }
+      });
+
+      // Cull off-screen pipes
+      this.pipes = this.pipes.filter(function (p) {
+        if (p.x + PIPE_W < -10) {
+          if (p.wordLabel)  p.wordLabel.destroy();
+          if (p.emojiLabel) p.emojiLabel.destroy();
+          return false;
+        }
+        return true;
+      });
+
+      // Collision
+      var dead = false;
+      for (var i = 0; i < this.pipes.length; i++) {
+        var p  = this.pipes[i];
+        var hW = PIPE_W / 2 + 2;      // horizontal half-width with small buffer
+        var hG = PIPE_GAP / 2 - 3;    // vertical half-gap (shrink hitbox slightly)
+
+        if (this.birdY + BIRD_R < p.x - hW) continue; // pipe not reached yet (wrong axis?)
+        // Check horizontal overlap
+        if (BIRD_X + BIRD_R > p.x - hW && BIRD_X - BIRD_R < p.x + hW) {
+          // Check vertical: hit top or bottom pipe?
+          if (this.birdY - BIRD_R < p.gapY - hG ||
+              this.birdY + BIRD_R > p.gapY + hG) {
+            this.killBird();
+            dead = true;
+            break;
+          }
+          // Check word bubble hit (only if word pipe and not yet collected)
+          if (p.wordObj && !p.wordHit) {
+            var dx = BIRD_X - p.x;
+            var dy = this.birdY - p.gapY;
+            if (dx * dx + dy * dy < 32 * 32) {
+              p.wordHit = true;
+              if (p.wordLabel)  { p.wordLabel.destroy();  p.wordLabel  = null; }
+              if (p.emojiLabel) { p.emojiLabel.destroy(); p.emojiLabel = null; }
+              this.isPaused = true;
+              var pRef = p;
+              callbacks.onPractice(p.wordObj, null, function () {
+                self.isPaused = false;
+                callbacks.onPoints(5);
+                self.showPop(BIRD_X, self.birdY - 40, '+5 ⭐ ออกเสียงได้!');
+              });
+            }
+          }
+        }
+      }
+      if (dead) return;
+
+      // Draw
+      this.pipes.forEach(function (p) { self.drawPipe(g, p); });
+      this.pipes.forEach(function (p) {
+        if (p.wordObj && !p.wordHit && p.wordLabel) self.drawBubble(g, p.x, p.gapY);
+      });
+      this.drawGround(g);
+      this.drawBird(g, time);
     },
 
-    // ── [POP] Floating score text ─────────────────────────────────
-    // Creates a Phaser Text that floats upward and fades out
+    // Scrolling ground tile pattern drawn over the static base
+    drawGround: function (g) {
+      var off = (this.scrollOff % 80 + 80) % 80;
+      for (var gx = -off; gx < W + 80; gx += 80) {
+        g.fillStyle(0x4aaa4a, 0.65);
+        g.fillRect(gx,      GROUND_Y, 40, 12);
+        g.fillStyle(0x5cb85c, 0.65);
+        g.fillRect(gx + 40, GROUND_Y, 40, 12);
+      }
+    },
+
+    // ── [PIPES] ──────────────────────────────────────────────────
+    drawPipe: function (g, p) {
+      var x      = p.x;
+      var gapY   = p.gapY;
+      var halfG  = PIPE_GAP / 2;
+      var halfW  = PIPE_W / 2;
+      var topH   = gapY - halfG;     // height of top pipe
+      var botY   = gapY + halfG;     // top of bottom pipe
+      var botH   = GROUND_Y - botY;  // height of bottom pipe
+
+      // Word pipes are golden, regular pipes are green
+      var pc  = p.wordObj ? 0xe67e22 : 0x27ae60;
+      var pcd = p.wordObj ? 0xc0392b : 0x1e8449;
+
+      // Top pipe body
+      if (topH > 0) {
+        g.fillStyle(pc);
+        g.fillRect(x - halfW, 0, PIPE_W, topH - 15);
+        g.fillStyle(pcd);
+        g.fillRect(x - halfW - 7, topH - 18, PIPE_W + 14, 20); // cap
+        g.fillStyle(0xffffff, 0.18);
+        g.fillRect(x - halfW + 4, 0, 11, topH - 15); // highlight
+      }
+      // Bottom pipe body
+      if (botH > 0) {
+        g.fillStyle(pc);
+        g.fillRect(x - halfW, botY + 15, PIPE_W, botH - 15);
+        g.fillStyle(pcd);
+        g.fillRect(x - halfW - 7, botY, PIPE_W + 14, 20); // cap
+        g.fillStyle(0xffffff, 0.18);
+        g.fillRect(x - halfW + 4, botY + 15, 11, botH - 15); // highlight
+      }
+    },
+
+    // ── [BUBBLE] Word bubble in the gap center ───────────────────
+    drawBubble: function (g, x, y) {
+      // Outer glow
+      g.fillStyle(0xffd700, 0.28);
+      g.fillCircle(x, y, 38);
+      // White fill with golden border
+      g.fillStyle(0xfffde7, 0.95);
+      g.lineStyle(3, 0xf39c12);
+      g.fillCircle(x, y, 30);
+      g.strokeCircle(x, y, 30);
+      // Inner shimmer
+      g.fillStyle(0xffec6e, 0.45);
+      g.fillCircle(x, y, 20);
+    },
+
+    // ── [BIRD] Yellow cartoon bird ───────────────────────────────
+    drawBird: function (g, time) {
+      var x  = BIRD_X;
+      var y  = this.birdY;
+      var vy = this.birdVY;
+
+      // Tilt: nose down when falling, nose up briefly after flap
+      var tilt     = Phaser.Math.Clamp(vy * 0.065, -0.55, 0.7);
+      var cos      = Math.cos(tilt);
+      var sin      = Math.sin(tilt);
+      var wingFlap = Math.sin(time * 0.018) * 9;
+
+      function rPt(lx, ly) {
+        return { x: x + lx * cos - ly * sin, y: y + lx * sin + ly * cos };
+      }
+
+      // Shadow (only when near ground)
+      var shadowAlpha = Math.max(0, 1 - (GROUND_Y - y) / (H * 0.6));
+      if (shadowAlpha > 0.05) {
+        g.fillStyle(0x000000, shadowAlpha * 0.18);
+        g.fillEllipse(x, GROUND_Y - 4, 30, 8);
+      }
+
+      // Tail feathers
+      var tailPts = [
+        rPt(-16, -3),
+        rPt(-28, -11 + tilt * 6),
+        rPt(-26,  0),
+        rPt(-30,  7 - tilt * 6),
+        rPt(-16,  6)
+      ];
+      g.fillStyle(0xf9a825);
+      g.fillPoints(tailPts, true);
+
+      // Wing (flaps up/down with time)
+      var wingPts = [
+        rPt(-5,  -5 - wingFlap),
+        rPt(-20, -18 - wingFlap),
+        rPt(-24, -9  - wingFlap * 0.5),
+        rPt(-7,   5)
+      ];
+      g.fillStyle(0xfbc02d);
+      g.fillPoints(wingPts, true);
+
+      // Body (14-point ellipse, rotated)
+      var bodyPts = [];
+      for (var a = 0; a < 14; a++) {
+        var ang = (a / 14) * Math.PI * 2;
+        bodyPts.push(rPt(Math.cos(ang) * 19, Math.sin(ang) * 14));
+      }
+      g.fillStyle(0xffd600);
+      g.fillPoints(bodyPts, true);
+
+      // White belly patch
+      var bellyPts = [];
+      for (var a2 = 0; a2 < 10; a2++) {
+        var ang2 = (a2 / 10) * Math.PI * 2;
+        bellyPts.push(rPt(5 + Math.cos(ang2) * 10, 2 + Math.sin(ang2) * 9));
+      }
+      g.fillStyle(0xfff9c4);
+      g.fillPoints(bellyPts, true);
+
+      // Beak (orange triangle)
+      var beakPts = [
+        rPt(15, -4),
+        rPt(28,  1),
+        rPt(15,  5)
+      ];
+      g.fillStyle(0xff6d00);
+      g.fillPoints(beakPts, true);
+
+      // Eye
+      var ep = rPt(10, -7);
+      g.fillStyle(0xffffff);
+      g.fillCircle(ep.x, ep.y, 6.5);
+      var pp = rPt(12, -6);
+      g.fillStyle(0x1a1a2e);
+      g.fillCircle(pp.x, pp.y, 3.8);
+      var hp = rPt(13.5, -7.5);
+      g.fillStyle(0xffffff);
+      g.fillCircle(hp.x, hp.y, 1.5);
+    },
+
+    // ── [POP] Floating score popup ───────────────────────────────
     showPop: function (x, y, text) {
       var pop = this.add.text(x, y, text, {
-        fontFamily: 'Prompt, sans-serif',
-        fontSize:   '20px',
-        fontStyle:  'bold',
-        color:      '#ff9f1c',
-        stroke:     '#ffffff',
-        strokeThickness: 3
-      }).setOrigin(0.5).setDepth(10);
-      // Tween: move upward 45px while fading to invisible, then destroy
+        fontFamily: 'Prompt, sans-serif', fontSize: '20px', fontStyle: 'bold',
+        color: '#ff9f1c', stroke: '#ffffff', strokeThickness: 3
+      }).setOrigin(0.5).setDepth(15);
       this.tweens.add({
-        targets: pop, y: y - 45, alpha: 0, duration: 800, ease: 'Power2',
+        targets: pop, y: y - 48, alpha: 0, duration: 900, ease: 'Power2',
         onComplete: function () { pop.destroy(); }
       });
     }
   });
 
-  // Create and return the Phaser.Game that runs AirScene
   return new Phaser.Game({
-    type:   Phaser.AUTO,       // use WebGL if available, otherwise Canvas
-    parent: 'airplaneGame',    // HTML div id to inject the canvas into
+    type:   Phaser.AUTO,
+    parent: 'airplaneGame',
     width:  W,
     height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
-    scene:  AirScene,
-    audio:  { noAudio: true }  // no sound effects
+    scene:  FlapScene,
+    audio:  { noAudio: true }
   });
 }
 
-// ── Public API ────────────────────────────────────────────────────
-// Wraps the game so it can be controlled with AirplaneGame.start() / .stop()
-// The IIFE keeps `game` private — nothing outside can accidentally overwrite it
 var AirplaneGame = (function () {
-  var game = null; // holds the running Phaser.Game, or null if stopped
-
+  var game = null;
   function start(words, cbs) {
-    stop(); // destroy any previous game before starting a new one
-    // 60ms delay lets the browser finish DOM cleanup before Phaser creates the canvas
+    stop();
     setTimeout(function () { game = createAirplaneGame(words, cbs); }, 60);
   }
-
   function stop() {
-    if (game) {
-      try { game.destroy(true); } catch (e) {} // true = also remove the canvas from the DOM
-      game = null;
-    }
+    if (game) { try { game.destroy(true); } catch (e) {} game = null; }
   }
-
   return { start: start, stop: stop };
 }());
