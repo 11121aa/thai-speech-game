@@ -498,7 +498,7 @@ function createCrossyGame(words, callbacks) {
   // Create and return the Phaser.Game that runs CrossyScene
   return new Phaser.Game({
     type:   Phaser.AUTO,
-    parent: 'crossyGame', // HTML div id to inject the canvas into
+    parent: 'crossyCanvas', // injects canvas INSIDE platformer-wrap so buttons overlay correctly
     width:  W, height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene:  CrossyScene,
