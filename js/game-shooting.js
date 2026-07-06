@@ -222,10 +222,11 @@ function createShootingGame(words, callbacks) {
 
       this.targets.push({
         x: tx, y: ty,
-        baseX: tx,                             // oscillation centre
-        moveAmp:   30 + Math.random() * 40,    // oscillation half-width (px)
-        moveSpeed: 1.4 + Math.random() * 1.2,  // oscillation speed multiplier
-        movePhase: Math.random() * Math.PI * 2,// random start phase so targets desync
+        baseX: tx,
+        moveAmp:   30 + Math.random() * 40,
+        moveSpeed: 1.4 + Math.random() * 1.2,
+        movePhase: Math.random() * Math.PI * 2,
+        sizeScale: 0.55 + Math.random() * 0.95, // random size: 0.55× (tiny) → 1.5× (large)
         angle: angle, word: word,
         hit: false, done: false, expired: false,
         born: this.time.now, s: 0,
@@ -325,7 +326,8 @@ function createShootingGame(words, callbacks) {
           var tgt = self.targets[i];
           if (tgt.hit || tgt.expired || tgt.s < 0.4) continue;
           var dx = proj.x - tgt.x, dy = proj.y - tgt.y;
-          if (dx * dx + dy * dy < PROJ_HIT_R * PROJ_HIT_R) {
+          var hr = PROJ_HIT_R * tgt.sizeScale;
+          if (dx * dx + dy * dy < hr * hr) {
             tgt.hit = true;
             self.sfxBreak.play();
             self.spawnBreakParticles(tgt.x, tgt.y);
@@ -477,21 +479,22 @@ function createShootingGame(words, callbacks) {
       g.fillStyle(0x7d6b5a);
       g.fillRect(cx - 4, cy, 8, (GROUND_Y - cy) * tgt.s);
 
-      // Bullseye rings outer → inner
+      // Bullseye rings outer → inner (scaled by both pop-in and random sizeScale)
+      var ss = tgt.sizeScale;
       for (var ri = 0; ri < RING_R.length; ri++) {
         g.fillStyle(RING_C[ri]);
-        g.fillCircle(cx, cy, RING_R[ri] * tgt.s);
+        g.fillCircle(cx, cy, RING_R[ri] * tgt.s * ss);
       }
       g.lineStyle(1, 0x00000022);
-      g.lineBetween(cx - 32 * tgt.s, cy, cx + 32 * tgt.s, cy);
-      g.lineBetween(cx, cy - 32 * tgt.s, cx, cy + 32 * tgt.s);
+      g.lineBetween(cx - 32 * tgt.s * ss, cy, cx + 32 * tgt.s * ss, cy);
+      g.lineBetween(cx, cy - 32 * tgt.s * ss, cx, cy + 32 * tgt.s * ss);
 
-      // Countdown arc (green → yellow → red) just outside the outermost ring
+      // Countdown arc just outside the outermost ring
       if (!tgt.hit && !tgt.expired && tgt.s > 0.3) {
         var arcColor = frac > 0.5 ? 0x27ae60 : frac > 0.25 ? 0xf39c12 : 0xe74c3c;
         g.lineStyle(4 * tgt.s, arcColor);
         g.beginPath();
-        g.arc(cx, cy, 40 * tgt.s, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2, false, 0.02);
+        g.arc(cx, cy, (RING_R[0] + 8) * tgt.s * ss, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2, false, 0.02);
         g.strokePath();
       }
 
