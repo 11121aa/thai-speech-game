@@ -176,7 +176,7 @@
 <!-- Shared Practice Modal — static backdrop prevents accidental close on mobile -->
 <div class="modal fade" id="practiceModal" tabindex="-1"
      data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
     <div class="modal-content" style="border-radius:24px;">
       <div class="modal-body text-center p-4" style="position:relative;">
         <button id="ppBtnSkip" title="ข้าม"
@@ -186,7 +186,7 @@
         <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
         <div class="challenge-word" id="ppWord">บ้าน</div>
         <p class="text-secondary" id="ppReading"></p>
-        <div class="practice-stage">
+        <div class="practice-stage" id="ppPracticeStage">
           <div class="mouth-animation-box" id="ppMouthAnimation" style="display:none;"></div>
           <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
           <div class="camera-mirror" id="ppCameraWrap">

@@ -107,6 +107,13 @@ const PracticePanel = (function () {
     el("ppCorrectMsg").style.display = "none";
     el("ppBtnCorrect").disabled = true;
     lastPracticeId = null;
+    // Restore practice aids hidden during playback review
+    var ps = el("ppPracticeStage");
+    if (ps) ps.style.display = "";
+    el("ppBtnListen").style.display = "";
+    el("ppWaveCanvas").style.display = "";
+    el("ppBtnMic").style.display = "";
+    el("ppRecordHint").style.display = "";
     if (continueTimer) {
       clearTimeout(continueTimer);
       continueTimer = null;
@@ -210,6 +217,13 @@ const PracticePanel = (function () {
     const audioEl = el("ppPlaybackAudio");
     const url = URL.createObjectURL(blob);
     audioEl.src = url;
+    // Collapse practice aids — frees ~150px so the judge buttons fit on screen
+    var ps = el("ppPracticeStage");
+    if (ps) ps.style.display = "none";
+    el("ppBtnListen").style.display  = "none";
+    el("ppWaveCanvas").style.display = "none";
+    el("ppBtnMic").style.display     = "none";
+    el("ppRecordHint").style.display = "none";
     el("ppPlaybackArea").style.display = "block";
 
     const btnCorrect = el("ppBtnCorrect");
