@@ -38,12 +38,12 @@ function createShootingGame(words, callbacks) {
 
   // ── [PROJ] Projectile settings ────────────────────────────────
   var PROJ_SPD   = 9;    // cannonball speed (px/frame at 60fps)
-  var PROJ_HIT_R = 36;   // hit radius (px)
+  var PROJ_HIT_R = 26;   // hit radius (px)
 
   var RELOAD_MS  = 1500; // 1.5-second reload between shots
 
   // ── [RINGS] Bullseye colours outer → inner ─────────────────────
-  var RING_R = [32, 25, 18, 12, 7];
+  var RING_R = [22, 17, 12, 8, 4];  // smaller target (~30% reduction)
   var RING_C = [0xe74c3c, 0xffffff, 0x2980b9, 0xffffff, 0xf1c40f];
   // Particle colours reuse ring colours for the break effect
   var BREAK_COLORS = [0xe74c3c, 0xffffff, 0x2980b9, 0xf1c40f, 0xff9900];
@@ -223,8 +223,8 @@ function createShootingGame(words, callbacks) {
       this.targets.push({
         x: tx, y: ty,
         baseX: tx,                             // oscillation centre
-        moveAmp:   15 + Math.random() * 25,    // oscillation half-width (px)
-        moveSpeed: 0.6 + Math.random() * 0.6,  // oscillation speed multiplier
+        moveAmp:   30 + Math.random() * 40,    // oscillation half-width (px)
+        moveSpeed: 1.4 + Math.random() * 1.2,  // oscillation speed multiplier
         movePhase: Math.random() * Math.PI * 2,// random start phase so targets desync
         angle: angle, word: word,
         hit: false, done: false, expired: false,
