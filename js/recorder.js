@@ -56,6 +56,12 @@ const Recorder = (function () {
     const chunks = [];
     const mimeType = getSupportedMimeType();
 
+    // Auto-stop thresholds
+    const SPEECH_THRESH  = 0.012; // RMS above this = "speaking"
+    const MIN_SPEECH_MS  = 600;   // need at least this much speech before auto-stop is armed
+    const SILENCE_TAIL_MS = 1000; // silence after speech → stop
+    const MAX_MS         = 10000; // hard cap regardless of input
+
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then(function (stream) {
@@ -70,7 +76,66 @@ const Recorder = (function () {
         analyser.fftSize = 2048;
         source.connect(analyser);
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        if (canvas) drawWaveform(canvas, analyser, dataArray, rafHolder);
+
+        const recStartedAt = Date.now();
+        let speechStartedAt = null;  // timestamp when first speech detected
+        let silenceStartedAt = null; // timestamp when silence began (after speech)
+
+        function loop() {
+          rafHolder.id = requestAnimationFrame(loop);
+          analyser.getByteTimeDomainData(dataArray);
+
+          // Draw waveform
+          if (canvas) {
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#2ec4b6";
+            ctx.beginPath();
+            const sliceWidth = canvas.width / dataArray.length;
+            let x = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              const v = dataArray[i] / 128.0;
+              const y = (v * canvas.height) / 2;
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+              x += sliceWidth;
+            }
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+          }
+
+          // RMS voice detection
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            const v = (dataArray[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / dataArray.length);
+          const now = Date.now();
+
+          if (rms > SPEECH_THRESH) {
+            if (!speechStartedAt) speechStartedAt = now;
+            silenceStartedAt = null; // reset silence clock while speaking
+          } else if (speechStartedAt && !silenceStartedAt) {
+            silenceStartedAt = now; // first silent frame after speech
+          }
+
+          // Decide whether to auto-stop
+          let shouldStop = (now - recStartedAt) >= MAX_MS;
+          if (!shouldStop && speechStartedAt && silenceStartedAt) {
+            const hadSpeechMs  = silenceStartedAt - speechStartedAt;
+            const silenceLenMs = now - silenceStartedAt;
+            if (hadSpeechMs >= MIN_SPEECH_MS && silenceLenMs >= SILENCE_TAIL_MS) shouldStop = true;
+          }
+
+          if (shouldStop && mediaRecorder && mediaRecorder.state !== "inactive") {
+            cancelAnimationFrame(rafHolder.id);
+            rafHolder.id = null;
+            mediaRecorder.stop();
+          }
+        }
+        loop();
 
         // Pass mimeType only when the browser declared support (empty string = browser default)
         mediaRecorder = mimeType
@@ -84,7 +149,7 @@ const Recorder = (function () {
           if (e.data.size > 0) chunks.push(e.data);
         };
         mediaRecorder.onstop = function () {
-          if (rafHolder.id) cancelAnimationFrame(rafHolder.id);
+          if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
           mediaStream.getTracks().forEach(function (t) { t.stop(); });
           if (audioCtx.state !== "closed") audioCtx.close();
           const blob = new Blob(chunks, { type: actualMime });
@@ -101,7 +166,7 @@ const Recorder = (function () {
         if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       },
       cancel: function () {
-        if (rafHolder.id) cancelAnimationFrame(rafHolder.id);
+        if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
         if (mediaRecorder && mediaRecorder.state !== "inactive") {
           mediaRecorder.ondataavailable = null;
           mediaRecorder.onstop = null;

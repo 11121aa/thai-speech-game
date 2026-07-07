@@ -178,7 +178,7 @@ const PracticePanel = (function () {
       const btn = el("ppBtnMic");
       btn.classList.add("recording");
       btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-      el("ppRecordHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเพื่อหยุด";
+      el("ppRecordHint").textContent = "กำลังอัดเสียง... หยุดอัตโนมัติเมื่อหยุดพูด หรือกดอีกครั้งเพื่อหยุดเอง";
       el("ppErrorMsg").style.display = "none";
 
       recordController = Recorder.startRecording(
