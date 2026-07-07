@@ -46,6 +46,13 @@
         <h1 class="hero-title" style="font-size:2.4rem;">🎮 เลือกเกม</h1>
         <p class="hero-lead">เลือกประเภทเกมที่ชอบแล้วเริ่มฝึกออกเสียงได้เลย!</p>
       </div>
+
+      <!-- Practice leaderboard -->
+      <div class="soft-card mb-4" id="practiceLeaderCard">
+        <h6 class="fw-bold mb-3"><i class="bi bi-mic-fill me-1" style="color:var(--color-accent-purple);"></i>ผู้ฝึกยอดเยี่ยม <span class="text-secondary fw-normal small">(จำนวนคำที่ฝึกทั้งหมด)</span></h6>
+        <div id="practiceLeaderRows"><div class="text-secondary text-center small py-2">กำลังโหลด...</div></div>
+      </div>
+
       <div class="game-mode-hub">
         <div class="game-mode-card" id="cardMatching">
           <span class="mode-icon">🃏</span>
@@ -143,6 +150,14 @@
           <div class="finish-btns">
             <button class="btn btn-outline-primary btn-bouncy" id="btnReturnMode">กลับเมนูเกม</button>
             <button class="btn btn-warning btn-bouncy" id="btnPlayAgain">เล่นอีกครั้ง</button>
+          </div>
+          <!-- Per-game leaderboard -->
+          <div id="finishLeaderboard" style="margin-top:1.2rem;width:100%;text-align:left;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:0.5rem;">
+              <i class="bi bi-trophy-fill" style="color:var(--color-secondary-dark);"></i>
+              <span class="fw-bold" style="font-size:0.95rem;">Top 5 — <span id="finishLeaderGame"></span></span>
+            </div>
+            <div id="finishLeaderRows"><div class="text-secondary text-center small py-1">กำลังโหลด...</div></div>
           </div>
         </div>
       </div>
@@ -327,7 +342,71 @@ function finishGame() {
   }
   document.getElementById('finalPoints').textContent = G.pts;
   document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
+
+  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗' };
+  document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
+  document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
+
   showScreen('screenFinish');
+
+  // Save score then refresh leaderboard
+  saveGameScore(G.mode, G.pts).then(function () {
+    loadGameLeaderboard(G.mode, 'finishLeaderRows');
+  });
+}
+
+/* ── Leaderboard helpers ── */
+var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน' };
+
+async function saveGameScore(gameKey, score) {
+  try {
+    var session = await Auth.getSession();
+    if (!session) return;
+    var userId = session.user.id;
+    var displayName = (session.user.email || '').split('@')[0];
+    var { data: cur } = await sb.from('game_scores').select('best_score').eq('user_id', userId).eq('game_key', gameKey).maybeSingle();
+    if (!cur || score > (cur.best_score || 0)) {
+      await sb.from('game_scores').upsert({ user_id: userId, game_key: gameKey, best_score: score, display_name: displayName, updated_at: new Date().toISOString() });
+    }
+  } catch(e) { /* table may not exist yet; non-fatal */ }
+}
+
+async function loadGameLeaderboard(gameKey, containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  try {
+    var { data } = await sb.from('game_scores').select('display_name, best_score').eq('game_key', gameKey).order('best_score', { ascending: false }).limit(5);
+    if (!data || !data.length) { container.innerHTML = '<div class="text-secondary text-center small py-1">ยังไม่มีข้อมูล</div>'; return; }
+    var medals = ['🥇','🥈','🥉'];
+    container.innerHTML = data.map(function(r, i) {
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid #f0ebfc;">' +
+        '<span style="font-size:1.1rem;width:26px;text-align:center;">' + (medals[i] || '<span style="color:#9b93b0;font-weight:700;font-size:0.8rem;">' + (i+1) + '</span>') + '</span>' +
+        '<span style="flex:1;font-size:0.88rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.display_name || '—') + '</span>' +
+        '<span style="font-weight:700;color:var(--color-primary-dark);white-space:nowrap;">⭐ ' + r.best_score + '</span>' +
+        '</div>';
+    }).join('');
+  } catch(e) { container.innerHTML = '<div class="text-secondary text-center small py-1">ไม่สามารถโหลดได้</div>'; }
+}
+
+async function loadPracticeLeaderboard() {
+  var container = document.getElementById('practiceLeaderRows');
+  var card = document.getElementById('practiceLeaderCard');
+  if (!container) return;
+  try {
+    var { data, error } = await sb.rpc('get_practice_leaderboard', { lim: 5 });
+    if (error) throw error;
+    if (!data || !data.length) { container.innerHTML = '<div class="text-secondary text-center small py-1">ยังไม่มีข้อมูล</div>'; return; }
+    var medals = ['🥇','🥈','🥉'];
+    container.innerHTML = data.map(function(r, i) {
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid #f0ebfc;">' +
+        '<span style="font-size:1.1rem;width:26px;text-align:center;">' + (medals[i] || '<span style="color:#9b93b0;font-weight:700;font-size:0.8rem;">' + (i+1) + '</span>') + '</span>' +
+        '<span style="flex:1;font-size:0.88rem;font-weight:500;">' + (r.display_name || '—') + '</span>' +
+        '<span style="font-weight:700;color:var(--color-accent-purple);white-space:nowrap;">🎤 ' + r.total_count + '</span>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    if (card) card.style.display = 'none'; // hide if function not set up yet
+  }
 }
 
 function startTimer(limit) {
@@ -448,6 +527,7 @@ function launchGame() {
 document.addEventListener('DOMContentLoaded', async function () {
   Auth.initNav();
   _allWords = await WordsApi.fetchAllWords();
+  loadPracticeLeaderboard();
 
   document.getElementById('cardMatching').addEventListener('click', function () { openSetup('matching'); });
   document.getElementById('cardShooting').addEventListener('click', function () { openSetup('shooting'); });

@@ -106,13 +106,13 @@
         <canvas id="dailyChart" width="900" height="170" style="width:100%;"></canvas>
       </div>
 
-      <!-- High scores per game -->
+      <!-- Game leaderboards -->
       <div class="mt-4 mb-2">
         <h6 class="mb-3 fw-bold">
           <i class="bi bi-trophy-fill me-1" style="color:var(--color-secondary-dark);"></i>
-          คะแนนสูงสุดในเกม (บนอุปกรณ์นี้)
+          คะแนนสูงสุดในแต่ละเกม
         </h6>
-        <div class="d-flex gap-3 flex-wrap" id="highScoreCards"></div>
+        <div class="row g-3" id="gameLeaderboardCards"></div>
       </div>
 
     </div>
@@ -307,7 +307,7 @@ async function initUserProfile(session) {
     .eq('user_id', session.user.id)
     .order('practiced_at', { ascending: false });
 
-  renderHighScores();
+  loadUserGameLeaderboards();
 
   if (!data || !data.length) return;
 
@@ -316,26 +316,63 @@ async function initUserProfile(session) {
   drawDailyChart(data);
 }
 
-function renderHighScores() {
-  var hs = JSON.parse(localStorage.getItem('ghsv2') || '{}');
-  var games = [
-    { key: 'matching', name: 'จับคู่ภาพ', icon: '🃏', color: 'var(--color-accent-purple)' },
-    { key: 'shooting', name: 'ยิงเป้า', icon: '🎯', color: 'var(--color-danger)' },
-    { key: 'airplane', name: 'ขับเครื่องบิน', icon: '✈️', color: 'var(--color-primary-dark)' }
-  ];
-  var container = document.getElementById('highScoreCards');
+var MGMT_GAMES = [
+  { key: 'matching',  name: 'จับคู่ภาพ',     icon: '🃏', color: 'var(--color-accent-purple)' },
+  { key: 'shooting',  name: 'ยิงเป้า',         icon: '🎯', color: 'var(--color-danger)' },
+  { key: 'airplane',  name: 'ขับเครื่องบิน',  icon: '✈️', color: 'var(--color-primary-dark)' },
+  { key: 'flashcard', name: 'ไพ่คำศัพท์',     icon: '🎴', color: 'var(--color-secondary-dark)' },
+  { key: 'platformer',name: 'วิ่งเก็บเหรียญ', icon: '🍄', color: '#4caf50' },
+  { key: 'crossy',    name: 'ข้ามถนน',         icon: '🚗', color: '#ff9f1c' }
+];
+
+async function loadUserGameLeaderboards() {
+  var container = document.getElementById('gameLeaderboardCards');
+  if (!container) return;
   container.innerHTML = '';
-  games.forEach(function (g) {
-    var score = hs[g.key] || 0;
-    var div = document.createElement('div');
-    div.className = 'soft-card text-center flex-fill';
-    div.style.minWidth = '120px';
-    div.innerHTML =
-      '<div style="font-size:2.2rem;">' + g.icon + '</div>' +
-      '<div style="font-size:0.85rem;color:var(--color-text-soft);font-weight:600;margin:0.2rem 0;">' + g.name + '</div>' +
-      '<div style="font-size:2.4rem;font-weight:700;color:' + g.color + ';">' + score + '</div>' +
-      '<div style="font-size:0.75rem;color:var(--color-text-soft);">⭐ แต้มสูงสุด</div>';
-    container.appendChild(div);
+
+  // My personal best from localStorage (instant, no network)
+  var myBest = JSON.parse(localStorage.getItem('ghsv2') || '{}');
+
+  MGMT_GAMES.forEach(function (g) {
+    var col = document.createElement('div');
+    col.className = 'col-sm-6 col-lg-4';
+    col.innerHTML =
+      '<div class="soft-card h-100">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem;">' +
+          '<span style="font-size:1.6rem;">' + g.icon + '</span>' +
+          '<div>' +
+            '<div style="font-weight:700;font-size:0.95rem;">' + g.name + '</div>' +
+            '<div style="font-size:0.75rem;color:var(--color-text-soft);">คะแนนของฉัน: <strong style="color:' + g.color + ';">' + (myBest[g.key] || 0) + '</strong> ⭐</div>' +
+          '</div>' +
+        '</div>' +
+        '<div id="lb_' + g.key + '"><div class="text-secondary text-center small py-1">กำลังโหลด...</div></div>' +
+      '</div>';
+    container.appendChild(col);
+
+    // Load top-5 from Supabase for this game
+    sb.from('game_scores')
+      .select('display_name, best_score')
+      .eq('game_key', g.key)
+      .order('best_score', { ascending: false })
+      .limit(5)
+      .then(function (res) {
+        var el = document.getElementById('lb_' + g.key);
+        if (!el) return;
+        var data = res.data || [];
+        if (!data.length) { el.innerHTML = '<div class="text-secondary text-center small py-1">ยังไม่มีข้อมูล</div>'; return; }
+        var medals = ['🥇','🥈','🥉'];
+        el.innerHTML = data.map(function(r, i) {
+          return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f0ebfc;font-size:0.82rem;">' +
+            '<span style="width:22px;text-align:center;">' + (medals[i] || (i+1)) + '</span>' +
+            '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;">' + (r.display_name || '—') + '</span>' +
+            '<span style="font-weight:700;color:' + g.color + ';white-space:nowrap;">⭐ ' + r.best_score + '</span>' +
+            '</div>';
+        }).join('');
+      })
+      .catch(function () {
+        var el = document.getElementById('lb_' + g.key);
+        if (el) el.innerHTML = '<div class="text-secondary text-center small py-1">รัน game_scores.sql ก่อน</div>';
+      });
   });
 }
 
