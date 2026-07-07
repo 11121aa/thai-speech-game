@@ -125,13 +125,72 @@
       </div>
 
       <ul class="nav nav-pills mb-4 gap-2">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabWords" type="button">จัดการคลังคำ</button></li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabPatients" type="button"><i class="bi bi-people-fill me-1"></i>ผู้ป่วย</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabWords" type="button">จัดการคลังคำ</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabSounds" type="button">รูปปากตามเสียง</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabScoring" type="button">ให้คะแนนเสียง</button></li>
       </ul>
 
       <div class="tab-content">
-        <div class="tab-pane fade show active" id="tabWords">
+
+        <!-- ── Patients Tab ── -->
+        <div class="tab-pane fade show active" id="tabPatients">
+
+          <!-- Top row: patient list + leaderboard -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="soft-card h-100">
+                <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>ชื่อผู้ป่วย / Gmail</h6>
+                <div id="patientList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="soft-card h-100">
+                <h6 class="fw-bold mb-3"><i class="bi bi-trophy-fill me-1" style="color:var(--color-secondary-dark);"></i>Leader Board <span class="text-secondary fw-normal small">(จำนวนคำที่ฝึก)</span></h6>
+                <div id="leaderboardList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Patient detail (hidden until a patient is clicked) -->
+          <div id="patientDetail" style="display:none;">
+            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+              <h5 class="mb-0" id="detailPatientName"></h5>
+              <button class="btn btn-sm btn-outline-secondary" id="btnCloseDetail"><i class="bi bi-x-lg"></i> ปิด</button>
+            </div>
+
+            <!-- Daily activity chart -->
+            <div class="soft-card mb-3">
+              <h6 class="fw-bold mb-2"><i class="bi bi-calendar3 me-1"></i>จำนวนการฝึก 14 วันล่าสุด</h6>
+              <canvas id="detailDailyChart" width="900" height="150" style="width:100%;"></canvas>
+            </div>
+
+            <!-- Bottom: practice list (left) + frequency charts (right) -->
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <div class="soft-card h-100">
+                  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-mic-fill me-1" style="color:var(--color-accent-purple);"></i>การฝึกออกเสียง</h6>
+                    <input type="text" class="form-control form-control-sm ms-auto" id="detailSearch" placeholder="ค้นหาคำ..." style="max-width:160px;">
+                  </div>
+                  <div id="detailPracticeList" style="max-height:420px;overflow-y:auto;"></div>
+                </div>
+              </div>
+              <div class="col-lg-6 d-flex flex-column gap-3">
+                <div class="soft-card flex-fill">
+                  <h6 class="fw-bold mb-2" style="font-size:0.85rem;"><i class="bi bi-bar-chart-fill me-1" style="color:var(--color-primary-dark);"></i>เสียงที่ฝึกบ่อยที่สุด</h6>
+                  <canvas id="soundFreqChart" width="400" height="180" style="width:100%;"></canvas>
+                </div>
+                <div class="soft-card flex-fill">
+                  <h6 class="fw-bold mb-2" style="font-size:0.85rem;"><i class="bi bi-bar-chart-steps me-1" style="color:var(--color-accent-purple);"></i>คำที่ฝึกบ่อยที่สุด</h6>
+                  <canvas id="wordFreqChart" width="400" height="180" style="width:100%;"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Word Management Tab ── -->
+        <div class="tab-pane fade" id="tabWords">
           <div class="soft-card mb-4">
             <h5 class="mb-3" id="wordFormTitle">เพิ่มคำฝึกออกเสียง</h5>
             <form id="wordForm" class="row g-3">
@@ -162,7 +221,7 @@
           </div>
         </div>
 
-        <!-- Sounds: mouth diagram URLs per consonant group -->
+        <!-- ── Sounds Tab ── -->
         <div class="tab-pane fade" id="tabSounds">
           <div class="soft-card">
             <p class="text-secondary mb-3">ตั้งค่า URL รูปภาพปากสำหรับแต่ละหมวดเสียง — คำทุกคำในหมวดเดียวกันจะใช้รูปเดียวกันโดยอัตโนมัติ</p>
@@ -175,22 +234,6 @@
           </div>
         </div>
 
-        <div class="tab-pane fade" id="tabScoring">
-          <div class="soft-card mb-3">
-            <div class="d-flex align-items-center gap-3 flex-wrap">
-              <label class="fw-semibold mb-0">กรองผู้ฝึก</label>
-              <select class="form-select" style="max-width:300px;" id="filterUserSelect"><option value="">ทุกคน</option></select>
-            </div>
-          </div>
-          <div class="soft-card">
-            <div class="table-responsive">
-              <table class="table table-hover align-middle">
-                <thead><tr><th>คำ</th><th>ผู้ฝึก</th><th>วันที่</th><th>ผู้ปกครองตัดสิน</th><th>เสียง</th><th>คะแนน specialist</th><th></th></tr></thead>
-                <tbody id="practiceTableBody"><tr><td colspan="7" class="text-secondary">ยังไม่มีข้อมูล</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -434,17 +477,239 @@ function drawPie(canvasId, data) {
 }
 
 /* ── Specialist view ── */
+var allPracticeData = [];  // all practice rows, used by patient detail
+
 async function initSpecialist() {
-  await loadUserMap();
   await loadWords();
   await loadSounds();
-  await loadPractice('');
+  await loadPatientDashboard();
 
   document.getElementById('wordForm').addEventListener('submit', onWordSubmit);
   document.getElementById('wordCancelEditBtn').addEventListener('click', resetWordForm);
   document.getElementById('wordSearchInput').addEventListener('input', renderWordsTable);
-  document.getElementById('filterUserSelect').addEventListener('change', function (e) { loadPractice(e.target.value); });
   document.getElementById('btnLogoutSpec').addEventListener('click', Auth.logout.bind(Auth));
+  document.getElementById('btnCloseDetail').addEventListener('click', function () {
+    document.getElementById('patientDetail').style.display = 'none';
+  });
+  document.getElementById('detailSearch').addEventListener('input', function () {
+    renderDetailPracticeList(currentDetailData, this.value.trim().toLowerCase());
+  });
+}
+
+var currentDetailData = [];
+
+async function loadPatientDashboard() {
+  // Load users
+  var { data: users } = await sb.rpc('list_users_for_specialist');
+  users = users || [];
+  users.forEach(function (u) { userEmailMap[u.user_id] = u.email; });
+
+  // Load all practice records (id + user_id + word info only for counts)
+  var { data: practices } = await sb.from('practice')
+    .select('id, user_id, practiced_at, parent_marked_correct, words(word, letter_category, exercise_code, emoji)')
+    .order('practiced_at', { ascending: false });
+  allPracticeData = practices || [];
+
+  // Count per user for leaderboard
+  var counts = {};
+  allPracticeData.forEach(function (p) { counts[p.user_id] = (counts[p.user_id] || 0) + 1; });
+
+  var ranked = users.map(function (u) {
+    return { userId: u.user_id, email: u.email, count: counts[u.user_id] || 0 };
+  }).sort(function (a, b) { return b.count - a.count; });
+
+  renderPatientList(ranked);
+  renderLeaderboard(ranked);
+}
+
+function renderPatientList(ranked) {
+  var container = document.getElementById('patientList');
+  if (!ranked.length) { container.innerHTML = '<p class="text-secondary text-center py-3 small">ยังไม่มีผู้ใช้</p>'; return; }
+  container.innerHTML = '';
+  ranked.forEach(function (u, i) {
+    var btn = document.createElement('button');
+    btn.className = 'w-100 text-start btn btn-light mb-1 py-2 px-3';
+    btn.style.cssText = 'border-radius:10px;border:1px solid #e8e3f5;font-size:0.9rem;';
+    btn.innerHTML =
+      '<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:26px;font-size:0.75rem;font-weight:700;margin-right:8px;">' + u.email[0].toUpperCase() + '</span>' +
+      '<span style="font-weight:600;">' + u.email + '</span>';
+    btn.addEventListener('click', function () { openPatientDetail(u); });
+    container.appendChild(btn);
+  });
+}
+
+function renderLeaderboard(ranked) {
+  var container = document.getElementById('leaderboardList');
+  container.innerHTML = '';
+  var medals = ['🥇', '🥈', '🥉'];
+  ranked.forEach(function (u, i) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid #f0ebfc;';
+    var medal = i < 3 ? medals[i] : '<span style="display:inline-block;width:22px;text-align:center;font-weight:700;color:#9b93b0;font-size:0.8rem;">' + (i + 1) + '</span>';
+    row.innerHTML =
+      '<span style="font-size:1.2rem;">' + medal + '</span>' +
+      '<span style="flex:1;font-size:0.9rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.email + '</span>' +
+      '<span style="font-weight:700;color:var(--color-primary-dark);white-space:nowrap;">' + u.count + ' คำ</span>';
+    container.appendChild(row);
+  });
+  if (!ranked.length) container.innerHTML = '<p class="text-secondary text-center py-3 small">ยังไม่มีข้อมูล</p>';
+}
+
+async function openPatientDetail(u) {
+  document.getElementById('detailPatientName').textContent = u.email;
+  document.getElementById('detailSearch').value = '';
+  document.getElementById('patientDetail').style.display = 'block';
+  document.getElementById('patientDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Load full practice records for this patient (with file_path + score)
+  var { data } = await sb.from('practice')
+    .select('id, score, parent_marked_correct, practiced_at, file_path, user_id, words(word, letter_category, exercise_code, emoji)')
+    .eq('user_id', u.userId)
+    .order('practiced_at', { ascending: false });
+  currentDetailData = data || [];
+
+  drawDetailDailyChart(currentDetailData);
+  renderDetailPracticeList(currentDetailData, '');
+  drawHBarChart('soundFreqChart', buildFreqData(currentDetailData, 'exercise_code'),
+    ['#2ec4b6','#ff9f1c','#ff6b9d','#8a5cf6','#4caf50','#2196f3','#f44336','#ff5722']);
+  drawHBarChart('wordFreqChart', buildFreqData(currentDetailData, 'word'),
+    ['#8a5cf6','#2ec4b6','#ff6b9d','#ff9f1c','#4caf50','#2196f3','#f44336','#ff5722']);
+}
+
+function buildFreqData(rows, field) {
+  var counts = {};
+  rows.forEach(function (r) {
+    var key = r.words ? r.words[field] : null;
+    if (!key) return;
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  return Object.entries(counts)
+    .map(function (e) { return { label: e[0], value: e[1] }; })
+    .sort(function (a, b) { return b.value - a.value; });
+}
+
+function drawDetailDailyChart(data) {
+  var canvas = document.getElementById('detailDailyChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var days = [];
+  var today = new Date();
+  for (var i = 13; i >= 0; i--) {
+    var d = new Date(today); d.setDate(d.getDate() - i);
+    days.push({ label: d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }), key: d.toDateString(), count: 0 });
+  }
+  data.forEach(function (row) {
+    var key = new Date(row.practiced_at).toDateString();
+    var found = days.find(function (d) { return d.key === key; });
+    if (found) found.count++;
+  });
+
+  var maxCount = Math.max(1, Math.max.apply(null, days.map(function (d) { return d.count; })));
+  var padL = 28, padR = 10, padT = 18, padB = 34;
+  var chartW = W - padL - padR, chartH = H - padT - padB;
+  var slotW = chartW / days.length;
+  var barW = Math.max(8, slotW - 5);
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#f0ebfc'; ctx.lineWidth = 1;
+  for (var g = 0; g <= 4; g++) {
+    var gy = padT + chartH - (g / 4) * chartH;
+    ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(W - padR, gy); ctx.stroke();
+    if (g > 0) {
+      ctx.font = '10px Prompt,sans-serif'; ctx.fillStyle = '#c9c2db'; ctx.textAlign = 'right';
+      ctx.fillText(Math.round((g / 4) * maxCount), padL - 4, gy + 3);
+    }
+  }
+  days.forEach(function (day, i) {
+    var x = padL + i * slotW + (slotW - barW) / 2;
+    var bh = day.count ? Math.max(5, (day.count / maxCount) * chartH) : 2;
+    var y = padT + chartH - bh;
+    var grad = ctx.createLinearGradient(0, y, 0, y + bh);
+    if (day.count) { grad.addColorStop(0, '#2ec4b6'); grad.addColorStop(1, '#1a9e92'); }
+    else { grad.addColorStop(0, '#e8e3f5'); grad.addColorStop(1, '#d8d2ee'); }
+    ctx.fillStyle = grad;
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, barW, bh, 3); ctx.fill(); } else ctx.fillRect(x, y, barW, bh);
+    if (day.count) {
+      ctx.font = 'bold 10px Prompt,sans-serif'; ctx.fillStyle = '#2b2438'; ctx.textAlign = 'center';
+      ctx.fillText(day.count, x + barW / 2, y - 3);
+    }
+    if (i % 2 === 0) {
+      ctx.font = '9px Prompt,sans-serif'; ctx.fillStyle = '#9b93b0'; ctx.textAlign = 'center';
+      ctx.fillText(day.label, x + barW / 2, H - padB + 13);
+    }
+  });
+}
+
+function drawHBarChart(canvasId, items, colors) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  var n = Math.min(items.length, 7);
+  if (!n) { ctx.font = '13px Prompt,sans-serif'; ctx.fillStyle = '#9b93b0'; ctx.textAlign = 'center'; ctx.fillText('ยังไม่มีข้อมูล', W / 2, H / 2); return; }
+  var maxVal = Math.max(1, items[0].value);
+  var labelW = 72, padR = 36, rowH = H / n;
+  var barMaxW = W - labelW - padR;
+  items.slice(0, n).forEach(function (d, i) {
+    var y = i * rowH;
+    ctx.font = '11px Prompt,sans-serif'; ctx.fillStyle = '#3d3557'; ctx.textAlign = 'right';
+    var lbl = d.label.length > 8 ? d.label.slice(0, 8) + '…' : d.label;
+    ctx.fillText(lbl, labelW - 5, y + rowH / 2 + 4);
+    var bw = Math.max(4, (d.value / maxVal) * barMaxW);
+    var bx = labelW, by = y + 4, bh = rowH - 8;
+    ctx.fillStyle = colors[i % colors.length];
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill(); } else ctx.fillRect(bx, by, bw, bh);
+    ctx.font = 'bold 10px Prompt,sans-serif';
+    if (bw > 22) { ctx.fillStyle = '#fff'; ctx.textAlign = 'right'; ctx.fillText(d.value, bx + bw - 4, y + rowH / 2 + 4); }
+    else { ctx.fillStyle = '#2b2438'; ctx.textAlign = 'left'; ctx.fillText(d.value, bx + bw + 4, y + rowH / 2 + 4); }
+  });
+}
+
+function renderDetailPracticeList(rows, filter) {
+  var list = document.getElementById('detailPracticeList');
+  list.innerHTML = '';
+  var filtered = filter ? rows.filter(function (r) {
+    return r.words && (r.words.word.includes(filter) || r.words.exercise_code.includes(filter));
+  }) : rows;
+  if (!filtered.length) { list.innerHTML = '<p class="text-secondary text-center py-3 small">ไม่มีข้อมูล</p>'; return; }
+  filtered.forEach(function (row) {
+    var item = document.createElement('div');
+    item.className = 'recording-item';
+    item.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+    var wordInfo = row.words ? (row.words.emoji || '') + ' ' + row.words.word : '?';
+    var time = new Date(row.practiced_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+    var judged = row.parent_marked_correct === true
+      ? '<span class="recording-judge correct" style="white-space:nowrap;">✅ ถูก</span>'
+      : row.parent_marked_correct === false
+        ? '<span class="recording-judge" style="background:#ffe7e7;color:#e74c3c;white-space:nowrap;">❌ ผิด</span>'
+        : '<span class="recording-judge pending" style="white-space:nowrap;">⏳ รอ</span>';
+    item.innerHTML =
+      '<div class="recording-word" style="min-width:70px;">' + wordInfo + '</div>' +
+      '<div class="recording-time" style="min-width:56px;">' + time + '</div>' +
+      judged +
+      (row.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 btn-play-audio" style="flex-shrink:0;">▶ เล่น</button>' : '') +
+      '<input type="number" min="0" max="100" class="form-control form-control-sm" style="width:68px;flex-shrink:0;" value="' + (row.score === null || row.score === undefined ? '' : row.score) + '" placeholder="คะแนน">' +
+      '<button class="btn btn-sm btn-warning py-0 btn-save-score" style="flex-shrink:0;">บันทึก</button>';
+
+    if (row.file_path) {
+      item.querySelector('.btn-play-audio').addEventListener('click', async function () {
+        this.disabled = true; this.textContent = '…';
+        var me = this;
+        var { data: signed } = await sb.storage.from('practice-audio').createSignedUrl(row.file_path, 3600);
+        if (signed) { new Audio(signed.signedUrl).play(); }
+        me.disabled = false; me.textContent = '▶ เล่น';
+      });
+    }
+    var rowId = row.id;
+    item.querySelector('.btn-save-score').addEventListener('click', function () {
+      var val = item.querySelector('input').value;
+      sb.from('practice').update({ score: val === '' ? null : parseFloat(val) }).eq('id', rowId);
+    });
+    list.appendChild(item);
+  });
 }
 
 async function loadSounds() {
@@ -463,22 +728,9 @@ async function loadSounds() {
     var soundId = s.id;
     tr.querySelector('.btn-save-sound').addEventListener('click', function () {
       var url = tr.querySelector('.sound-url-input').value.trim() || null;
-      sb.from('sounds').update({ mouth_image_url: url }).eq('id', soundId).then(function () {
-        loadSounds();
-      });
+      sb.from('sounds').update({ mouth_image_url: url }).eq('id', soundId).then(function () { loadSounds(); });
     });
     body.appendChild(tr);
-  });
-}
-
-async function loadUserMap() {
-  var { data } = await sb.rpc('list_users_for_specialist');
-  if (!data) return;
-  var sel = document.getElementById('filterUserSelect');
-  data.forEach(function (u) {
-    userEmailMap[u.user_id] = u.email;
-    var opt = document.createElement('option'); opt.value = u.user_id; opt.textContent = u.email;
-    sel.appendChild(opt);
   });
 }
 
@@ -543,41 +795,6 @@ async function deleteWord(id) {
   if (!confirm('ลบคำนี้ใช่ไหม?')) return;
   await sb.from('words').delete().eq('id', id);
   await loadWords();
-}
-
-async function loadPractice(filterUser) {
-  var q = sb.from('practice')
-    .select('id, score, parent_marked_correct, practiced_at, file_path, user_id, words(word, reading, letter_category)')
-    .order('practiced_at', { ascending: false });
-  if (filterUser) q = q.eq('user_id', filterUser);
-  var { data } = await q;
-  var body = document.getElementById('practiceTableBody');
-  body.innerHTML = '';
-  if (!data || !data.length) { body.innerHTML = '<tr><td colspan="7" class="text-secondary">ยังไม่มีข้อมูล</td></tr>'; return; }
-  for (var row of data) {
-    var tr = document.createElement('tr');
-    var time = new Date(row.practiced_at).toLocaleString('th-TH');
-    var email = userEmailMap[row.user_id] || row.user_id.slice(0, 8) + '…';
-    var wordText = row.words ? row.words.word : '?';
-    var parentJudge = row.parent_marked_correct === true ? '<span class="badge bg-success">✅ ถูก</span>'
-                    : row.parent_marked_correct === false ? '<span class="badge bg-danger">❌ ผิด</span>'
-                    : '<span class="badge bg-secondary">รอ</span>';
-    var audio = '';
-    if (row.file_path) {
-      var { data: signed } = await sb.storage.from('practice-audio').createSignedUrl(row.file_path, 3600);
-      if (signed) audio = '<audio controls src="' + signed.signedUrl + '" style="max-width:180px;height:30px;"></audio>';
-    }
-    tr.innerHTML =
-      '<td>' + wordText + '</td><td>' + email + '</td><td style="white-space:nowrap;">' + time + '</td><td>' + parentJudge + '</td><td>' + (audio||'—') + '</td>' +
-      '<td><input type="number" min="0" max="100" class="form-control form-control-sm" style="width:80px;" value="' + (row.score===null?'':row.score) + '"></td>' +
-      '<td><button class="btn btn-sm btn-warning">บันทึก</button></td>';
-    var rowId = row.id;
-    tr.querySelector('.btn-warning').addEventListener('click', function () {
-      var val = tr.querySelector('input').value;
-      sb.from('practice').update({ score: val === '' ? null : parseFloat(val) }).eq('id', rowId);
-    });
-    body.appendChild(tr);
-  }
 }
 </script>
 </body>
