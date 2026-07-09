@@ -26,7 +26,6 @@
       </button>
       <div class="collapse navbar-collapse" id="navMain">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
-          <li class="nav-item"><a class="nav-link" data-page="index.html" href="index.html">หน้าหลัก</a></li>
           <li class="nav-item"><a class="nav-link" data-page="game.html" href="game.html">เกม</a></li>
           <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
           <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
@@ -687,7 +686,7 @@ async function initSpecialist() {
       openCreateHw();
       // Pre-check this patient in the assign list
       setTimeout(function () {
-        var cb = document.querySelector('#hwAssignList input[value="' + currentDetailPatient.user_id + '"]');
+        var cb = document.querySelector('#hwAssignList input[value="' + (currentDetailPatient.user_id || currentDetailPatient.userId) + '"]');
         if (cb) cb.checked = true;
       }, 100);
     }
@@ -891,12 +890,14 @@ function drawHBarChart(canvasId, items, colors) {
   var canvas = document.getElementById(canvasId);
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
+  var n = Math.min(items.length, 7);
+  var rowH = 36;
+  canvas.height = n ? n * rowH : 60;
   var W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-  var n = Math.min(items.length, 7);
   if (!n) { ctx.font = '13px Prompt,sans-serif'; ctx.fillStyle = '#9b93b0'; ctx.textAlign = 'center'; ctx.fillText('ยังไม่มีข้อมูล', W / 2, H / 2); return; }
   var maxVal = Math.max(1, items[0].value);
-  var labelW = 72, padR = 36, rowH = H / n;
+  var labelW = 72, padR = 36;
   var barMaxW = W - labelW - padR;
   items.slice(0, n).forEach(function (d, i) {
     var y = i * rowH;
@@ -1398,9 +1399,10 @@ async function loadDetailHw(patient) {
   var container = document.getElementById('detailHwCards');
   container.innerHTML = '<p class="text-secondary small py-1">กำลังโหลด...</p>';
 
+  var patientUid = patient.user_id || patient.userId;
   var { data } = await sb.from('homework_assignments')
     .select('id, assigned_at, homework(id, name, repeat_count, homework_words(word_id))')
-    .eq('patient_user_id', patient.user_id)
+    .eq('patient_user_id', patientUid)
     .order('assigned_at', { ascending: false });
   var assignments = data || [];
 
