@@ -172,21 +172,29 @@
     <h4 class="mb-3">⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
 
     <div class="setup-row">
-      <label>ความยาก</label>
+      <label>ความยาก / โหมด</label>
       <div class="diff-btns">
         <button class="diff-btn active" data-diff="easy">ง่าย <small class="text-secondary">มีตัวอย่างเสียง</small></button>
         <button class="diff-btn" data-diff="hard">ยาก <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
+        <button class="diff-btn" data-diff="hw" style="background:#e74c3c;color:#fff;border-color:#e74c3c;">การบ้าน</button>
       </div>
     </div>
 
-    <div class="setup-row">
-      <label>1 · เลือกหมวดเสียง</label>
-      <div class="word-set-list" id="setupSoundList"></div>
+    <div id="hwSelectorRow" class="setup-row" style="display:none;">
+      <label>เลือกการบ้าน</label>
+      <div id="hwSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto;"></div>
     </div>
 
-    <div class="setup-row">
-      <label>2 · เลือกระดับที่ต้องการฝึก</label>
-      <div class="word-set-list" id="setupLevelList"></div>
+    <div id="soundLevelRows">
+      <div class="setup-row">
+        <label>1 · เลือกหมวดเสียง</label>
+        <div class="word-set-list" id="setupSoundList"></div>
+      </div>
+
+      <div class="setup-row">
+        <label>2 · เลือกระดับที่ต้องการฝึก</label>
+        <div class="word-set-list" id="setupLevelList"></div>
+      </div>
     </div>
 
     <div class="setup-row" style="align-items:center;">
@@ -297,6 +305,7 @@
 var G = {
   mode: null, words: [], pts: 0, timeLeft: 60,
   paused: false, timerHandle: null, hardMode: false,
+  hwMode: false, hwAssignmentId: null,
   highScores: JSON.parse(localStorage.getItem('ghsv2') || '{}')
 };
 
@@ -316,6 +325,7 @@ function openPractice(word, onCorrect, onClosed) {
   G.paused = true;
   PracticePanel.open(word, {
     showListen: !G.hardMode,
+    hwAssignmentId: G.hwAssignmentId,
     onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
     onClosed:  function () { G.paused = false; if (onClosed) onClosed(); }
   });
@@ -443,11 +453,18 @@ function startTimer(limit) {
 /* ===== Setup overlay helpers ===== */
 var _allWords = [], _setupMode = null, _setupCam = null;
 var LEVELS_ALL = ['Sound', '1 syllable', '2 syllable', '3 syllable', 'Sentences'];
+var _hwAssignments = [], _selectedHwAssignmentId = null, _hwPool = [];
 
 function openSetup(mode) {
   _setupMode = mode;
   var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
+  // Reset to easy/normal mode
+  document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelector('.diff-btn[data-diff="easy"]').classList.add('active');
+  document.getElementById('hwSelectorRow').style.display = 'none';
+  document.getElementById('soundLevelRows').style.display = 'block';
+  _selectedHwAssignmentId = null; _hwPool = [];
   populateSounds();
   populateLevels();
   updateWordCount();
@@ -484,7 +501,17 @@ function populateLevels() {
   });
 }
 
+function isHwMode() {
+  var btn = document.querySelector('.diff-btn.active');
+  return btn && btn.getAttribute('data-diff') === 'hw';
+}
+
 function getSetupPool() {
+  if (isHwMode()) {
+    var pool = _hwPool.slice().sort(function () { return Math.random() - 0.5; });
+    if (_setupMode === 'matching') pool = pool.slice(0, 10);
+    return pool;
+  }
   var soundEl = document.querySelector('#setupSoundList input[name="setupSound"]:checked');
   var selectedSound = soundEl ? soundEl.value : null;
   var selectedLevels = new Set();
@@ -499,9 +526,45 @@ function getSetupPool() {
 
 function updateWordCount() {
   var pool = getSetupPool();
-  var count = pool.length;
-  if (_setupMode === 'matching') count = Math.min(count, 10);
+  var count = isHwMode() ? pool.length : (_setupMode === 'matching' ? Math.min(pool.length, 10) : pool.length);
   document.getElementById('setupWordCount').textContent = count + ' คำ';
+}
+
+async function loadHwSelectorList() {
+  var list = document.getElementById('hwSelectorList');
+  list.innerHTML = '<div class="text-secondary small text-center py-2">กำลังโหลด...</div>';
+  var session = await Auth.getSession();
+  if (!session) {
+    list.innerHTML = '<div class="text-secondary small text-center">กรุณา<a href="login.html">เข้าสู่ระบบ</a>ก่อน</div>';
+    return;
+  }
+  var { data } = await sb.from('homework_assignments')
+    .select('id, homework(id, name, repeat_count, homework_words(word_id, words(id, word, emoji, level, letter_category)))')
+    .eq('patient_user_id', session.user.id)
+    .order('assigned_at', { ascending: false });
+  _hwAssignments = data || [];
+  list.innerHTML = '';
+  if (!_hwAssignments.length) {
+    list.innerHTML = '<div class="text-secondary small text-center py-2">ยังไม่มีการบ้านที่ได้รับมอบหมาย</div>';
+    return;
+  }
+  _hwAssignments.forEach(function (a) {
+    var hw = a.homework;
+    if (!hw) return;
+    var wordObjs = (hw.homework_words || []).map(function (w) { return w.words; }).filter(Boolean);
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-outline-secondary text-start w-100 py-2 hw-selector-btn';
+    btn.style.cssText = 'border-radius:10px;font-size:0.9rem;';
+    btn.innerHTML = '<strong>' + (hw.name || 'การบ้าน #' + hw.id) + '</strong><span class="text-secondary small ms-2">' + wordObjs.length + ' คำ</span>';
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.hw-selector-btn').forEach(function (b) { b.classList.remove('btn-warning'); b.classList.add('btn-outline-secondary'); });
+      btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-warning');
+      _selectedHwAssignmentId = a.id;
+      _hwPool = wordObjs;
+      updateWordCount();
+    });
+    list.appendChild(btn);
+  });
 }
 
 function startSetupCam() {
@@ -516,9 +579,14 @@ function stopSetupCam() {
 }
 
 function launchGame() {
+  var diffBtn = document.querySelector('.diff-btn.active');
+  var diff = diffBtn ? diffBtn.getAttribute('data-diff') : 'easy';
+  G.hwMode = diff === 'hw';
+  G.hwAssignmentId = G.hwMode ? _selectedHwAssignmentId : null;
+  G.hardMode = diff === 'hard';
+  if (G.hwMode && !_selectedHwAssignmentId) { alert('กรุณาเลือกการบ้านก่อน'); return; }
   var pool = getSetupPool();
   if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
-  G.hardMode = (document.querySelector('.diff-btn.active') || {}).getAttribute('data-diff') === 'hard';
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
@@ -590,6 +658,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
+      var hw = btn.getAttribute('data-diff') === 'hw';
+      document.getElementById('hwSelectorRow').style.display = hw ? 'block' : 'none';
+      document.getElementById('soundLevelRows').style.display = hw ? 'none' : 'block';
+      if (hw) { _selectedHwAssignmentId = null; _hwPool = []; loadHwSelectorList(); }
+      updateWordCount();
     });
   });
 

@@ -178,7 +178,7 @@ const Recorder = (function () {
     };
   }
 
-  async function uploadAndSavePractice(blob, wordId, userId, mimeType) {
+  async function uploadAndSavePractice(blob, wordId, userId, mimeType, extra) {
     const mime = mimeType || blob.type || "audio/webm";
     const ext  = mimeToExt(mime);
     const path = userId + "/" + crypto.randomUUID() + "." + ext;
@@ -186,9 +186,11 @@ const Recorder = (function () {
       contentType: mime
     });
     if (uploadError) throw uploadError;
+    var row = { word_id: wordId, user_id: userId, file_path: path };
+    if (extra && extra.homework_assignment_id) row.homework_assignment_id = extra.homework_assignment_id;
     const { data: inserted, error: insertError } = await sb
       .from("practice")
-      .insert({ word_id: wordId, user_id: userId, file_path: path })
+      .insert(row)
       .select("id")
       .single();
     if (insertError) throw insertError;

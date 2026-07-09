@@ -115,6 +115,25 @@
         <div class="row g-3" id="gameLeaderboardCards"></div>
       </div>
 
+      <!-- User homework section -->
+      <div class="soft-card mt-4" id="userHwSection">
+        <h6 class="mb-3 fw-bold"><i class="bi bi-journal-check me-1" style="color:var(--color-primary-dark);"></i>การบ้านของฉัน</h6>
+        <div class="d-flex gap-2 mb-3">
+          <button class="btn btn-sm btn-warning active user-hw-filter" data-filter="all">ทั้งหมด</button>
+          <button class="btn btn-sm btn-outline-secondary user-hw-filter" data-filter="notdone">ยังไม่เสร็จ</button>
+          <button class="btn btn-sm btn-outline-success user-hw-filter" data-filter="done">เสร็จแล้ว ✅</button>
+        </div>
+        <div id="userHwCards" class="d-flex flex-wrap gap-3"><p class="text-secondary small py-2">กำลังโหลด...</p></div>
+      </div>
+      <div id="userHwDetailSection" style="display:none;" class="soft-card mt-4">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" id="btnUserHwBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+          <h5 class="mb-0" id="userHwDetailTitle"></h5>
+          <span id="userHwDetailStatus" class="badge"></span>
+        </div>
+        <div class="table-responsive" id="userHwDetailTableWrap"></div>
+      </div>
+
     </div>
 
     <!-- ── Specialist View ── -->
@@ -237,10 +256,39 @@
                   <button class="btn btn-warning btn-bouncy px-4 py-3" id="btnCreateHw" style="min-width:220px;font-size:1.05rem;">
                     <i class="bi bi-plus-circle-fill me-2"></i>สร้างการบ้าน
                   </button>
-                  <button class="btn btn-outline-secondary btn-bouncy px-4 py-3 disabled" style="min-width:220px;font-size:1.05rem;">
-                    <i class="bi bi-eye me-2"></i>ดูการบ้าน <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">เร็วๆ นี้</span>
+                  <button class="btn btn-outline-primary btn-bouncy px-4 py-3" id="btnViewHw" style="min-width:220px;font-size:1.05rem;">
+                    <i class="bi bi-eye me-2"></i>ดูการบ้าน
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Patient HW list view -->
+          <div id="hwPatientView" style="display:none;">
+            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+              <button class="btn btn-sm btn-outline-secondary" id="btnHwPatientBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+              <h5 class="mb-0">การบ้านของ <span id="hwPatientViewName"></span></h5>
+            </div>
+            <div class="d-flex gap-2 mb-3">
+              <button class="btn btn-sm btn-warning active hw-filter-btn" data-filter="all">ทั้งหมด</button>
+              <button class="btn btn-sm btn-outline-secondary hw-filter-btn" data-filter="notdone">ยังไม่เสร็จ</button>
+              <button class="btn btn-sm btn-outline-success hw-filter-btn" data-filter="done">เสร็จแล้ว ✅</button>
+            </div>
+            <div id="hwCardGrid" class="d-flex flex-wrap gap-3"></div>
+            <p id="hwCardEmpty" class="text-secondary text-center py-4" style="display:none;">ไม่พบการบ้าน</p>
+          </div>
+
+          <!-- HW detail view (word × recording table) -->
+          <div id="hwDetailView" style="display:none;">
+            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+              <button class="btn btn-sm btn-outline-secondary" id="btnHwDetailBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+              <h5 class="mb-0" id="hwDetailTitle"></h5>
+              <span id="hwDetailStatus" class="badge"></span>
+            </div>
+            <div class="soft-card">
+              <div class="table-responsive" id="hwDetailTableWrap">
+                <p class="text-secondary text-center py-3">กำลังโหลด...</p>
               </div>
             </div>
           </div>
@@ -250,6 +298,10 @@
             <div class="d-flex align-items-center gap-3 mb-4">
               <button class="btn btn-sm btn-outline-secondary" id="btnHwBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
               <h5 class="mb-0">สร้างการบ้าน</h5>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">ชื่อการบ้าน</label>
+              <input type="text" class="form-control" id="hwName" placeholder="เช่น ป สัปดาห์ที่ 1">
             </div>
             <div class="row g-3">
               <!-- Word list -->
@@ -386,6 +438,7 @@ async function initUserProfile(session) {
     .order('practiced_at', { ascending: false });
 
   loadUserGameLeaderboards();
+  loadUserHw(session);
 
   if (!data || !data.length) return;
 
@@ -612,7 +665,13 @@ async function initSpecialist() {
   });
 
   document.getElementById('btnCreateHw').addEventListener('click', openCreateHw);
-  document.getElementById('btnHwBack').addEventListener('click', closeCreateHw);
+  document.getElementById('btnViewHw').addEventListener('click', function () {
+    if (!hwSelectedPatient) { alert('กรุณาเลือกผู้ป่วยก่อน'); return; }
+    loadPatientHwList(hwSelectedPatient);
+  });
+  document.getElementById('btnHwBack').addEventListener('click', function () { showHwView('hwListView'); });
+  document.getElementById('btnHwPatientBack').addEventListener('click', function () { showHwView('hwListView'); });
+  document.getElementById('btnHwDetailBack').addEventListener('click', function () { showHwView('hwPatientView'); });
   document.getElementById('btnHwMinus').addEventListener('click', function () {
     if (hwRepeatCount > 1) { hwRepeatCount--; document.getElementById('hwRepeatDisplay').textContent = hwRepeatCount; }
   });
@@ -622,7 +681,21 @@ async function initSpecialist() {
   document.getElementById('btnHwCreate').addEventListener('click', createHomework);
   document.getElementById('btnHwReturn').addEventListener('click', function () {
     document.getElementById('hwSuccessMsg').style.display = 'none';
-    closeCreateHw();
+    showHwView('hwListView');
+  });
+
+  // Filter buttons in hwPatientView
+  document.querySelectorAll('.hw-filter-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.hw-filter-btn').forEach(function (b) {
+        b.classList.remove('active', 'btn-warning', 'btn-outline-success');
+        b.classList.add('btn-outline-secondary');
+      });
+      btn.classList.remove('btn-outline-secondary');
+      var f = btn.getAttribute('data-filter');
+      btn.classList.add('active', f === 'done' ? 'btn-outline-success' : 'btn-warning');
+      renderHwCards(hwCurrentPatientAssignments, hwCurrentPracticeCache, f);
+    });
   });
 }
 
@@ -921,6 +994,17 @@ async function deleteWord(id) {
 }
 
 /* ── Homework ── */
+var hwSelectedPatient = null;
+var hwCurrentPatient = null;
+var hwCurrentPatientAssignments = [];
+var hwCurrentPracticeCache = [];
+
+function showHwView(viewId) {
+  ['hwListView','hwPatientView','hwDetailView','hwCreateView'].forEach(function (id) {
+    document.getElementById(id).style.display = id === viewId ? 'block' : 'none';
+  });
+}
+
 function initHomeworkTab() {
   var list = document.getElementById('hwPatientList');
   if (!allSpecialistUsers.length) {
@@ -929,28 +1013,29 @@ function initHomeworkTab() {
   }
   list.innerHTML = '';
   allSpecialistUsers.forEach(function (u) {
-    var row = document.createElement('div');
-    row.style.cssText = 'padding:8px 10px;border-radius:10px;border:1px solid #e8e3f5;margin-bottom:4px;font-size:0.88rem;display:flex;align-items:center;gap:8px;';
+    var btn = document.createElement('button');
+    btn.className = 'w-100 text-start btn btn-light mb-1 py-2 px-3 hw-patient-row';
+    btn.style.cssText = 'border-radius:10px;border:1px solid #e8e3f5;font-size:0.88rem;';
     var init = u.email[0].toUpperCase();
-    row.innerHTML =
-      '<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:28px;font-size:0.75rem;font-weight:700;flex-shrink:0;">' + init + '</span>' +
-      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.email + '</span>';
-    list.appendChild(row);
+    btn.innerHTML =
+      '<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:28px;font-size:0.75rem;font-weight:700;flex-shrink:0;margin-right:8px;">' + init + '</span>' +
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">' + u.email + '</span>';
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.hw-patient-row').forEach(function (b) { b.classList.remove('btn-primary'); b.classList.add('btn-light'); });
+      btn.classList.remove('btn-light'); btn.classList.add('btn-primary');
+      hwSelectedPatient = u;
+    });
+    list.appendChild(btn);
   });
 }
 
 function openCreateHw() {
   hwRepeatCount = 5;
   document.getElementById('hwRepeatDisplay').textContent = '5';
+  document.getElementById('hwName').value = '';
   populateHwWords();
   populateHwAssign();
-  document.getElementById('hwListView').style.display = 'none';
-  document.getElementById('hwCreateView').style.display = 'block';
-}
-
-function closeCreateHw() {
-  document.getElementById('hwCreateView').style.display = 'none';
-  document.getElementById('hwListView').style.display = 'block';
+  showHwView('hwCreateView');
 }
 
 function populateHwWords() {
@@ -1000,8 +1085,9 @@ async function createHomework() {
   btn.disabled = true; btn.textContent = 'กำลังสร้าง...';
 
   try {
+    var hwName = (document.getElementById('hwName').value || '').trim() || ('การบ้าน ' + new Date().toLocaleDateString('th-TH'));
     var { data: hw, error } = await sb.from('homework')
-      .insert({ created_by: currentSession.user.id, repeat_count: hwRepeatCount })
+      .insert({ created_by: currentSession.user.id, repeat_count: hwRepeatCount, name: hwName })
       .select('id').single();
     if (error) throw error;
 
@@ -1015,6 +1101,283 @@ async function createHomework() {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>สร้างการบ้าน';
   }
+}
+
+/* ── Therapist: view patient homework ── */
+async function loadPatientHwList(patient) {
+  hwCurrentPatient = patient;
+  document.getElementById('hwPatientViewName').textContent = patient.email;
+  document.getElementById('hwCardGrid').innerHTML = '<p class="text-secondary text-center py-3 small">กำลังโหลด...</p>';
+  document.getElementById('hwCardEmpty').style.display = 'none';
+  showHwView('hwPatientView');
+
+  var { data } = await sb.from('homework_assignments')
+    .select('id, assigned_at, homework(id, name, repeat_count, homework_words(word_id))')
+    .eq('patient_user_id', patient.user_id)
+    .order('assigned_at', { ascending: false });
+  hwCurrentPatientAssignments = data || [];
+
+  if (!hwCurrentPatientAssignments.length) {
+    document.getElementById('hwCardGrid').innerHTML = '';
+    document.getElementById('hwCardEmpty').style.display = 'block';
+    return;
+  }
+
+  var aIds = hwCurrentPatientAssignments.map(function (a) { return a.id; });
+  var { data: pData } = await sb.from('practice').select('word_id, homework_assignment_id').in('homework_assignment_id', aIds);
+  hwCurrentPracticeCache = pData || [];
+
+  // Reset filter buttons
+  document.querySelectorAll('.hw-filter-btn').forEach(function (b) {
+    b.classList.remove('active', 'btn-warning', 'btn-outline-success');
+    b.classList.add('btn-outline-secondary');
+  });
+  var allBtn = document.querySelector('.hw-filter-btn[data-filter="all"]');
+  if (allBtn) { allBtn.classList.remove('btn-outline-secondary'); allBtn.classList.add('active', 'btn-warning'); }
+
+  renderHwCards(hwCurrentPatientAssignments, hwCurrentPracticeCache, 'all');
+}
+
+function renderHwCards(assignments, practiceData, filter) {
+  var grid = document.getElementById('hwCardGrid');
+  grid.innerHTML = '';
+  var shown = 0;
+  assignments.forEach(function (a) {
+    var hw = a.homework;
+    if (!hw) return;
+    var words = hw.homework_words || [];
+    var repeatCount = hw.repeat_count || 5;
+    var hwP = practiceData.filter(function (p) { return p.homework_assignment_id === a.id; });
+    var allDone = words.length > 0 && words.every(function (w) {
+      return hwP.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+    });
+    if (filter === 'done' && !allDone) return;
+    if (filter === 'notdone' && allDone) return;
+    var doneCount = words.filter(function (w) {
+      return hwP.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+    }).length;
+    shown++;
+    var card = document.createElement('div');
+    card.style.cssText = 'background:' + (allDone ? '#e8f8f5' : '#fff') + ';border:1.5px solid ' + (allDone ? '#2ec4b6' : '#e8e3f5') + ';border-radius:14px;padding:1rem 1.2rem;cursor:pointer;min-width:160px;max-width:220px;position:relative;';
+    card.innerHTML =
+      (allDone ? '<div style="position:absolute;top:8px;right:10px;font-size:1.1rem;">✅</div>' : '') +
+      '<div style="font-weight:700;font-size:0.95rem;margin-bottom:4px;">' + (hw.name || 'การบ้าน #' + hw.id) + '</div>' +
+      '<div style="font-size:0.8rem;color:#9b93b0;">' + words.length + ' คำ · ' + doneCount + '/' + words.length + ' เสร็จ</div>' +
+      '<div style="font-size:0.75rem;color:#c0bbd0;margin-top:4px;">' + new Date(a.assigned_at).toLocaleDateString('th-TH') + '</div>';
+    card.addEventListener('click', function () { openHwDetail(a.id, hw.id, hw, hwCurrentPatient); });
+    grid.appendChild(card);
+  });
+  var empty = document.getElementById('hwCardEmpty');
+  if (empty) empty.style.display = shown ? 'none' : 'block';
+  if (!shown) grid.innerHTML = '';
+}
+
+async function openHwDetail(assignmentId, homeworkId, hw, patient) {
+  document.getElementById('hwDetailTitle').textContent = (hw.name || 'การบ้าน #' + homeworkId) + ' — ' + patient.email;
+  document.getElementById('hwDetailStatus').textContent = '';
+  document.getElementById('hwDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
+  showHwView('hwDetailView');
+
+  var results = await Promise.all([
+    sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
+  ]);
+  var words = (results[0].data || []);
+  var practices = (results[1].data || []);
+  var feedbacks = (results[2].data || []);
+  var repeatCount = hw.repeat_count || 5;
+
+  var allDone = words.length > 0 && words.every(function (w) {
+    return practices.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+  });
+  var statusEl = document.getElementById('hwDetailStatus');
+  statusEl.className = 'badge ' + (allDone ? 'bg-success' : 'bg-warning text-dark');
+  statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
+
+  renderHwDetailTable('hwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
+}
+
+function renderHwDetailTable(containerId, words, practices, feedbacks, assignmentId, repeatCount, isSpecialist) {
+  var byWord = {};
+  practices.forEach(function (p) {
+    if (!byWord[p.word_id]) byWord[p.word_id] = [];
+    byWord[p.word_id].push(p);
+  });
+  var maxCols = repeatCount;
+  Object.values(byWord).forEach(function (arr) { if (arr.length > maxCols) maxCols = arr.length; });
+
+  var html = '<table class="table table-bordered align-middle" style="font-size:0.88rem;"><thead><tr><th>คำ</th>';
+  for (var c = 1; c <= maxCols; c++) html += '<th style="white-space:nowrap;text-align:center;">ครั้งที่ ' + c + '</th>';
+  html += '<th>หมายเหตุ</th></tr></thead><tbody>';
+
+  words.forEach(function (hww) {
+    var w = hww.words;
+    if (!w) return;
+    var recs = byWord[hww.word_id] || [];
+    var fb = feedbacks.find(function (f) { return f.word_id === hww.word_id; });
+    var noteVal = fb ? (fb.note || '') : '';
+    var isDoneWord = recs.length >= repeatCount;
+    html += '<tr style="' + (isDoneWord ? 'background:rgba(46,196,182,0.07);' : '') + '">';
+    html += '<td style="font-weight:600;white-space:nowrap;">' + (w.emoji || '') + ' ' + w.word + '</td>';
+    for (var i = 0; i < maxCols; i++) {
+      var rec = recs[i];
+      if (rec) {
+        var icon = rec.parent_marked_correct === true ? '✅' : rec.parent_marked_correct === false ? '❌' : '⏳';
+        html += '<td style="text-align:center;white-space:nowrap;">' +
+          (rec.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 px-1 btn-hw-play" data-path="' + rec.file_path + '" style="font-size:0.7rem;margin-right:3px;">▶</button>' : '') +
+          (isSpecialist
+            ? '<span class="hw-result-toggle" data-prac-id="' + rec.id + '" data-correct="' + rec.parent_marked_correct + '" style="cursor:pointer;font-size:1rem;" title="คลิกเพื่อเปลี่ยน">' + icon + '</span>'
+            : '<span style="font-size:1rem;">' + icon + '</span>') +
+          '</td>';
+      } else {
+        html += '<td style="color:#d0cce0;text-align:center;">—</td>';
+      }
+    }
+    var noteCell = isSpecialist
+      ? '<input type="text" class="form-control form-control-sm hw-note-input" data-word-id="' + hww.word_id + '" data-assign-id="' + assignmentId + '" value="' + noteVal.replace(/"/g, '&quot;') + '" placeholder="หมายเหตุ" style="min-width:120px;">'
+      : (noteVal ? '<span>' + noteVal + '</span>' : '<span style="color:#d0cce0;">—</span>');
+    html += '<td>' + noteCell + '</td></tr>';
+  });
+  html += '</tbody></table>';
+
+  var wrap = document.getElementById(containerId);
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.btn-hw-play').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      btn.disabled = true; btn.textContent = '…';
+      var { data: signed } = await sb.storage.from('practice-audio').createSignedUrl(btn.getAttribute('data-path'), 3600);
+      if (signed) new Audio(signed.signedUrl).play();
+      btn.disabled = false; btn.textContent = '▶';
+    });
+  });
+
+  if (isSpecialist) {
+    wrap.querySelectorAll('.hw-result-toggle').forEach(function (span) {
+      span.addEventListener('click', async function () {
+        var cur = span.getAttribute('data-correct');
+        var next = cur === 'true' ? false : cur === 'false' ? null : true;
+        await sb.from('practice').update({ parent_marked_correct: next }).eq('id', parseInt(span.getAttribute('data-prac-id')));
+        span.setAttribute('data-correct', String(next));
+        span.textContent = next === true ? '✅' : next === false ? '❌' : '⏳';
+      });
+    });
+    var noteTimers = {};
+    wrap.querySelectorAll('.hw-note-input').forEach(function (inp) {
+      inp.addEventListener('input', function () {
+        var wid = parseInt(inp.getAttribute('data-word-id'));
+        var aid = parseInt(inp.getAttribute('data-assign-id'));
+        clearTimeout(noteTimers[wid]);
+        noteTimers[wid] = setTimeout(async function () {
+          await sb.from('homework_word_feedback').upsert({ homework_assignment_id: aid, word_id: wid, note: inp.value, updated_at: new Date().toISOString() });
+        }, 700);
+      });
+    });
+  }
+}
+
+/* ── Patient: my homework ── */
+var _userHwAssignments = [];
+var _userHwPracticeData = [];
+
+async function loadUserHw(session) {
+  var { data } = await sb.from('homework_assignments')
+    .select('id, assigned_at, homework(id, name, repeat_count, homework_words(word_id))')
+    .eq('patient_user_id', session.user.id)
+    .order('assigned_at', { ascending: false });
+  _userHwAssignments = data || [];
+
+  if (!_userHwAssignments.length) {
+    document.getElementById('userHwCards').innerHTML = '<p class="text-secondary small py-2">ยังไม่มีการบ้าน</p>';
+    return;
+  }
+
+  var aIds = _userHwAssignments.map(function (a) { return a.id; });
+  var { data: pData } = await sb.from('practice').select('word_id, homework_assignment_id').in('homework_assignment_id', aIds);
+  _userHwPracticeData = pData || [];
+
+  document.querySelectorAll('.user-hw-filter').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.user-hw-filter').forEach(function (b) {
+        b.classList.remove('active', 'btn-warning', 'btn-outline-success');
+        b.classList.add('btn-outline-secondary');
+      });
+      btn.classList.remove('btn-outline-secondary');
+      var f = btn.getAttribute('data-filter');
+      btn.classList.add('active', f === 'done' ? 'btn-outline-success' : 'btn-warning');
+      renderUserHwCards(_userHwAssignments, _userHwPracticeData, f);
+    });
+  });
+
+  document.getElementById('btnUserHwBack').addEventListener('click', function () {
+    document.getElementById('userHwDetailSection').style.display = 'none';
+    document.getElementById('userHwSection').style.display = 'block';
+  });
+
+  renderUserHwCards(_userHwAssignments, _userHwPracticeData, 'all');
+}
+
+function renderUserHwCards(assignments, practiceData, filter) {
+  var container = document.getElementById('userHwCards');
+  container.innerHTML = '';
+  var shown = 0;
+  assignments.forEach(function (a) {
+    var hw = a.homework;
+    if (!hw) return;
+    var words = hw.homework_words || [];
+    var repeatCount = hw.repeat_count || 5;
+    var hwP = practiceData.filter(function (p) { return p.homework_assignment_id === a.id; });
+    var allDone = words.length > 0 && words.every(function (w) {
+      return hwP.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+    });
+    if (filter === 'done' && !allDone) return;
+    if (filter === 'notdone' && allDone) return;
+    var doneCount = words.filter(function (w) {
+      return hwP.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+    }).length;
+    shown++;
+    var card = document.createElement('div');
+    card.style.cssText = 'background:' + (allDone ? '#e8f8f5' : '#fff') + ';border:1.5px solid ' + (allDone ? '#2ec4b6' : '#e8e3f5') + ';border-radius:14px;padding:1rem 1.2rem;cursor:pointer;min-width:160px;max-width:220px;position:relative;';
+    card.innerHTML =
+      (allDone ? '<div style="position:absolute;top:8px;right:10px;font-size:1.1rem;">✅</div>' : '') +
+      '<div style="font-weight:700;font-size:0.95rem;margin-bottom:4px;">' + (hw.name || 'การบ้าน #' + hw.id) + '</div>' +
+      '<div style="font-size:0.8rem;color:#9b93b0;">' + words.length + ' คำ · ' + doneCount + '/' + words.length + ' เสร็จ</div>' +
+      '<div style="font-size:0.75rem;color:#c0bbd0;margin-top:4px;">' + new Date(a.assigned_at).toLocaleDateString('th-TH') + '</div>';
+    card.addEventListener('click', function () { openUserHwDetail(a); });
+    container.appendChild(card);
+  });
+  if (!shown) container.innerHTML = '<p class="text-secondary small py-2">ไม่พบการบ้าน</p>';
+}
+
+async function openUserHwDetail(assignment) {
+  var hw = assignment.homework;
+  document.getElementById('userHwDetailTitle').textContent = hw ? (hw.name || 'การบ้าน #' + hw.id) : 'การบ้าน';
+  document.getElementById('userHwDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
+  document.getElementById('userHwSection').style.display = 'none';
+  document.getElementById('userHwDetailSection').style.display = 'block';
+
+  var homeworkId = hw ? hw.id : null;
+  if (!homeworkId) return;
+
+  var results = await Promise.all([
+    sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }),
+    sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignment.id)
+  ]);
+  var words = results[0].data || [];
+  var practices = results[1].data || [];
+  var feedbacks = results[2].data || [];
+  var repeatCount = (hw && hw.repeat_count) || 5;
+
+  var allDone = words.length > 0 && words.every(function (w) {
+    return practices.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+  });
+  var statusEl = document.getElementById('userHwDetailStatus');
+  statusEl.className = 'badge ' + (allDone ? 'bg-success' : 'bg-warning text-dark');
+  statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
+
+  renderHwDetailTable('userHwDetailTableWrap', words, practices, feedbacks, assignment.id, repeatCount, false);
 }
 </script>
 </body>
