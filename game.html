@@ -84,6 +84,11 @@
           <span class="mode-title">ข้ามถนน</span>
           <span class="mode-desc">โดดข้ามรถ ฝึกพูดคำทุกครั้งที่ข้ามได้</span>
         </div>
+        <div class="game-mode-card" id="cardTictactoe">
+          <span class="mode-icon">⭕</span>
+          <span class="mode-title">ติ๊กแทคโต</span>
+          <span class="mode-desc">เล่น XO กับ AI แล้วฝึกพูดคำทุกรอบ</span>
+        </div>
       </div>
     </div>
 
@@ -117,6 +122,8 @@
       </div>
       <!-- Flashcard Game — Phaser renders here -->
       <div id="flashcardGame" style="display:none;"></div>
+      <!-- Tic-Tac-Toe — pure DOM -->
+      <div id="tictactoeGame" style="display:none;"></div>
       <!-- Crossy Road: Phaser canvas + 4-directional DOM buttons -->
       <div id="crossyGame" style="display:none;">
         <div class="platformer-wrap">
@@ -286,6 +293,7 @@
 <!-- Phaser 3 game engine -->
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 <!-- One file per Phaser game — open the file to polish that game -->
+<script src="js/game-tictactoe.js"></script>
 <script src="js/game-shooting.js"></script>
 <script src="js/game-airplane.js"></script>
 <script src="js/game-platformer.js"></script>
@@ -360,6 +368,7 @@ function finishGame() {
   FlashcardGame.stop();
   PlatformerGame.stop();
   CrossyGame.stop();
+  TictactoeGame.stop();
   var hs = G.highScores[G.mode] || 0;
   if (G.pts > hs) {
     G.highScores[G.mode] = G.pts;
@@ -368,7 +377,7 @@ function finishGame() {
   document.getElementById('finalPoints').textContent = G.pts;
   document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
 
-  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗' };
+  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', tictactoe:'ติ๊กแทคโต ⭕' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
   document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
 
@@ -381,7 +390,7 @@ function finishGame() {
 }
 
 /* ── Leaderboard helpers ── */
-var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน' };
+var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', tictactoe:'ติ๊กแทคโต' };
 
 async function saveGameScore(gameKey, score) {
   try {
@@ -457,7 +466,7 @@ var _hwAssignments = [], _selectedHwAssignmentId = null, _hwPool = [];
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗' };
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', tictactoe: 'ติ๊กแทคโต ⭕' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
   // Reset to easy/normal mode
   document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
@@ -593,16 +602,17 @@ function launchGame() {
   G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false;
   document.getElementById('hudPoints').textContent = 0;
   var names = {
-    matching:  'จับคู่ภาพ 🃏',
-    shooting:  'ยิงเป้า 🎯',
-    airplane:  'ขับเครื่องบิน ✈️',
-    flashcard: 'ไพ่คำศัพท์ 🎴',
-    platformer:'วิ่งเก็บเหรียญ 🍄',
-    crossy:    'ข้ามถนน 🚗'
+    matching:   'จับคู่ภาพ 🃏',
+    shooting:   'ยิงเป้า 🎯',
+    airplane:   'ขับเครื่องบิน ✈️',
+    flashcard:  'ไพ่คำศัพท์ 🎴',
+    platformer: 'วิ่งเก็บเหรียญ 🍄',
+    crossy:     'ข้ามถนน 🚗',
+    tictactoe:  'ติ๊กแทคโต ⭕'
   };
   document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
 
-  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame'].forEach(function (id) {
+  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','tictactoeGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
@@ -616,7 +626,9 @@ function launchGame() {
   } else {
     if (timerPill) timerPill.style.visibility = '';
     var limit = G.mode === 'flashcard' ? 180 :
-                G.mode === 'platformer' ? 90  : G.mode === 'crossy' ? 90 : 60;
+                G.mode === 'platformer' ? 90  :
+                G.mode === 'crossy'     ? 90  :
+                G.mode === 'tictactoe'  ? 120 : 60;
     startTimer(limit);
   }
 
@@ -635,6 +647,9 @@ function launchGame() {
   } else if (G.mode === 'crossy') {
     document.getElementById('crossyGame').style.display = 'block';
     CrossyGame.start(pool, GAME_CBS);     // Phaser game (crossy road)
+  } else if (G.mode === 'tictactoe') {
+    document.getElementById('tictactoeGame').style.display = 'block';
+    TictactoeGame.start(pool, GAME_CBS);
   } else {
     document.getElementById('airplaneGame').style.display = 'block';
     AirplaneGame.start(pool, GAME_CBS);   // Phaser game
@@ -653,6 +668,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardFlashcard').addEventListener('click', function () { openSetup('flashcard'); });
   document.getElementById('cardPlatformer').addEventListener('click', function () { openSetup('platformer'); });
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
+  document.getElementById('cardTictactoe').addEventListener('click', function () { openSetup('tictactoe'); });
 
   document.querySelectorAll('.diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -674,7 +690,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
     restoreTimerPill();
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); TictactoeGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });
