@@ -97,7 +97,7 @@ const PracticePanel = (function () {
     // Restore practice aids hidden during playback review
     var ps = el("ppPracticeStage");
     if (ps) ps.style.display = "";
-    el("ppBtnListen").style.display = "";
+    el("ppBtnListen").style.display = (callbacks.showListen === false) ? "none" : "";
     el("ppWaveCanvas").style.display = "";
     el("ppBtnMic").style.display = "";
     el("ppRecordHint").style.display = "";

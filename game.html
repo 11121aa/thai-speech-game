@@ -172,6 +172,14 @@
     <h4 class="mb-3">⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
 
     <div class="setup-row">
+      <label>ความยาก</label>
+      <div class="diff-btns">
+        <button class="diff-btn active" data-diff="easy">ง่าย <small class="text-secondary">มีตัวอย่างเสียง</small></button>
+        <button class="diff-btn" data-diff="hard">ยาก <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
+      </div>
+    </div>
+
+    <div class="setup-row">
       <label>1 · เลือกหมวดเสียง</label>
       <div class="word-set-list" id="setupSoundList"></div>
     </div>
@@ -288,7 +296,7 @@
 /* ===== Global game-session state ===== */
 var G = {
   mode: null, words: [], pts: 0, timeLeft: 60,
-  paused: false, timerHandle: null,
+  paused: false, timerHandle: null, hardMode: false,
   highScores: JSON.parse(localStorage.getItem('ghsv2') || '{}')
 };
 
@@ -307,6 +315,7 @@ function addPts(n) {
 function openPractice(word, onCorrect, onClosed) {
   G.paused = true;
   PracticePanel.open(word, {
+    showListen: !G.hardMode,
     onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
     onClosed:  function () { G.paused = false; if (onClosed) onClosed(); }
   });
@@ -509,6 +518,7 @@ function stopSetupCam() {
 function launchGame() {
   var pool = getSetupPool();
   if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
+  G.hardMode = (document.querySelector('.diff-btn.active') || {}).getAttribute('data-diff') === 'hard';
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
@@ -575,6 +585,13 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardFlashcard').addEventListener('click', function () { openSetup('flashcard'); });
   document.getElementById('cardPlatformer').addEventListener('click', function () { openSetup('platformer'); });
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
+
+  document.querySelectorAll('.diff-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
 
   document.getElementById('btnSetupCancel').addEventListener('click', function () {
     stopSetupCam();
