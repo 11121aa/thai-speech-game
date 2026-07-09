@@ -1205,7 +1205,6 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, assignmen
     byWord[p.word_id].push(p);
   });
   var maxCols = repeatCount;
-  Object.values(byWord).forEach(function (arr) { if (arr.length > maxCols) maxCols = arr.length; });
 
   var html = '<table class="table table-bordered align-middle" style="font-size:0.88rem;"><thead><tr><th>คำ</th>';
   for (var c = 1; c <= maxCols; c++) html += '<th style="white-space:nowrap;text-align:center;">ครั้งที่ ' + c + '</th>';
