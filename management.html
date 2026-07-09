@@ -126,6 +126,7 @@
 
       <ul class="nav nav-pills mb-4 gap-2">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabPatients" type="button"><i class="bi bi-people-fill me-1"></i>ผู้ป่วย</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabHomework" type="button"><i class="bi bi-journal-check me-1"></i>การบ้าน</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabWords" type="button">จัดการคลังคำ</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabSounds" type="button">รูปปากตามเสียง</button></li>
       </ul>
@@ -219,6 +220,84 @@
           </div>
         </div>
 
+        <!-- ── Homework Tab ── -->
+        <div class="tab-pane fade" id="tabHomework">
+
+          <!-- List view: patient list + action buttons -->
+          <div id="hwListView">
+            <div class="row g-3">
+              <div class="col-md-5">
+                <div class="soft-card h-100">
+                  <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>รายชื่อผู้ป่วย</h6>
+                  <div id="hwPatientList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
+                </div>
+              </div>
+              <div class="col-md-7">
+                <div class="soft-card h-100 d-flex flex-column align-items-center justify-content-center gap-3 py-5">
+                  <button class="btn btn-warning btn-bouncy px-4 py-3" id="btnCreateHw" style="min-width:220px;font-size:1.05rem;">
+                    <i class="bi bi-plus-circle-fill me-2"></i>สร้างการบ้าน
+                  </button>
+                  <button class="btn btn-outline-secondary btn-bouncy px-4 py-3 disabled" style="min-width:220px;font-size:1.05rem;">
+                    <i class="bi bi-eye me-2"></i>ดูการบ้าน <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">เร็วๆ นี้</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Create HW view -->
+          <div id="hwCreateView" style="display:none;">
+            <div class="d-flex align-items-center gap-3 mb-4">
+              <button class="btn btn-sm btn-outline-secondary" id="btnHwBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+              <h5 class="mb-0">สร้างการบ้าน</h5>
+            </div>
+            <div class="row g-3">
+              <!-- Word list -->
+              <div class="col-md-4">
+                <div class="soft-card h-100">
+                  <h6 class="fw-bold mb-3">เลือกคำ</h6>
+                  <div id="hwWordList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+                </div>
+              </div>
+              <!-- Repeat count -->
+              <div class="col-md-4">
+                <div class="soft-card h-100 d-flex flex-column align-items-center justify-content-center gap-2 py-4">
+                  <h6 class="fw-bold">จำนวนครั้งที่ต้องพูด</h6>
+                  <div class="d-flex align-items-center gap-3 mt-2">
+                    <button class="btn btn-outline-secondary" id="btnHwMinus" style="width:42px;height:42px;padding:0;font-size:1.5rem;line-height:1;">−</button>
+                    <span id="hwRepeatDisplay" style="font-size:3rem;font-weight:700;min-width:56px;text-align:center;">5</span>
+                    <button class="btn btn-outline-secondary" id="btnHwPlus" style="width:42px;height:42px;padding:0;font-size:1.5rem;line-height:1;">+</button>
+                  </div>
+                  <p class="text-secondary small text-center mt-2">ครั้งต่อคำ</p>
+                </div>
+              </div>
+              <!-- Patient assign -->
+              <div class="col-md-4">
+                <div class="soft-card h-100">
+                  <h6 class="fw-bold mb-3">มอบหมายให้ผู้ป่วย</h6>
+                  <div id="hwAssignList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="text-end mt-4">
+              <button class="btn btn-warning btn-bouncy px-5" id="btnHwCreate">
+                <i class="bi bi-check-circle-fill me-2"></i>สร้างการบ้าน
+              </button>
+            </div>
+          </div>
+
+          <!-- Success popup (fixed overlay) -->
+          <div id="hwSuccessMsg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:20px;padding:2.5rem 2rem;text-align:center;max-width:320px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+              <div style="font-size:3rem;">🎉</div>
+              <h4 class="mt-2 mb-1">สร้างการบ้านสำเร็จ!</h4>
+              <p class="text-secondary mb-3">มอบหมายการบ้านให้ผู้ป่วยแล้ว</p>
+              <button class="btn btn-warning btn-bouncy w-100" id="btnHwReturn">กลับไปหน้าการบ้าน</button>
+            </div>
+          </div>
+
+        </div>
+
         <!-- ── Sounds Tab ── -->
         <div class="tab-pane fade" id="tabSounds">
           <div class="soft-card">
@@ -271,7 +350,8 @@
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
 <script>
-var currentSession, allWords = [], userEmailMap = {};
+var currentSession, allWords = [], userEmailMap = {}, allSpecialistUsers = [];
+var hwRepeatCount = 5;
 
 document.addEventListener('DOMContentLoaded', async function () {
   var session = await Auth.requireLogin('management.html');
@@ -518,6 +598,7 @@ async function initSpecialist() {
   await loadWords();
   await loadSounds();
   await loadPatientDashboard();
+  initHomeworkTab();
 
   document.getElementById('wordForm').addEventListener('submit', onWordSubmit);
   document.getElementById('wordCancelEditBtn').addEventListener('click', resetWordForm);
@@ -529,6 +610,20 @@ async function initSpecialist() {
   document.getElementById('detailSearch').addEventListener('input', function () {
     renderDetailPracticeList(currentDetailData, this.value.trim().toLowerCase());
   });
+
+  document.getElementById('btnCreateHw').addEventListener('click', openCreateHw);
+  document.getElementById('btnHwBack').addEventListener('click', closeCreateHw);
+  document.getElementById('btnHwMinus').addEventListener('click', function () {
+    if (hwRepeatCount > 1) { hwRepeatCount--; document.getElementById('hwRepeatDisplay').textContent = hwRepeatCount; }
+  });
+  document.getElementById('btnHwPlus').addEventListener('click', function () {
+    hwRepeatCount++; document.getElementById('hwRepeatDisplay').textContent = hwRepeatCount;
+  });
+  document.getElementById('btnHwCreate').addEventListener('click', createHomework);
+  document.getElementById('btnHwReturn').addEventListener('click', function () {
+    document.getElementById('hwSuccessMsg').style.display = 'none';
+    closeCreateHw();
+  });
 }
 
 var currentDetailData = [];
@@ -537,6 +632,7 @@ async function loadPatientDashboard() {
   // Load users
   var { data: users } = await sb.rpc('list_users_for_specialist');
   users = users || [];
+  allSpecialistUsers = users;
   users.forEach(function (u) { userEmailMap[u.user_id] = u.email; });
 
   // Load all practice records (id + user_id + word info only for counts)
@@ -822,6 +918,103 @@ async function deleteWord(id) {
   if (!confirm('ลบคำนี้ใช่ไหม?')) return;
   await sb.from('words').delete().eq('id', id);
   await loadWords();
+}
+
+/* ── Homework ── */
+function initHomeworkTab() {
+  var list = document.getElementById('hwPatientList');
+  if (!allSpecialistUsers.length) {
+    list.innerHTML = '<p class="text-secondary text-center py-3 small">ยังไม่มีผู้ป่วย</p>';
+    return;
+  }
+  list.innerHTML = '';
+  allSpecialistUsers.forEach(function (u) {
+    var row = document.createElement('div');
+    row.style.cssText = 'padding:8px 10px;border-radius:10px;border:1px solid #e8e3f5;margin-bottom:4px;font-size:0.88rem;display:flex;align-items:center;gap:8px;';
+    var init = u.email[0].toUpperCase();
+    row.innerHTML =
+      '<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:28px;font-size:0.75rem;font-weight:700;flex-shrink:0;">' + init + '</span>' +
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.email + '</span>';
+    list.appendChild(row);
+  });
+}
+
+function openCreateHw() {
+  hwRepeatCount = 5;
+  document.getElementById('hwRepeatDisplay').textContent = '5';
+  populateHwWords();
+  populateHwAssign();
+  document.getElementById('hwListView').style.display = 'none';
+  document.getElementById('hwCreateView').style.display = 'block';
+}
+
+function closeCreateHw() {
+  document.getElementById('hwCreateView').style.display = 'none';
+  document.getElementById('hwListView').style.display = 'block';
+}
+
+function populateHwWords() {
+  var list = document.getElementById('hwWordList');
+  list.innerHTML = '';
+  if (!allWords.length) { list.innerHTML = '<p class="text-secondary small">ยังไม่มีคำในระบบ</p>'; return; }
+  allWords.forEach(function (w) {
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
+    lbl.innerHTML =
+      '<input type="checkbox" value="' + w.id + '" style="width:15px;height:15px;flex-shrink:0;">' +
+      '<span style="flex:1;">' + (w.emoji || '') + ' ' + w.word + '</span>' +
+      '<span style="font-size:0.7rem;color:#9b93b0;white-space:nowrap;">' + (w.level || '') + '</span>';
+    list.appendChild(lbl);
+  });
+}
+
+function populateHwAssign() {
+  var list = document.getElementById('hwAssignList');
+  list.innerHTML = '';
+  if (!allSpecialistUsers.length) { list.innerHTML = '<p class="text-secondary small">ยังไม่มีผู้ป่วย</p>'; return; }
+  allSpecialistUsers.forEach(function (u) {
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
+    var init = u.email[0].toUpperCase();
+    lbl.innerHTML =
+      '<input type="checkbox" value="' + u.user_id + '" style="width:15px;height:15px;flex-shrink:0;">' +
+      '<span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:24px;font-size:0.7rem;font-weight:700;flex-shrink:0;">' + init + '</span>' +
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.email + '</span>';
+    list.appendChild(lbl);
+  });
+}
+
+async function createHomework() {
+  var wordIds = [];
+  document.querySelectorAll('#hwWordList input[type="checkbox"]:checked').forEach(function (cb) {
+    wordIds.push(parseInt(cb.value, 10));
+  });
+  var patientIds = [];
+  document.querySelectorAll('#hwAssignList input[type="checkbox"]:checked').forEach(function (cb) {
+    patientIds.push(cb.value);
+  });
+  if (!wordIds.length) { alert('กรุณาเลือกคำอย่างน้อย 1 คำ'); return; }
+  if (!patientIds.length) { alert('กรุณาเลือกผู้ป่วยอย่างน้อย 1 คน'); return; }
+
+  var btn = document.getElementById('btnHwCreate');
+  btn.disabled = true; btn.textContent = 'กำลังสร้าง...';
+
+  try {
+    var { data: hw, error } = await sb.from('homework')
+      .insert({ created_by: currentSession.user.id, repeat_count: hwRepeatCount })
+      .select('id').single();
+    if (error) throw error;
+
+    await sb.from('homework_words').insert(wordIds.map(function (wid) { return { homework_id: hw.id, word_id: wid }; }));
+    await sb.from('homework_assignments').insert(patientIds.map(function (uid) { return { homework_id: hw.id, patient_user_id: uid }; }));
+
+    document.getElementById('hwSuccessMsg').style.display = 'flex';
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>สร้างการบ้าน';
+  }
 }
 </script>
 </body>
