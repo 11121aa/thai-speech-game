@@ -206,6 +206,25 @@
                 </div>
               </div>
             </div>
+
+            <!-- Homework section inside patient detail -->
+            <div class="soft-card mt-3">
+              <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+                <h6 class="fw-bold mb-0"><i class="bi bi-journal-check me-1" style="color:var(--color-primary-dark);"></i>การบ้าน</h6>
+                <button class="btn btn-sm btn-warning btn-bouncy ms-auto" id="btnDetailCreateHw"><i class="bi bi-plus-circle-fill me-1"></i>สร้างการบ้าน</button>
+              </div>
+              <div id="detailHwCards" class="d-flex flex-wrap gap-3"><p class="text-secondary small py-1">กำลังโหลด...</p></div>
+            </div>
+
+            <!-- HW detail table (inside patient detail, replaces hw cards when card clicked) -->
+            <div id="detailHwDetailSection" style="display:none;" class="soft-card mt-3">
+              <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+                <button class="btn btn-sm btn-outline-secondary" id="btnDetailHwBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+                <h5 class="mb-0" id="detailHwDetailTitle"></h5>
+                <span id="detailHwDetailStatus" class="badge"></span>
+              </div>
+              <div class="table-responsive" id="detailHwDetailTableWrap"></div>
+            </div>
           </div>
         </div>
 
@@ -660,6 +679,23 @@ async function initSpecialist() {
   document.getElementById('btnCloseDetail').addEventListener('click', function () {
     document.getElementById('patientDetail').style.display = 'none';
   });
+  document.getElementById('btnDetailCreateHw').addEventListener('click', function () {
+    if (currentDetailPatient) {
+      // Pre-select this patient in the homework tab then open create view
+      hwSelectedPatient = currentDetailPatient;
+      document.querySelector('[data-bs-target="#tabHomework"]').click();
+      openCreateHw();
+      // Pre-check this patient in the assign list
+      setTimeout(function () {
+        var cb = document.querySelector('#hwAssignList input[value="' + currentDetailPatient.user_id + '"]');
+        if (cb) cb.checked = true;
+      }, 100);
+    }
+  });
+  document.getElementById('btnDetailHwBack').addEventListener('click', function () {
+    document.getElementById('detailHwDetailSection').style.display = 'none';
+    document.getElementById('detailHwCards').parentElement.style.display = 'block';
+  });
   document.getElementById('detailSearch').addEventListener('input', function () {
     renderDetailPracticeList(currentDetailData, this.value.trim().toLowerCase());
   });
@@ -700,6 +736,7 @@ async function initSpecialist() {
 }
 
 var currentDetailData = [];
+var currentDetailPatient = null;
 
 async function loadPatientDashboard() {
   // Load users
@@ -760,8 +797,11 @@ function renderLeaderboard(ranked) {
 }
 
 async function openPatientDetail(u) {
+  currentDetailPatient = u;
   document.getElementById('detailPatientName').textContent = u.email;
   document.getElementById('detailSearch').value = '';
+  document.getElementById('detailHwDetailSection').style.display = 'none';
+  document.getElementById('detailHwCards').parentElement.style.display = 'block';
   document.getElementById('patientDetail').style.display = 'block';
   document.getElementById('patientDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -778,6 +818,7 @@ async function openPatientDetail(u) {
     ['#2ec4b6','#ff9f1c','#ff6b9d','#8a5cf6','#4caf50','#2196f3','#f44336','#ff5722']);
   drawHBarChart('wordFreqChart', buildFreqData(currentDetailData, 'word'),
     ['#8a5cf6','#2ec4b6','#ff6b9d','#ff9f1c','#4caf50','#2196f3','#f44336','#ff5722']);
+  loadDetailHw(u);
 }
 
 function buildFreqData(rows, field) {
@@ -1350,6 +1391,77 @@ function renderUserHwCards(assignments, practiceData, filter) {
     container.appendChild(card);
   });
   if (!shown) container.innerHTML = '<p class="text-secondary small py-2">ไม่พบการบ้าน</p>';
+}
+
+/* ── Homework inside patient detail (Patients tab) ── */
+async function loadDetailHw(patient) {
+  var container = document.getElementById('detailHwCards');
+  container.innerHTML = '<p class="text-secondary small py-1">กำลังโหลด...</p>';
+
+  var { data } = await sb.from('homework_assignments')
+    .select('id, assigned_at, homework(id, name, repeat_count, homework_words(word_id))')
+    .eq('patient_user_id', patient.user_id)
+    .order('assigned_at', { ascending: false });
+  var assignments = data || [];
+
+  if (!assignments.length) {
+    container.innerHTML = '<p class="text-secondary small py-1">ยังไม่มีการบ้าน</p>';
+    return;
+  }
+
+  var aIds = assignments.map(function (a) { return a.id; });
+  var { data: pData } = await sb.from('practice').select('word_id, homework_assignment_id').in('homework_assignment_id', aIds);
+  var practiceData = pData || [];
+
+  container.innerHTML = '';
+  assignments.forEach(function (a) {
+    var hw = a.homework;
+    if (!hw) return;
+    var words = hw.homework_words || [];
+    var repeatCount = hw.repeat_count || 5;
+    var hwP = practiceData.filter(function (p) { return p.homework_assignment_id === a.id; });
+    var allDone = words.length > 0 && words.every(function (w) {
+      return hwP.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+    });
+    var doneCount = words.filter(function (w) {
+      return hwP.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+    }).length;
+
+    var card = document.createElement('div');
+    card.style.cssText = 'background:' + (allDone ? '#e8f8f5' : '#fff') + ';border:1.5px solid ' + (allDone ? '#2ec4b6' : '#e8e3f5') + ';border-radius:14px;padding:0.8rem 1rem;cursor:pointer;min-width:150px;max-width:200px;position:relative;';
+    card.innerHTML =
+      (allDone ? '<div style="position:absolute;top:6px;right:8px;font-size:1rem;">✅</div>' : '') +
+      '<div style="font-weight:700;font-size:0.88rem;margin-bottom:3px;">' + (hw.name || 'การบ้าน #' + hw.id) + '</div>' +
+      '<div style="font-size:0.75rem;color:#9b93b0;">' + words.length + ' คำ · ' + doneCount + '/' + words.length + ' เสร็จ</div>';
+    card.addEventListener('click', function () { openDetailHwDetail(a.id, hw, patient); });
+    container.appendChild(card);
+  });
+}
+
+async function openDetailHwDetail(assignmentId, hw, patient) {
+  document.getElementById('detailHwDetailTitle').textContent = (hw.name || 'การบ้าน #' + hw.id);
+  document.getElementById('detailHwDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
+  document.getElementById('detailHwCards').parentElement.style.display = 'none';
+  document.getElementById('detailHwDetailSection').style.display = 'block';
+
+  var results = await Promise.all([
+    sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', hw.id),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
+  ]);
+  var words = results[0].data || [];
+  var practices = results[1].data || [];
+  var feedbacks = results[2].data || [];
+  var repeatCount = hw.repeat_count || 5;
+
+  var allDone = words.length > 0 && words.every(function (w) {
+    return practices.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+  });
+  var statusEl = document.getElementById('detailHwDetailStatus');
+  statusEl.className = 'badge ' + (allDone ? 'bg-success' : 'bg-warning text-dark');
+  statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
+
+  renderHwDetailTable('detailHwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
 }
 
 async function openUserHwDetail(assignment) {
