@@ -47,44 +47,28 @@
     </div>
 
     <div class="row g-3 mb-5">
-      <div class="col-md-3">
+      <div class="col-md-4">
         <div class="soft-card text-center h-100">
           <div class="feature-icon bg-soft-pink mx-auto">1️⃣</div>
-          <h6 class="mt-2 mb-0">เลือกอายุของน้อง</h6>
+          <h6 class="mt-2 mb-0">เลือกหมวดเสียง</h6>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <div class="soft-card text-center h-100">
-          <div class="feature-icon bg-soft-yellow mx-auto">2️⃣</div>
-          <h6 class="mt-2 mb-0">เลือกแบบฝึกหัด</h6>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="soft-card text-center h-100">
-          <div class="feature-icon bg-soft-purple mx-auto">3️⃣</div>
+          <div class="feature-icon bg-soft-purple mx-auto">2️⃣</div>
           <h6 class="mt-2 mb-0">ฟังตัวอย่าง แล้วลองพูดตาม</h6>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <div class="soft-card text-center h-100">
-          <div class="feature-icon mx-auto" style="background:#e3f6e5;">4️⃣</div>
+          <div class="feature-icon mx-auto" style="background:#e3f6e5;">3️⃣</div>
           <h6 class="mt-2 mb-0">กดฝึกออกเสียงเพื่อบันทึกเสียง</h6>
         </div>
       </div>
     </div>
 
-    <div class="text-center mb-4">
-      <h5 class="mb-3">เลือกอายุของน้อง</h5>
-      <div class="d-flex gap-3 justify-content-center flex-wrap">
-        <button class="age-pick-btn" data-age="4">4<small>ขวบ</small></button>
-        <button class="age-pick-btn" data-age="5">5<small>ขวบ</small></button>
-        <button class="age-pick-btn" data-age="6">6<small>ขวบ</small></button>
-        <button class="age-pick-btn" data-age="7">7<small>ขวบ</small></button>
-      </div>
-    </div>
-
-    <div id="exerciseListSection" style="display:none;">
-      <h5 class="text-center mb-4">แบบฝึกหัดสำหรับอายุ <span id="selectedAgeLabel"></span> ขวบ</h5>
+    <div id="exerciseListSection">
+      <h5 class="text-center mb-4">เลือกหมวดเสียง</h5>
       <div class="alert alert-warning" id="noDataBanner" style="display:none;">
         <i class="bi bi-exclamation-triangle-fill me-2"></i>ยังไม่พบคลังคำในระบบ — เว็บไซต์นี้ยังไม่ได้เชื่อมต่อฐานข้อมูล Supabase กรุณาตั้งค่าตามขั้นตอนใน <code>README.md</code> (รัน schema.sql, นำเข้า data/words.csv, แก้ <code>js/config.js</code> ให้เป็น URL/anon key จริง) แล้วลองใหม่
       </div>
@@ -180,14 +164,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     Auth.initNav();
-
-    document.querySelectorAll(".age-pick-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        document.querySelectorAll(".age-pick-btn").forEach(function (b) { b.classList.remove("active-age"); });
-        btn.classList.add("active-age");
-        loadExercises(parseInt(btn.getAttribute("data-age"), 10));
-      });
-    });
+    loadExercises();
 
     document.getElementById("btnBackToExercises").addEventListener("click", function () {
       document.getElementById("wordListSection").style.display = "none";
@@ -195,10 +172,9 @@
     });
   });
 
-  async function loadExercises(age) {
-    document.getElementById("selectedAgeLabel").textContent = age;
-    const words = await WordsApi.fetchWordsForAge(age);
-    exercisesByAge = WordsApi.groupByExercise(words);
+  async function loadExercises() {
+    const words = await WordsApi.fetchAllWords();
+    exercisesByAge = WordsApi.groupBySound(words);
 
     document.getElementById("noDataBanner").style.display = exercisesByAge.length ? "none" : "block";
 
@@ -210,21 +186,19 @@
       col.innerHTML =
         '<div class="feature-card text-center h-100" style="cursor:pointer;">' +
         '<div class="feature-icon bg-soft-purple mx-auto" style="font-size:1.6rem;">' + ex.letter_category + '</div>' +
-        '<h6 class="mt-2 mb-1">หมวด ' + ex.letter_category + '</h6>' +
+        '<h6 class="mt-2 mb-1">หมวดเสียง ' + ex.letter_category + '</h6>' +
         '<p class="text-secondary small mb-0">' + ex.words.length + ' คำ</p>' +
         '</div>';
       col.addEventListener("click", function () { openExercise(idx); });
       list.appendChild(col);
     });
 
-    document.getElementById("exerciseListSection").style.display = "block";
     document.getElementById("wordListSection").style.display = "none";
-    document.getElementById("exerciseListSection").scrollIntoView({ behavior: "smooth" });
   }
 
   function openExercise(idx) {
     const exercise = exercisesByAge[idx];
-    document.getElementById("exerciseTitleLabel").textContent = "หมวด " + exercise.letter_category;
+    document.getElementById("exerciseTitleLabel").textContent = "หมวดเสียง " + exercise.letter_category;
 
     const rows = document.getElementById("wordRows");
     rows.innerHTML = "";
@@ -234,7 +208,7 @@
       row.innerHTML =
         '<div><span style="font-size:1.6rem;">' + (w.emoji || "🔸") + "</span> " +
         '<strong style="font-size:1.3rem;">' + w.word + "</strong> " +
-        '<span class="text-secondary">' + w.reading + "</span></div>" +
+        '<span class="badge bg-secondary bg-opacity-25 text-secondary fw-normal ms-1" style="font-size:0.72rem;">' + (w.level || '') + "</span></div>" +
         '<div class="d-flex gap-2">' +
         '<button class="btn btn-outline-primary btn-sm btn-listen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>' +
         '<button class="btn btn-warning btn-sm btn-practice"><i class="bi bi-mic-fill me-1"></i>ฝึกออกเสียง</button>' +

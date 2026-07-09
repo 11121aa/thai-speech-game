@@ -195,12 +195,10 @@
             <h5 class="mb-3" id="wordFormTitle">เพิ่มคำฝึกออกเสียง</h5>
             <form id="wordForm" class="row g-3">
               <input type="hidden" id="wordId">
-              <div class="col-md-3"><label class="form-label fw-semibold">รหัสแบบฝึกหัด</label><input type="text" class="form-control" id="wordExerciseCode" required></div>
-              <div class="col-md-3"><label class="form-label fw-semibold">หมวดตัวอักษร</label><input type="text" class="form-control" id="wordLetterCategory" required></div>
+              <div class="col-md-3"><label class="form-label fw-semibold">หมวดเสียง (ตัวอักษร)</label><input type="text" class="form-control" id="wordLetterCategory" required></div>
               <div class="col-md-3"><label class="form-label fw-semibold">คำ</label><input type="text" class="form-control" id="wordWord" required></div>
-              <div class="col-md-3"><label class="form-label fw-semibold">คำอ่าน</label><input type="text" class="form-control" id="wordReading" required></div>
+              <div class="col-md-3"><label class="form-label fw-semibold">ระดับ</label><select class="form-select" id="wordLevel" required><option value="Sound">Sound</option><option value="1 syllable">1 syllable</option><option value="2 syllable">2 syllable</option><option value="3 syllable">3 syllable</option><option value="Sentences">Sentences</option></select></div>
               <div class="col-md-3"><label class="form-label fw-semibold">Emoji</label><input type="text" class="form-control" id="wordEmoji"></div>
-              <div class="col-md-3"><label class="form-label fw-semibold">ระดับอายุ</label><select class="form-select" id="wordAgeLevel" required><option value="4">4 ขวบ</option><option value="5">5 ขวบ</option><option value="6">6 ขวบ</option><option value="7">7 ขวบ</option></select></div>
               <div class="col-md-6 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-warning btn-bouncy" id="wordSubmitBtn">เพิ่มคำ</button>
                 <button type="button" class="btn btn-outline-secondary" id="wordCancelEditBtn" style="display:none;">ยกเลิก</button>
@@ -214,7 +212,7 @@
             </div>
             <div class="table-responsive" style="max-height:440px;overflow-y:auto;">
               <table class="table table-hover align-middle">
-                <thead><tr><th>คำ</th><th>คำอ่าน</th><th>หมวด</th><th>รหัส</th><th>อายุ</th><th>Emoji</th><th></th></tr></thead>
+                <thead><tr><th>คำ</th><th>หมวดเสียง</th><th>ระดับ</th><th>Emoji</th><th></th></tr></thead>
                 <tbody id="wordsTableBody"></tbody>
               </table>
             </div>
@@ -224,11 +222,11 @@
         <!-- ── Sounds Tab ── -->
         <div class="tab-pane fade" id="tabSounds">
           <div class="soft-card">
-            <p class="text-secondary mb-3">ตั้งค่า URL รูปภาพปากสำหรับแต่ละหมวดเสียง — คำทุกคำในหมวดเดียวกันจะใช้รูปเดียวกันโดยอัตโนมัติ</p>
+            <p class="text-secondary mb-3">รายการหมวดเสียงทั้งหมดในระบบ (เพิ่มหมวดใหม่ด้วยการรัน SQL)</p>
             <div class="table-responsive">
               <table class="table table-hover align-middle">
-                <thead><tr><th>รหัสเสียง</th><th>หมวด</th><th>URL รูปปาก (ว่าง = ยังไม่มีรูป)</th><th>ตัวอย่าง</th><th></th></tr></thead>
-                <tbody id="soundsTableBody"><tr><td colspan="5" class="text-secondary">กำลังโหลด...</td></tr></tbody>
+                <thead><tr><th>หมวดเสียง (ตัวอักษร)</th><th>สร้างเมื่อ</th></tr></thead>
+                <tbody id="soundsTableBody"><tr><td colspan="2" class="text-secondary">กำลังโหลด...</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -303,7 +301,7 @@ async function initUserProfile(session) {
   document.getElementById('btnLogout').addEventListener('click', Auth.logout.bind(Auth));
 
   var { data } = await sb.from('practice')
-    .select('*, words(word, letter_category, exercise_code, emoji)')
+    .select('*, words(word, letter_category, level, emoji)')
     .eq('user_id', session.user.id)
     .order('practiced_at', { ascending: false });
 
@@ -490,7 +488,7 @@ function renderStats(data) {
   }
 
   var byGroup = {};
-  data.forEach(function (r) { var g = r.words ? r.words.exercise_code : 'other'; byGroup[g] = (byGroup[g] || 0) + 1; });
+  data.forEach(function (r) { var g = r.words ? r.words.letter_category : 'other'; byGroup[g] = (byGroup[g] || 0) + 1; });
   if (Object.keys(byGroup).length) drawPie('freqChart', byGroup);
 }
 
@@ -543,7 +541,7 @@ async function loadPatientDashboard() {
 
   // Load all practice records (id + user_id + word info only for counts)
   var { data: practices } = await sb.from('practice')
-    .select('id, user_id, practiced_at, parent_marked_correct, words(word, letter_category, exercise_code, emoji)')
+    .select('id, user_id, practiced_at, parent_marked_correct, words(word, letter_category, level, emoji)')
     .order('practiced_at', { ascending: false });
   allPracticeData = practices || [];
 
@@ -600,14 +598,14 @@ async function openPatientDetail(u) {
 
   // Load full practice records for this patient (with file_path + score)
   var { data } = await sb.from('practice')
-    .select('id, score, parent_marked_correct, practiced_at, file_path, user_id, words(word, letter_category, exercise_code, emoji)')
+    .select('id, score, parent_marked_correct, practiced_at, file_path, user_id, words(word, letter_category, level, emoji)')
     .eq('user_id', u.userId)
     .order('practiced_at', { ascending: false });
   currentDetailData = data || [];
 
   drawDetailDailyChart(currentDetailData);
   renderDetailPracticeList(currentDetailData, '');
-  drawHBarChart('soundFreqChart', buildFreqData(currentDetailData, 'exercise_code'),
+  drawHBarChart('soundFreqChart', buildFreqData(currentDetailData, 'letter_category'),
     ['#2ec4b6','#ff9f1c','#ff6b9d','#8a5cf6','#4caf50','#2196f3','#f44336','#ff5722']);
   drawHBarChart('wordFreqChart', buildFreqData(currentDetailData, 'word'),
     ['#8a5cf6','#2ec4b6','#ff6b9d','#ff9f1c','#4caf50','#2196f3','#f44336','#ff5722']);
@@ -709,7 +707,7 @@ function renderDetailPracticeList(rows, filter) {
   var list = document.getElementById('detailPracticeList');
   list.innerHTML = '';
   var filtered = filter ? rows.filter(function (r) {
-    return r.words && (r.words.word.includes(filter) || r.words.exercise_code.includes(filter));
+    return r.words && (r.words.word.includes(filter) || (r.words.letter_category || '').includes(filter));
   }) : rows;
   if (!filtered.length) { list.innerHTML = '<p class="text-secondary text-center py-3 small">ไม่มีข้อมูล</p>'; return; }
   filtered.forEach(function (row) {
@@ -750,40 +748,32 @@ function renderDetailPracticeList(rows, filter) {
 }
 
 async function loadSounds() {
-  var { data } = await sb.from('sounds').select('*').order('exercise_code', { ascending: true });
+  var { data } = await sb.from('sounds').select('*').order('letter', { ascending: true });
   var body = document.getElementById('soundsTableBody');
   body.innerHTML = '';
-  if (!data || !data.length) { body.innerHTML = '<tr><td colspan="5" class="text-secondary">ยังไม่มีข้อมูล — กรุณารัน schema.sql อีกครั้ง</td></tr>'; return; }
+  if (!data || !data.length) { body.innerHTML = '<tr><td colspan="2" class="text-secondary">ยังไม่มีข้อมูล — รัน wordlist2_migration.sql ก่อน</td></tr>'; return; }
   data.forEach(function (s) {
     var tr = document.createElement('tr');
     tr.innerHTML =
-      '<td><code>' + s.exercise_code + '</code></td>' +
-      '<td>' + s.letter_category + '</td>' +
-      '<td><input type="url" class="form-control form-control-sm sound-url-input" placeholder="https://..." value="' + (s.mouth_image_url || '') + '" data-id="' + s.id + '"></td>' +
-      '<td>' + (s.mouth_image_url ? '<img src="' + s.mouth_image_url + '" style="height:40px;border-radius:6px;" onerror="this.style.display=\'none\'">' : '<span class="text-secondary small">ยังไม่มีรูป</span>') + '</td>' +
-      '<td><button class="btn btn-sm btn-warning btn-save-sound">บันทึก</button></td>';
-    var soundId = s.id;
-    tr.querySelector('.btn-save-sound').addEventListener('click', function () {
-      var url = tr.querySelector('.sound-url-input').value.trim() || null;
-      sb.from('sounds').update({ mouth_image_url: url }).eq('id', soundId).then(function () { loadSounds(); });
-    });
+      '<td style="font-size:1.4rem;font-weight:700;">' + s.letter + '</td>' +
+      '<td class="text-secondary small">' + new Date(s.created_at).toLocaleDateString('th-TH') + '</td>';
     body.appendChild(tr);
   });
 }
 
 async function loadWords() {
-  var { data } = await sb.from('words').select('*').order('exercise_code', { ascending: true });
+  var { data } = await sb.from('words').select('*').order('letter_category', { ascending: true }).order('level', { ascending: true });
   allWords = data || []; renderWordsTable();
 }
 
 function renderWordsTable() {
   var q = document.getElementById('wordSearchInput').value.trim().toLowerCase();
-  var filtered = q ? allWords.filter(function (w) { return w.word.includes(q) || w.letter_category.includes(q) || w.exercise_code.includes(q); }) : allWords;
+  var filtered = q ? allWords.filter(function (w) { return w.word.includes(q) || w.letter_category.includes(q); }) : allWords;
   var body = document.getElementById('wordsTableBody');
   body.innerHTML = '';
   filtered.forEach(function (w) {
     var tr = document.createElement('tr');
-    tr.innerHTML = '<td>' + w.word + '</td><td>' + w.reading + '</td><td>' + w.letter_category + '</td><td>' + w.exercise_code + '</td><td>' + w.age_level + '</td><td>' + (w.emoji||'') + '</td><td class="text-end"><button class="btn btn-sm btn-outline-primary me-1 btn-edit-w">แก้ไข</button><button class="btn btn-sm btn-outline-danger btn-del-w">ลบ</button></td>';
+    tr.innerHTML = '<td>' + w.word + '</td><td>' + w.letter_category + '</td><td>' + (w.level||'') + '</td><td>' + (w.emoji||'') + '</td><td class="text-end"><button class="btn btn-sm btn-outline-primary me-1 btn-edit-w">แก้ไข</button><button class="btn btn-sm btn-outline-danger btn-del-w">ลบ</button></td>';
     tr.querySelector('.btn-edit-w').addEventListener('click', function () { fillWordForm(w); });
     tr.querySelector('.btn-del-w').addEventListener('click', function () { deleteWord(w.id); });
     body.appendChild(tr);
@@ -792,12 +782,10 @@ function renderWordsTable() {
 
 function fillWordForm(w) {
   document.getElementById('wordId').value = w.id;
-  document.getElementById('wordExerciseCode').value = w.exercise_code;
   document.getElementById('wordLetterCategory').value = w.letter_category;
   document.getElementById('wordWord').value = w.word;
-  document.getElementById('wordReading').value = w.reading;
+  document.getElementById('wordLevel').value = w.level || 'Sound';
   document.getElementById('wordEmoji').value = w.emoji || '';
-  document.getElementById('wordAgeLevel').value = w.age_level;
   document.getElementById('wordFormTitle').textContent = 'แก้ไขคำ';
   document.getElementById('wordSubmitBtn').textContent = 'บันทึก';
   document.getElementById('wordCancelEditBtn').style.display = 'inline-block';
@@ -815,14 +803,16 @@ function resetWordForm() {
 async function onWordSubmit(e) {
   e.preventDefault();
   var id = document.getElementById('wordId').value;
+  var lc = document.getElementById('wordLetterCategory').value.trim();
   var payload = {
-    exercise_code: document.getElementById('wordExerciseCode').value.trim(),
-    letter_category: document.getElementById('wordLetterCategory').value.trim(),
+    letter_category: lc,
     word: document.getElementById('wordWord').value.trim(),
-    reading: document.getElementById('wordReading').value.trim(),
-    emoji: document.getElementById('wordEmoji').value.trim(),
-    age_level: parseInt(document.getElementById('wordAgeLevel').value, 10)
+    level: document.getElementById('wordLevel').value,
+    emoji: document.getElementById('wordEmoji').value.trim() || document.getElementById('wordWord').value.trim()
   };
+  // Look up sound_id from sounds table
+  var { data: soundRow } = await sb.from('sounds').select('id').eq('letter', lc).maybeSingle();
+  if (soundRow) payload.sound_id = soundRow.id;
   if (id) await sb.from('words').update(payload).eq('id', id);
   else await sb.from('words').insert(payload);
   resetWordForm(); await loadWords();

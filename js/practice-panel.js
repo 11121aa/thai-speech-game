@@ -3,18 +3,7 @@ const PracticePanel = (function () {
   // Files live in MouthAnimation/ and are referenced as <img> so CSS
   // animations inside the SVG are isolated and always play in Chrome.
   const MOUTH_ANIMATIONS = {
-    por: '<img src="MouthAnimation/PouFish.gif" alt="ปากเสียง ป" style="width:100%;height:100%;display:block;">'
-  };
-
-  // Placeholder mouth-position references, keyed by exercise_code.
-  // TODO (Task 4 / future): replace icon+label with real diagrams/videos
-  // supplied by the user, mapped via target_consonant once Task 2 lands.
-  const MOUTH_PLACEHOLDERS = {
-    ror: { icon: "👅", label: 'ลิ้นกระดกขึ้นแบบเสียง "ร"' },
-    lor: { icon: "👅", label: 'ลิ้นแตะเพดานปากแบบเสียง "ล"' },
-    cluster_kl: { icon: "👄", label: "คำควบกล้ำ กล" },
-    cluster_pl: { icon: "👄", label: "คำควบกล้ำ ปล" },
-    cluster_other: { icon: "👄", label: "คำควบกล้ำ ร/ล" }
+    'ป': '<img src="MouthAnimation/PouFish.gif" alt="ปากเสียง ป" style="width:100%;height:100%;display:block;">'
   };
 
   let modalEl = null;
@@ -51,9 +40,7 @@ const PracticePanel = (function () {
   }
 
   function mouthInfoFor(word) {
-    const imageUrl = word.sounds && word.sounds.mouth_image_url;
-    if (imageUrl) return { imageUrl: imageUrl };
-    return MOUTH_PLACEHOLDERS[word.exercise_code] || null;
+    return null;
   }
 
   async function open(word, cbs) {
@@ -69,9 +56,9 @@ const PracticePanel = (function () {
 
     el("ppEmoji").textContent = word.emoji || "🔸";
     el("ppWord").textContent = word.word;
-    el("ppReading").textContent = word.reading;
+    el("ppReading").textContent = word.level || "";
     // Animation box: animation > picture > hidden
-    const animSvg = MOUTH_ANIMATIONS[word.exercise_code];
+    const animSvg = MOUTH_ANIMATIONS[word.letter_category];
     const animBox = el("ppMouthAnimation");
     if (animBox) {
       if (animSvg) {

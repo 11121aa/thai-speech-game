@@ -1,47 +1,40 @@
 const WordsApi = (function () {
-  async function fetchWordsForAge(age) {
-    if (!sb) return [];
-    const { data, error } = await sb
-      .from("words")
-      .select("*, sounds(id, exercise_code, letter_category, mouth_image_url)")
-      .lte("age_level", age)
-      .order("exercise_code", { ascending: true });
-    if (error) {
-      console.error(error);
-      return [];
-    }
-    return data;
-  }
-
-  function groupByExercise(words) {
-    const map = {};
-    words.forEach(function (w) {
-      if (!map[w.exercise_code]) {
-        map[w.exercise_code] = {
-          exercise_code: w.exercise_code,
-          letter_category: w.letter_category,
-          age_level: w.age_level,
-          words: []
-        };
-      }
-      map[w.exercise_code].words.push(w);
-      map[w.exercise_code].age_level = Math.min(map[w.exercise_code].age_level, w.age_level);
-    });
-    return Object.values(map).sort(function (a, b) {
-      return a.age_level - b.age_level || a.exercise_code.localeCompare(b.exercise_code);
-    });
-  }
+  const LEVEL_ORDER = ['Sound', '1 syllable', '2 syllable', '3 syllable', 'Sentences'];
 
   async function fetchAllWords() {
     if (!sb) return [];
     const { data, error } = await sb
       .from("words")
-      .select("*, sounds(id, exercise_code, letter_category, mouth_image_url)");
-    if (error) {
-      console.error(error);
-      return [];
-    }
-    return data;
+      .select("*, sounds(id, letter)")
+      .order("letter_category", { ascending: true });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  }
+
+  function groupBySound(words) {
+    const map = {};
+    words.forEach(function (w) {
+      const key = w.letter_category;
+      if (!map[key]) map[key] = { letter_category: key, sound_id: w.sound_id, words: [] };
+      map[key].words.push(w);
+    });
+    Object.values(map).forEach(function (g) {
+      g.words.sort(function (a, b) {
+        return LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level);
+      });
+    });
+    return Object.values(map).sort(function (a, b) {
+      return a.letter_category.localeCompare(b.letter_category, 'th');
+    });
+  }
+
+  // Kept for backward compat with game pages that still call these
+  async function fetchWordsForAge() {
+    return fetchAllWords();
+  }
+
+  function groupByExercise(words) {
+    return groupBySound(words);
   }
 
   function pickRandomWord(words) {
@@ -50,9 +43,10 @@ const WordsApi = (function () {
   }
 
   return {
-    fetchWordsForAge: fetchWordsForAge,
-    groupByExercise: groupByExercise,
     fetchAllWords: fetchAllWords,
+    fetchWordsForAge: fetchWordsForAge,
+    groupBySound: groupBySound,
+    groupByExercise: groupByExercise,
     pickRandomWord: pickRandomWord
   };
 })();
