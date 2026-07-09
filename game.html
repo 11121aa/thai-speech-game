@@ -170,23 +170,29 @@
 <div id="screenSetup" class="setup-overlay" style="display:none;">
   <div class="setup-panel">
     <h4 class="mb-3">⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
+
     <div class="setup-row">
-      <label>ความยาก</label>
-      <div class="diff-btns">
-        <button class="diff-btn active" data-diff="easy">ง่าย</button>
-        <button class="diff-btn" data-diff="hard">ยาก</button>
-      </div>
+      <label>1 · เลือกหมวดเสียง</label>
+      <div class="word-set-list" id="setupSoundList"></div>
     </div>
+
+    <div class="setup-row">
+      <label>2 · เลือกระดับที่ต้องการฝึก</label>
+      <div class="word-set-list" id="setupLevelList"></div>
+    </div>
+
+    <div class="setup-row" style="align-items:center;">
+      <label>จำนวนคำที่จะใช้</label>
+      <span id="setupWordCount" class="badge bg-warning text-dark" style="font-size:1rem;padding:5px 12px;">0</span>
+    </div>
+
     <div class="setup-row">
       <label>ดูตัวเองก่อนเริ่ม</label>
       <div class="camera-preview-setup" id="setupCameraWrap" style="display:none;">
         <video id="setupCameraVideo" autoplay muted playsinline></video>
       </div>
     </div>
-    <div class="setup-row">
-      <label>ชุดคำที่ต้องการฝึก</label>
-      <div class="word-set-list" id="wordSetList"></div>
-    </div>
+
     <div class="setup-footer">
       <button class="btn btn-outline-secondary btn-bouncy" id="btnSetupCancel">ยกเลิก</button>
       <button class="btn btn-warning btn-bouncy" id="btnSetupStart">เริ่มเกม! 🚀</button>
@@ -427,28 +433,66 @@ function startTimer(limit) {
 
 /* ===== Setup overlay helpers ===== */
 var _allWords = [], _setupMode = null, _setupCam = null;
+var LEVELS_ALL = ['Sound', '1 syllable', '2 syllable', '3 syllable', 'Sentences'];
 
 function openSetup(mode) {
   _setupMode = mode;
   var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
-  populateWordSets('easy');
+  populateSounds();
+  populateLevels();
+  updateWordCount();
   startSetupCam();
   document.getElementById('screenSetup').style.display = 'flex';
 }
 
-function populateWordSets(diff) {
-  var pool = _allWords.filter(function (w) { return diff === 'hard' || w.age_level <= 5; });
-  var groups = WordsApi.groupByExercise(pool);
-  var list = document.getElementById('wordSetList');
+function populateSounds() {
+  var sounds = [];
+  _allWords.forEach(function (w) { if (w.letter_category && !sounds.includes(w.letter_category)) sounds.push(w.letter_category); });
+  sounds.sort(function (a, b) { return a.localeCompare(b, 'th'); });
+  var list = document.getElementById('setupSoundList');
   list.innerHTML = '';
-  groups.forEach(function (g) {
-    var id = 'chk_' + g.exercise_code;
+  sounds.forEach(function (s, i) {
+    var id = 'sound_' + i;
     var item = document.createElement('div');
     item.className = 'word-set-item';
-    item.innerHTML = '<input type="checkbox" id="' + id + '" checked><label for="' + id + '">' + g.letter_category + ' <span class="text-secondary">(' + g.words.length + ' คำ)</span></label>';
+    item.innerHTML = '<input type="radio" name="setupSound" id="' + id + '" value="' + s + '"' + (i === 0 ? ' checked' : '') + '><label for="' + id + '" style="font-size:1.2rem;font-weight:700;">' + s + '</label>';
+    item.querySelector('input').addEventListener('change', updateWordCount);
     list.appendChild(item);
   });
+}
+
+function populateLevels() {
+  var list = document.getElementById('setupLevelList');
+  list.innerHTML = '';
+  LEVELS_ALL.forEach(function (lv) {
+    var id = 'lvl_' + lv.replace(/\s/g, '_');
+    var item = document.createElement('div');
+    item.className = 'word-set-item';
+    item.innerHTML = '<input type="checkbox" id="' + id + '" value="' + lv + '" checked><label for="' + id + '">' + lv + '</label>';
+    item.querySelector('input').addEventListener('change', updateWordCount);
+    list.appendChild(item);
+  });
+}
+
+function getSetupPool() {
+  var soundEl = document.querySelector('#setupSoundList input[name="setupSound"]:checked');
+  var selectedSound = soundEl ? soundEl.value : null;
+  var selectedLevels = new Set();
+  document.querySelectorAll('#setupLevelList input[type="checkbox"]:checked').forEach(function (cb) { selectedLevels.add(cb.value); });
+  var pool = _allWords.filter(function (w) {
+    return w.letter_category === selectedSound && selectedLevels.has(w.level);
+  });
+  pool.sort(function () { return Math.random() - 0.5; });
+  if (_setupMode === 'matching') pool = pool.slice(0, 10);
+  return pool;
+}
+
+function updateWordCount() {
+  var pool = getSetupPool();
+  var count = pool.length;
+  if (_setupMode === 'matching') count = Math.min(count, 10);
+  document.getElementById('setupWordCount').textContent = count + ' คำ';
 }
 
 function startSetupCam() {
@@ -463,12 +507,8 @@ function stopSetupCam() {
 }
 
 function launchGame() {
-  var diff = document.querySelector('.diff-btn.active').getAttribute('data-diff');
-  var checked = new Set();
-  document.querySelectorAll('#wordSetList input[type="checkbox"]:checked').forEach(function (cb) { checked.add(cb.id.replace('chk_', '')); });
-  var pool = _allWords.filter(function (w) { return checked.has(w.exercise_code) && (diff === 'hard' || w.age_level <= 5); });
-  if (!pool.length) { alert('กรุณาเลือกชุดคำอย่างน้อย 1 หมวด'); return; }
-  pool.sort(function () { return Math.random() - 0.5; });
+  var pool = getSetupPool();
+  if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
@@ -535,14 +575,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardFlashcard').addEventListener('click', function () { openSetup('flashcard'); });
   document.getElementById('cardPlatformer').addEventListener('click', function () { openSetup('platformer'); });
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
-
-  document.querySelectorAll('.diff-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      populateWordSets(btn.getAttribute('data-diff'));
-    });
-  });
 
   document.getElementById('btnSetupCancel').addEventListener('click', function () {
     stopSetupCam();
