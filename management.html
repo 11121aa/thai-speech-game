@@ -1270,7 +1270,10 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, assignmen
         var aid = parseInt(inp.getAttribute('data-assign-id'));
         clearTimeout(noteTimers[wid]);
         noteTimers[wid] = setTimeout(async function () {
-          await sb.from('homework_word_feedback').upsert({ homework_assignment_id: aid, word_id: wid, note: inp.value, updated_at: new Date().toISOString() });
+          await sb.from('homework_word_feedback').upsert(
+            { homework_assignment_id: aid, word_id: wid, note: inp.value, updated_at: new Date().toISOString() },
+            { onConflict: 'homework_assignment_id,word_id' }
+          );
         }, 700);
       });
     });
