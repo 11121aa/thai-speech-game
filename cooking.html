@@ -112,6 +112,7 @@ function resetG() {
     ing: 'tom', taps: 0, chopSt: 0,
     chopRun: false, chopDone: false, chopStart: 0,
     kAnim: 0, kAnimStart: 0,
+    tomFinalSt: 0, cabFinalSt: 0,
     // sausage
     kY: 260, kDir: 1, kSpd: 2.8, cuts: 0, cutSc: [],
     // combine
@@ -323,6 +324,72 @@ function drawSausageSprite(cuts) {
   } else {
     sSausageFull(cuts);
   }
+}
+
+/* Returns 0..1 fraction of sausage that forms the middle piece after the player's cuts */
+function getSausageFraction() {
+  if (G.cuts >= 2) return (CUT_TY[1] - CUT_TY[0]) / (NL * LH);
+  if (G.cuts === 1) return ((STOP + NL*LH) - CUT_TY[0]) / (NL * LH);
+  return 1.0;
+}
+
+/* Draw a player-cut bun polygon into a target area, clipping the bun sprite inside */
+function drawAssemblyBunPiece(poly, targetCX, targetCY, targetW, targetH) {
+  if (!poly || poly.length < 2) return false;
+  var sx = targetW / BW, sy = targetH / BH;
+  var ox = BCX, oy = BTY + BH / 2;
+  var tx = targetCX - ox * sx, ty = targetCY - oy * sy;
+  ctx.save();
+  ctx.translate(tx, ty); ctx.scale(sx, sy);
+  ctx.beginPath(); ctx.moveTo(poly[0].x, poly[0].y);
+  for (var i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+  ctx.closePath(); ctx.clip();
+  drawBunSprite();
+  ctx.restore();
+  ctx.save();
+  ctx.translate(tx, ty); ctx.scale(sx, sy);
+  ctx.beginPath(); ctx.moveTo(poly[0].x, poly[0].y);
+  for (var i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+  ctx.closePath();
+  ctx.strokeStyle = C.bunD; ctx.lineWidth = 2.5 / Math.min(sx, sy); ctx.stroke();
+  ctx.restore();
+  return true;
+}
+
+/* Draw an ingredient layer using the actual state from the player's work */
+function drawAssemblyLayer(ing, cx, cy, w) {
+  ctx.save();
+  if (ing === 'tom' || ing === 'tomato') {
+    var tSt = G.tomFinalSt || 0;
+    ctx.fillStyle = tSt >= 2 ? C.tomD : C.tom;
+    ctx.beginPath(); ctx.ellipse(cx, cy, w/2, 11, 0, 0, Math.PI*2); ctx.fill();
+    if (tSt === 0) {
+      ctx.fillStyle = 'rgba(255,220,200,.55)';
+      [-22,0,22].forEach(function(dx){ ctx.beginPath(); ctx.ellipse(cx+dx,cy,4,8,0,0,Math.PI*2); ctx.fill(); });
+    } else {
+      ctx.strokeStyle = 'rgba(255,190,180,.7)'; ctx.lineWidth = 2;
+      var nc = tSt >= 2 ? 7 : 4;
+      for (var i = 0; i < nc; i++) {
+        var lx = cx - w*0.44 + i*(w*0.88/(nc-1));
+        ctx.beginPath(); ctx.moveTo(lx, cy-9); ctx.lineTo(lx, cy+9); ctx.stroke();
+      }
+    }
+  } else if (ing === 'cab' || ing === 'cabbage') {
+    var cSt = G.cabFinalSt || 0;
+    ctx.fillStyle = C.cab; ctx.beginPath(); ctx.ellipse(cx, cy, w/2+8, 8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = C.cabD; ctx.lineWidth = 1.5;
+    var nc = cSt >= 2 ? 7 : (cSt >= 1 ? 4 : 2);
+    for (var i = 0; i < nc; i++) {
+      var lx = cx - w*0.44 + i*(w*0.88/Math.max(nc-1,1));
+      ctx.beginPath(); ctx.moveTo(lx, cy-6); ctx.lineTo(lx, cy+6); ctx.stroke();
+    }
+  } else {
+    var fr = getSausageFraction();
+    var r = Math.max(8, (w/2 - 8) * fr);
+    ctx.fillStyle = C.sau; ctx.beginPath(); ctx.ellipse(cx, cy, r, 18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = C.sauL; ctx.beginPath(); ctx.ellipse(cx-r*.28, cy-6, r*.2, 7, -0.2, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
 }
 
 function sKnife(kx,ky,angle) {
@@ -585,6 +652,7 @@ function finishChop() {
   var key=G.ing==='tom'?'tom':'cab';
   G.scores[key]=G.chopSt===0?20:G.chopSt===1?60:100;
   G.total+=G.scores[key];
+  if(G.ing==='tom') G.tomFinalSt=G.chopSt; else G.cabFinalSt=G.chopSt;
 }
 
 /* ══════════════════════════════════════════════
@@ -669,20 +737,21 @@ function drawCmb(ts) {
     if(G.sX>VW-45) G.sDir=-1; if(G.sX<45) G.sDir=1;
   }
 
-  // Bottom bun
-  sBunBot(VW/2,BBY,222,46);
+  // Bottom bun — player's actual cut right-piece
+  if (!drawAssemblyBunPiece(G.rightPiece, VW/2, BBY+23, 222, 46)) sBunBot(VW/2,BBY,222,46);
 
-  // Dropped layers
+  // Dropped ingredient layers — actual chop state + sausage fraction
   G.dropped.forEach(function(d,i){
-    sIngLayer(d.ing,d.x,BBY-22-i*20,185);
+    drawAssemblyLayer(d.ing,d.x,BBY-22-i*20,185);
   });
 
-  // Top bun after all done
+  // Top bun after all done — player's actual left-piece
   if(G.cIdx>=G.cList.length){
-    sBunTop(VW/2,BBY-G.dropped.length*20-60,222,55);
+    if (!drawAssemblyBunPiece(G.leftPiece, VW/2, BBY-G.dropped.length*20-33, 222, 55))
+      sBunTop(VW/2,BBY-G.dropped.length*20-60,222,55);
   }
 
-  // Moving ingredient
+  // Moving ingredient — show at player's actual chop/cut state
   if(G.cIdx<G.cList.length){
     // Target zone
     ctx.strokeStyle='rgba(46,196,182,.38)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
@@ -694,9 +763,13 @@ function drawCmb(ts) {
     ctx.beginPath(); ctx.moveTo(G.sX,240); ctx.lineTo(G.sX,BBY-14); ctx.stroke(); ctx.setLineDash([]);
 
     var ir=38;
-    if(cur==='tom') drawTomatoSprite(G.sX,225,ir,2);
-    else if(cur==='cab') drawCabbageSprite(G.sX,225,ir,2);
-    else { ctx.fillStyle=C.sau; ctx.beginPath(); ctx.ellipse(G.sX,225,ir*1.5,ir*.52,0,0,Math.PI*2); ctx.fill(); }
+    if(cur==='tom') drawTomatoSprite(G.sX,225,ir,G.tomFinalSt);
+    else if(cur==='cab') drawCabbageSprite(G.sX,225,ir,G.cabFinalSt);
+    else {
+      var fr=getSausageFraction(); var sr=Math.max(8,ir*fr);
+      ctx.fillStyle=C.sau; ctx.beginPath(); ctx.ellipse(G.sX,225,sr*1.5,sr*.52,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=C.sauL; ctx.beginPath(); ctx.ellipse(G.sX-sr*.3,225-sr*.18,sr*.22,sr*.14,0,0,Math.PI*2); ctx.fill();
+    }
   }
 
   if(G.cIdx>=G.cList.length&&!G.allDone){
@@ -737,9 +810,11 @@ function drawFinal() {
   ctx.fillText('🎉 Hot Dog สำเร็จ! 🎉',VW/2,68);
 
   var fc=VW/2, fy=250;
-  sBunTop(fc,fy-60,216,54);
-  sIngLayer('cab',fc,fy-20,192); sIngLayer('tom',fc,fy-7,175); sIngLayer('sau',fc,fy+9,158);
-  sBunBot(fc,fy+25,216,44);
+  if (!drawAssemblyBunPiece(G.leftPiece, fc, fy-60+27, 216, 54)) sBunTop(fc,fy-60,216,54);
+  drawAssemblyLayer('cab',fc,fy-20,192);
+  drawAssemblyLayer('tom',fc,fy-7,175);
+  drawAssemblyLayer('sau',fc,fy+9,158);
+  if (!drawAssemblyBunPiece(G.rightPiece, fc, fy+25+22, 216, 44)) sBunBot(fc,fy+25,216,44);
 
   fillRR(28,350,VW-56,210,16,C.ui);
   var rows=[['ตัดขนมปัง','bun'],['สับมะเขือเทศ','tom'],['สับกะหล่ำปลี','cab'],['ตัดไส้กรอก','sau'],['ใส่ส่วนผสม','cmb']];
