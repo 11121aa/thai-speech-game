@@ -95,7 +95,7 @@ function resetG() {
   G = {
     st: S.SEL, scores: { bun:0, tom:0, cab:0, sau:0, cmb:0 }, total: 0,
     // bun
-    cutting: false, pts: [], split: false,
+    cutting: false, pts: [], split: false, leftPiece: [], rightPiece: [],
     // chop
     ing: 'tom', taps: 0, chopSt: 0,
     chopRun: false, chopDone: false, chopStart: 0,
@@ -305,7 +305,9 @@ function drawSel() {
 /* ══════════════════════════════════════════════
    SCREEN: BUN CUT
 ══════════════════════════════════════════════ */
-var BCX=VW/2, BCY=290, BW=252, BH=125;
+// Bun rectangle bounds
+var BLX=80, BTY=315, BRX=400, BBY=465;
+var BCX=VW/2, BW=BRX-BLX, BH=BBY-BTY;
 
 function bestFit(pts) {
   var n=pts.length;
@@ -313,47 +315,67 @@ function bestFit(pts) {
   var sx=0,sy=0,sxy=0,sxx=0;
   pts.forEach(function(p){ sx+=p.x; sy+=p.y; sxy+=p.x*p.y; sxx+=p.x*p.x; });
   var d=n*sxx-sx*sx;
-  if(Math.abs(d)<1e-5) return 90; // vertical line
+  if(Math.abs(d)<1e-5) return 90;
   var m=(n*sxy-sx*sy)/d;
   return Math.atan(m)*180/Math.PI;
+}
+
+function drawPolygon(pts,fill,stroke) {
+  if(!pts||pts.length<2) return;
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+  ctx.closePath();
+  ctx.fillStyle=fill; ctx.fill();
+  if(stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=3; ctx.stroke(); }
 }
 
 function drawBunCut(ts) {
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
   drawStepBar();
-
   ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.textAlign='center';
   ctx.fillText('ลากตัดขนมปังเป็น 2 ชิ้น',VW/2,SH+28);
 
-  // Guideline
-  ctx.setLineDash([8,6]); ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(BCX,BCY-50); ctx.lineTo(BCX,BCY+BH+50); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.font='10px Prompt'; ctx.fillStyle='rgba(255,255,255,.3)';
-  ctx.fillText('แนวตัด↑',BCX+20,BCY-55);
-
   if(G.split){
-    var gap=26;
-    sBunTop(BCX-gap/2-BW/4,BCY-18,BW/2+8,BH);
-    sBunTop(BCX+gap/2+BW/4,BCY-18,BW/2+8,BH);
-    ctx.font='bold 28px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
-    ctx.fillText('ตัดได้ '+G.scores.bun+' คะแนน! '+(G.scores.bun>=80?'🎉':G.scores.bun>=50?'👍':'💪'),VW/2,BCY+BH+45);
+    // Show actual split polygons, shifted apart to reveal the cut
+    ctx.save(); ctx.translate(-8,0);
+    drawPolygon(G.leftPiece,C.bun,C.bunD);
+    ctx.restore();
+    ctx.save(); ctx.translate(8,0);
+    drawPolygon(G.rightPiece,C.bunL,C.bunD);
+    ctx.restore();
+    // Score
+    ctx.font='bold 26px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
+    ctx.fillText('ตัดได้ '+G.scores.bun+' คะแนน! '+(G.scores.bun>=80?'🎉':G.scores.bun>=50?'👍':'💪'),VW/2,BBY+52);
     ctx.font='14px Prompt'; ctx.fillStyle='rgba(255,255,255,.55)';
-    ctx.fillText(G.scores.bun>=80?'ตัดตรงมาก!':G.scores.bun>=50?'ดีพอใช้':'เส้นเอียงนิดหน่อย',VW/2,BCY+BH+75);
-    drawBtn(VW/2-85,BCY+BH+100,170,52,'ต่อไป →',C.acc);
+    ctx.fillText(G.scores.bun>=80?'ตัดตรงมาก!':G.scores.bun>=50?'ดีพอใช้':'ลองใหม่นะ',VW/2,BBY+78);
+    drawBtn(VW/2-85,BBY+98,170,52,'ต่อไป →',C.acc);
   } else {
-    sBunTop(BCX,BCY,BW,BH);
+    // Draw bun as flat rectangle placeholder
+    fillRR(BLX,BTY,BW,BH,14,C.bun);
+    ctx.strokeStyle=C.bunD; ctx.lineWidth=3; rr(BLX,BTY,BW,BH,14); ctx.stroke();
+    // Sesame seed dots
+    ctx.fillStyle=C.bunD;
+    [[185,338],[225,348],[265,336],[305,348],[345,336],[160,352],[380,350]].forEach(function(d){
+      ctx.beginPath(); ctx.arc(d[0],d[1],4.5,0,Math.PI*2); ctx.fill();
+    });
+    // Guideline (dashed centre line)
+    ctx.setLineDash([9,6]); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(BCX,BTY-22); ctx.lineTo(BCX,BBY+22); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font='10px Prompt'; ctx.fillStyle='rgba(255,255,255,.28)'; ctx.textAlign='center';
+    ctx.fillText('แนวตัด',BCX,BTY-30);
+    // Cut trail drawn by player
     if(G.pts.length>1){
-      ctx.strokeStyle=C.acc; ctx.lineWidth=4; ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.strokeStyle=C.acc; ctx.lineWidth=4.5; ctx.lineCap='round'; ctx.lineJoin='round';
       ctx.beginPath(); ctx.moveTo(G.pts[0].x,G.pts[0].y);
       G.pts.forEach(function(p){ ctx.lineTo(p.x,p.y); }); ctx.stroke();
     }
-    // Animated hint
+    // Animated hint when idle
     if(!G.cutting&&G.pts.length===0){
       var t=(ts%1400)/1400;
-      var hy=BCY-40+t*(BH+80);
+      var hy=BTY-38+t*(BH+76);
       ctx.fillStyle='rgba(46,196,182,'+(0.35+0.35*Math.sin(ts/280))+')';
-      ctx.beginPath(); ctx.arc(BCX,hy,10,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(BCX,hy,11,0,Math.PI*2); ctx.fill();
     }
   }
 }
@@ -693,7 +715,7 @@ canvas.addEventListener('pointerdown',function(e){
   // Bun Cut
   if(G.st===S.BUN){
     if(!G.split){ G.cutting=true; G.pts=[p]; }
-    else if(hit(p.x,p.y,VW/2-85,BCY+BH+100,170,52)){ G.st=S.BUN_R; }
+    else if(hit(p.x,p.y,VW/2-85,BBY+98,170,52)){ G.st=S.BUN_R; }
     return;
   }
   // Bun Result
@@ -752,15 +774,53 @@ canvas.addEventListener('pointermove',function(e){
 canvas.addEventListener('pointerup',function(e){
   e.preventDefault();
   if(G.st===S.BUN&&G.cutting){
+    var raw=G.pts.slice();
     G.cutting=false;
-    if(G.pts.length<3){ G.pts=[]; return; }
-    var ys=G.pts.map(function(p){ return p.y; });
-    var xs=G.pts.map(function(p){ return p.x; });
-    // Must pass through bun vertically
-    var minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
-    if(minY>BCY+30||maxY<BCY+BH-30){ G.pts=[]; return; }
-    // Must have some horizontal span (not too wide = not too diagonal)
-    var angle=bestFit(G.pts);
+    if(raw.length<4){G.pts=[];return;}
+    // Ensure top-to-bottom order
+    if(raw[0].y>raw[raw.length-1].y) raw.reverse();
+    // Reject cut that doesn't span at least half the bun height
+    if(raw[raw.length-1].y-raw[0].y < BH*0.5){G.pts=[];return;}
+
+    // Clip path to bun rectangle, interpolating exact entry (BTY) and exit (BBY)
+    var clip=[]; var entryDone=false, exitDone=false;
+    for(var ci=0; ci<raw.length&&!exitDone; ci++){
+      var cp=raw[ci], pp=ci>0?raw[ci-1]:null;
+      // Entry at top edge
+      if(!entryDone){
+        if(cp.y>=BTY){
+          if(pp&&pp.y<BTY){var et=(BTY-pp.y)/(cp.y-pp.y);clip.push({x:pp.x+et*(cp.x-pp.x),y:BTY});}
+          else{clip.push({x:cp.x,y:BTY});}
+          entryDone=true;
+        }
+      }
+      // Inside bun
+      if(entryDone&&cp.y>=BTY&&cp.y<=BBY){
+        clip.push({x:Math.max(BLX,Math.min(BRX,cp.x)),y:cp.y});
+      }
+      // Exit at bottom edge
+      if(entryDone&&!exitDone&&pp&&pp.y<=BBY&&cp.y>BBY){
+        var xt=(BBY-pp.y)/(cp.y-pp.y);
+        clip.push({x:Math.max(BLX,Math.min(BRX,pp.x+xt*(cp.x-pp.x))),y:BBY});
+        exitDone=true;
+      }
+    }
+    // If cut ended inside the bun, project exit to bottom edge
+    if(!exitDone&&clip.length>0){
+      clip.push({x:Math.max(BLX,Math.min(BRX,raw[raw.length-1].x)),y:BBY});
+    }
+    if(clip.length<2){G.pts=[];return;}
+    // Anchor first/last to exact bun edges
+    clip[0].y=BTY; clip[clip.length-1].y=BBY;
+
+    // Build two polygons split along the cut path
+    // Left piece:  TL → [cut] → BL
+    G.leftPiece  = [{x:BLX,y:BTY}].concat(clip).concat([{x:BLX,y:BBY}]);
+    // Right piece: TR → BR → [cut reversed]
+    G.rightPiece = [{x:BRX,y:BTY},{x:BRX,y:BBY}].concat(clip.slice().reverse());
+
+    // Score = how vertical the cut was (0° off = 100 pts)
+    var angle=bestFit(clip);
     var fromVert=Math.abs(Math.abs(angle)-90);
     G.scores.bun=Math.round(Math.max(0,100-fromVert*2.2));
     G.total+=G.scores.bun;
