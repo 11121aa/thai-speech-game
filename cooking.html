@@ -165,6 +165,7 @@ function trySprite(src) {
   return img;
 }
 var SPR = {
+  bg:  trySprite('img/cooking/bg.jpg'),
   bun: trySprite('img/cooking/bun.png'),
   tom: [
     trySprite('img/cooking/tomato_0.png'),
@@ -177,6 +178,17 @@ var SPR = {
     trySprite('img/cooking/cabbage_2.png'),
   ],
 };
+
+function drawBg() {
+  if (SPR.bg.ok) {
+    var iw = SPR.bg.naturalWidth, ih = SPR.bg.naturalHeight;
+    var scale = Math.max(VW / iw, VH / ih);
+    var dw = iw * scale, dh = ih * scale;
+    ctx.drawImage(SPR.bg, (VW - dw) / 2, (VH - dh) / 2, dw, dh);
+  } else {
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, VW, VH);
+  }
+}
 
 /* ══════════════════════════════════════════════
    SPRITES (placeholder shapes)
@@ -339,7 +351,7 @@ function drawStepBar() {
    SCREEN: FOOD SELECT
 ══════════════════════════════════════════════ */
 function drawSel() {
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+  drawBg();
   ctx.font='bold 30px Prompt,sans-serif'; ctx.fillStyle=C.w; ctx.textAlign='center';
   ctx.fillText('🍳 Cooking Game',VW/2,90);
   ctx.font='16px Prompt'; ctx.fillStyle=C.acc;
@@ -428,7 +440,7 @@ function drawBunPiece(poly,dx) {
 }
 
 function drawBunCut(ts) {
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+  drawBg();
   drawStepBar();
   ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.textAlign='center';
   ctx.fillText('ลากตัดขนมปังเป็น 2 ชิ้น',VW/2,SH+28);
@@ -475,7 +487,7 @@ var CHOP_DUR=9000;
 var ICX=185, ICY=380, IR=90;
 
 function drawChop(ts) {
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+  drawBg();
   drawStepBar();
   var isTom=G.ing==='tom';
   ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)'; ctx.textAlign='center';
@@ -534,7 +546,7 @@ var CUT_TY=[282,370];
 var KX=SCX+90;
 
 function drawSau(ts) {
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+  drawBg();
   drawStepBar();
   ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.textAlign='center';
   ctx.fillText('แตะตอนมีดผ่านรอยตัด! (2 ครั้ง)',VW/2,SH+26);
@@ -606,7 +618,7 @@ var BBY=630, CTW=155;
 var ING_LABELS={ tom:'มะเขือเทศ', cab:'กะหล่ำปลี', sau:'ไส้กรอก' };
 
 function drawCmb(ts) {
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+  drawBg();
   drawStepBar();
   var cur=G.cList[G.cIdx];
 
@@ -660,7 +672,7 @@ function drawCmb(ts) {
    SCREEN: STEP RESULT
 ══════════════════════════════════════════════ */
 function drawResult(key,lbl) {
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+  drawBg();
   drawStepBar();
   fillRR(45,SH+28,VW-90,205,18,C.ui);
   ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
@@ -680,7 +692,7 @@ function drawResult(key,lbl) {
    SCREEN: FINAL
 ══════════════════════════════════════════════ */
 function drawFinal() {
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+  drawBg();
   ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
   ctx.fillText('🎉 Hot Dog สำเร็จ! 🎉',VW/2,68);
 
