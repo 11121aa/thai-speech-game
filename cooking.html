@@ -5,45 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Cooking Game 🍳</title>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="css/style.css" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { background: #111827; height: 100%; overflow: hidden; touch-action: none; user-select: none; }
 body { display: flex; align-items: center; justify-content: center; }
 #wrap { position: absolute; width: 480px; height: 800px; }
 canvas { display: block; width: 480px; height: 800px; }
-#overlay {
-  display: none; position: absolute; inset: 0;
-  background: rgba(0,0,0,0.72); align-items: center; justify-content: center; z-index: 20;
-}
-#overlay.show { display: flex; }
-#popup {
-  background: #fff; border-radius: 24px; padding: 28px 30px;
-  text-align: center; width: 310px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.45);
-  font-family: 'Prompt', sans-serif;
-}
-.pe { font-size: 3.2rem; line-height: 1.1; }
-.pw { font-size: 2rem; font-weight: 700; color: #111827; margin: 6px 0 2px; }
-.pr { font-size: 0.88rem; color: #8090a0; margin-bottom: 14px; }
-.pb {
-  display: inline-block; border: none; border-radius: 12px;
-  padding: 9px 20px; font-size: 0.95rem; font-family: 'Prompt', sans-serif;
-  font-weight: 600; cursor: pointer; color: #fff; margin: 3px;
-}
-.pb-l { background: #2ec4b6; }
-.pb-n { background: #f0a500; width: 100%; margin-top: 8px; padding: 12px; display: block; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="c" width="480" height="800"></canvas>
-  <div id="overlay">
-    <div id="popup">
-      <div class="pe" id="pE">🍞</div>
-      <div class="pw" id="pW">ขนมปัง</div>
-      <div class="pr" id="pR">ขะ-นม-ปัง</div>
-      <button class="pb pb-l" id="pL">🔊 ฟังตัวอย่าง</button>
-      <button class="pb pb-n" id="pN">ต่อไป →</button>
+</div>
+
+<!-- Shared Practice Modal (identical to game.html) -->
+<div class="modal fade" id="practiceModal" tabindex="-1"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="border-radius:24px;">
+      <div class="modal-body text-center p-4" style="position:relative;">
+        <button id="ppBtnSkip" title="ข้าม"
+          style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:1.4rem;color:#bbb;cursor:pointer;line-height:1;"
+          aria-label="ข้าม">✕</button>
+        <p class="text-secondary mb-1">ลองออกเสียงคำนี้ดูสิ</p>
+        <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
+        <div class="challenge-word" id="ppWord">บ้าน</div>
+        <p class="text-secondary" id="ppReading"></p>
+        <div class="practice-stage" id="ppPracticeStage">
+          <div class="mouth-animation-box" id="ppMouthAnimation" style="display:none;"></div>
+          <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
+          <div class="camera-mirror" id="ppCameraWrap">
+            <video id="ppCameraVideo" autoplay muted playsinline></video>
+          </div>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" id="ppBtnListen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>
+        <canvas id="ppWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px; margin-top:0.75rem;"></canvas>
+        <button class="mic-btn mt-3" id="ppBtnMic"><i class="bi bi-mic-fill"></i></button>
+        <p class="small text-secondary" id="ppRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด</p>
+        <div class="alert alert-danger" id="ppErrorMsg" style="display:none;"></div>
+        <div id="ppPlaybackArea" style="display:none;">
+          <audio id="ppPlaybackAudio" controls style="width:100%;"></audio>
+          <p class="playback-label">ฟังเสียงตัวเองแล้วให้ผู้ปกครองช่วยตัดสิน</p>
+          <div class="alert alert-success" id="ppCorrectMsg" style="display:none;">เยี่ยมมาก! ได้แต้มเพิ่มแล้ว 🎉</div>
+          <div class="judge-buttons">
+            <button class="btn judge-btn-correct" id="ppBtnCorrect" disabled><i class="bi bi-check-circle-fill me-1"></i>ออกเสียงถูกแล้ว</button>
+            <button class="btn judge-btn-retry" id="ppBtnRetry"><i class="bi bi-arrow-counterclockwise me-1"></i>ลองอีกครั้ง</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -657,29 +669,15 @@ function getStepWord(fromSt) {
 }
 
 /* ══════════════════════════════════════════════
-   WORD POPUP
+   WORD POPUP — uses the shared PracticePanel (same as other games)
 ══════════════════════════════════════════════ */
-var pNext = null;
 function showPopup(fromSt, toSt) {
   var w = getStepWord(fromSt);
   if (!w) { initSt(toSt); G.st = toSt; return; }
-  pNext = toSt;
-  document.getElementById('pE').textContent = w.emoji || '📝';
-  document.getElementById('pW').textContent = w.word;
-  document.getElementById('pR').textContent = w.reading || '';
-  document.getElementById('overlay').classList.add('show');
+  PracticePanel.open(w, {
+    onClosed: function() { initSt(toSt); G.st = toSt; }
+  });
 }
-document.getElementById('pN').addEventListener('click',function(){
-  document.getElementById('overlay').classList.remove('show');
-  if(pNext!==null){ var ns=pNext; pNext=null; initSt(ns); G.st=ns; }
-});
-document.getElementById('pL').addEventListener('click',function(){
-  if('speechSynthesis' in window){
-    speechSynthesis.cancel();
-    var txt=document.getElementById('pW').textContent;
-    if(txt){ var u=new SpeechSynthesisUtterance(txt); u.lang='th-TH'; speechSynthesis.speak(u); }
-  }
-});
 
 /* ══════════════════════════════════════════════
    STATE INIT
@@ -850,5 +848,15 @@ canvas.addEventListener('pointerup',function(e){
 ══════════════════════════════════════════════ */
 requestAnimationFrame(loop);
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/words-api.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/practice-panel.js"></script>
 </body>
 </html>
