@@ -149,12 +149,15 @@ function hit(px,py,x,y,w,h) { return px>=x&&px<=x+w&&py>=y&&py<=y+h; }
 
    Expected filenames:
      img/cooking/bun.png
-     img/cooking/tomato_0.png  (whole)
-     img/cooking/tomato_1.png  (half-chopped)
-     img/cooking/tomato_2.png  (fully chopped)
+     img/cooking/tomato_0.png   (whole)
+     img/cooking/tomato_1.png   (half-chopped)
+     img/cooking/tomato_2.png   (fully chopped)
      img/cooking/cabbage_0.png
      img/cooking/cabbage_1.png
      img/cooking/cabbage_2.png
+     img/cooking/sausage_0.png  (whole, no cuts)
+     img/cooking/sausage_1.png  (first cut made)
+     img/cooking/sausage_2.png  (both cuts, middle highlighted)
 ══════════════════════════════════════════════ */
 function trySprite(src) {
   var img = new Image();
@@ -176,6 +179,11 @@ var SPR = {
     trySprite('img/cooking/cabbage_0.png'),
     trySprite('img/cooking/cabbage_1.png'),
     trySprite('img/cooking/cabbage_2.png'),
+  ],
+  sau: [
+    trySprite('img/cooking/sausage_0.png'),
+    trySprite('img/cooking/sausage_1.png'),
+    trySprite('img/cooking/sausage_2.png'),
   ],
 };
 
@@ -273,6 +281,47 @@ function drawCabbageSprite(cx,cy,r,st) {
     ctx.drawImage(img, cx-r, cy-r, r*2, r*2);
   } else {
     sCabbage(cx, cy, r, st);
+  }
+}
+
+function sSausageFull(cuts) {
+  // Connectors between links
+  for (var i = 0; i < NL-1; i++) {
+    var gy = STOP + i*LH + LH;
+    ctx.fillStyle = '#4a2008';
+    ctx.fillRect(SCX-7, gy-4, 14, STOP+(i+1)*LH-gy+8);
+  }
+  // All links — none are hidden even after cuts
+  for (var i = 0; i < NL; i++) {
+    var ly = STOP + i*LH + LH/2;
+    sSauLink(SCX, ly, LW, LH-10);
+  }
+  // White cut lines at each completed cut
+  for (var ci = 0; ci < Math.min(cuts, CUT_TY.length); ci++) {
+    var ty = CUT_TY[ci];
+    ctx.save();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3.5;
+    ctx.shadowColor = C.acc; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.moveTo(SCX-LW/2-10, ty); ctx.lineTo(SCX+LW/2+10, ty); ctx.stroke();
+    ctx.restore();
+  }
+  // Golden highlight on the middle piece after both cuts
+  if (cuts >= 2) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(240,165,0,0.2)';
+    ctx.fillRect(SCX-LW/2-5, CUT_TY[0], LW+10, CUT_TY[1]-CUT_TY[0]);
+    ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.setLineDash([4,3]);
+    ctx.strokeRect(SCX-LW/2-5, CUT_TY[0], LW+10, CUT_TY[1]-CUT_TY[0]);
+    ctx.setLineDash([]); ctx.restore();
+  }
+}
+function drawSausageSprite(cuts) {
+  var st = Math.min(cuts, 2);
+  var img = SPR.sau[st];
+  if (img && img.ok) {
+    ctx.drawImage(img, SCX-LW/2, STOP, LW, NL*LH);
+  } else {
+    sSausageFull(cuts);
   }
 }
 
@@ -551,48 +600,39 @@ function drawSau(ts) {
   ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.textAlign='center';
   ctx.fillText('แตะตอนมีดผ่านรอยตัด! (2 ครั้ง)',VW/2,SH+26);
 
-  // Move knife
+  // Move knife while still cutting
   if(G.cuts<2){ G.kY+=G.kDir*G.kSpd; if(G.kY>STOP+NL*LH-12) G.kDir=-1; if(G.kY<STOP+12) G.kDir=1; }
 
-  // Links
-  for(var i=0;i<NL;i++){
-    var ly=STOP+i*LH+LH/2;
-    var c1=G.cuts>=1&&Math.abs(ly-CUT_TY[0])<LH/2;
-    var c2=G.cuts>=2&&Math.abs(ly-CUT_TY[1])<LH/2;
-    if(!c1&&!c2) sSauLink(SCX,ly,LW,LH-10);
+  // Sausage — all pieces stay visible; cuts shown as white lines; middle highlighted after both cuts
+  drawSausageSprite(G.cuts);
+
+  if(G.cuts<2){
+    // Target dashes for remaining cuts only
+    CUT_TY.forEach(function(ty,i){
+      if(i>=G.cuts){
+        ctx.strokeStyle='rgba(46,196,182,.5)'; ctx.lineWidth=2.5; ctx.setLineDash([6,4]);
+        ctx.beginPath(); ctx.moveTo(SCX-36,ty); ctx.lineTo(SCX+36,ty); ctx.stroke(); ctx.setLineDash([]);
+        ctx.font='10px Prompt'; ctx.fillStyle=C.acc; ctx.textAlign='left';
+        ctx.fillText('ตัดที่นี่',SCX+40,ty+4);
+      }
+    });
+
+    // Proximity glow
+    CUT_TY.forEach(function(ty,i){
+      if(i<G.cuts) return;
+      var d=Math.abs(G.kY-ty);
+      if(d<30){ ctx.fillStyle='rgba(46,196,182,'+(0.14*(1-d/30))+')'; ctx.fillRect(0,ty-14,VW,28); }
+    });
+
+    // Horizontal knife
+    ctx.save(); ctx.translate(KX,G.kY); ctx.rotate(-Math.PI/2);
+    ctx.fillStyle=C.kni;
+    ctx.beginPath(); ctx.moveTo(-7,-6); ctx.lineTo(7,-6); ctx.lineTo(4,-74); ctx.lineTo(0,-88); ctx.lineTo(-4,-74); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=C.kniH; rr(-10,-6+74,20,50,5); ctx.fill();
+    ctx.restore();
   }
-  // Connectors
-  for(var i=0;i<NL-1;i++){
-    var gy=STOP+i*LH+LH;
-    var isG=(G.cuts>=1&&Math.abs(gy-CUT_TY[0])<14)||(G.cuts>=2&&Math.abs(gy-CUT_TY[1])<14);
-    if(!isG){ ctx.fillStyle='#4a2008'; ctx.fillRect(SCX-7,gy-4,14,(STOP+(i+1)*LH)-gy+8); }
-  }
 
-  // Target dashes
-  CUT_TY.forEach(function(ty,i){
-    if(i>=G.cuts){
-      ctx.strokeStyle='rgba(46,196,182,.5)'; ctx.lineWidth=2.5; ctx.setLineDash([6,4]);
-      ctx.beginPath(); ctx.moveTo(SCX-36,ty); ctx.lineTo(SCX+36,ty); ctx.stroke(); ctx.setLineDash([]);
-      ctx.font='10px Prompt'; ctx.fillStyle=C.acc; ctx.textAlign='left';
-      ctx.fillText('ตัดที่นี่',SCX+40,ty+4);
-    }
-  });
-
-  // Proximity glow
-  CUT_TY.forEach(function(ty,i){
-    if(i<G.cuts) return;
-    var d=Math.abs(G.kY-ty);
-    if(d<30){ ctx.fillStyle='rgba(46,196,182,'+(0.14*(1-d/30))+')'; ctx.fillRect(0,ty-14,VW,28); }
-  });
-
-  // Horizontal knife (rotated 90°)
-  ctx.save(); ctx.translate(KX,G.kY); ctx.rotate(-Math.PI/2);
-  ctx.fillStyle=C.kni;
-  ctx.beginPath(); ctx.moveTo(-7,-6); ctx.lineTo(7,-6); ctx.lineTo(4,-74); ctx.lineTo(0,-88); ctx.lineTo(-4,-74); ctx.closePath(); ctx.fill();
-  ctx.fillStyle=C.kniH; rr(-10,-6+74,20,50,5); ctx.fill();
-  ctx.restore();
-
-  // Cut feedback
+  // Cut feedback scores
   if(G.cutSc.length>0){
     G.cutSc.forEach(function(cs,i){
       ctx.font='bold 13px Prompt'; ctx.fillStyle=cs>=70?C.grn:C.gold; ctx.textAlign='center';
