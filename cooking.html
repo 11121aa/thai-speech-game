@@ -142,6 +142,43 @@ function drawBtn(x,y,w,h,txt,col) {
 function hit(px,py,x,y,w,h) { return px>=x&&px<=x+w&&py>=y&&py<=y+h; }
 
 /* ══════════════════════════════════════════════
+   SPRITE LOADER
+   Place image files in img/cooking/ and they are
+   used automatically. Missing files silently fall
+   back to the placeholder drawing below.
+
+   Expected filenames:
+     img/cooking/bun.png
+     img/cooking/tomato_0.png  (whole)
+     img/cooking/tomato_1.png  (half-chopped)
+     img/cooking/tomato_2.png  (fully chopped)
+     img/cooking/cabbage_0.png
+     img/cooking/cabbage_1.png
+     img/cooking/cabbage_2.png
+══════════════════════════════════════════════ */
+function trySprite(src) {
+  var img = new Image();
+  img.ok = false;
+  img.onload  = function(){ img.ok = true; };
+  img.onerror = function(){ img.ok = false; };
+  img.src = src;
+  return img;
+}
+var SPR = {
+  bun: trySprite('img/cooking/bun.png'),
+  tom: [
+    trySprite('img/cooking/tomato_0.png'),
+    trySprite('img/cooking/tomato_1.png'),
+    trySprite('img/cooking/tomato_2.png'),
+  ],
+  cab: [
+    trySprite('img/cooking/cabbage_0.png'),
+    trySprite('img/cooking/cabbage_1.png'),
+    trySprite('img/cooking/cabbage_2.png'),
+  ],
+};
+
+/* ══════════════════════════════════════════════
    SPRITES (placeholder shapes)
 ══════════════════════════════════════════════ */
 /* cx = centre-x of bun, cy = top-y, w = total width, h = height */
@@ -207,6 +244,24 @@ function sCabbage(cx,cy,r,st) {
     }
   }
   ctx.restore();
+}
+
+/* Sprite-aware wrappers — use loaded image if available, else placeholder */
+function drawTomatoSprite(cx,cy,r,st) {
+  var img = SPR.tom[st];
+  if (img && img.ok) {
+    ctx.drawImage(img, cx-r, cy-r, r*2, r*2);
+  } else {
+    sTomato(cx, cy, r, st);
+  }
+}
+function drawCabbageSprite(cx,cy,r,st) {
+  var img = SPR.cab[st];
+  if (img && img.ok) {
+    ctx.drawImage(img, cx-r, cy-r, r*2, r*2);
+  } else {
+    sCabbage(cx, cy, r, st);
+  }
 }
 
 function sKnife(kx,ky,angle) {
@@ -339,12 +394,16 @@ function bestFit(pts) {
    Everything else (clipping, polygon-split, scoring) stays unchanged.
 ──────────────────────────────────────────────────────────────────── */
 function drawBunSprite() {
-  fillRR(BLX,BTY,BW,BH,14,C.bun);
-  ctx.strokeStyle=C.bunD; ctx.lineWidth=3; rr(BLX,BTY,BW,BH,14); ctx.stroke();
-  ctx.fillStyle=C.bunD;
-  [[185,338],[225,348],[265,336],[305,348],[345,336],[160,352],[380,350]].forEach(function(d){
-    ctx.beginPath(); ctx.arc(d[0],d[1],4.5,0,Math.PI*2); ctx.fill();
-  });
+  if (SPR.bun.ok) {
+    ctx.drawImage(SPR.bun, BLX, BTY, BW, BH);
+  } else {
+    fillRR(BLX,BTY,BW,BH,14,C.bun);
+    ctx.strokeStyle=C.bunD; ctx.lineWidth=3; rr(BLX,BTY,BW,BH,14); ctx.stroke();
+    ctx.fillStyle=C.bunD;
+    [[185,338],[225,348],[265,336],[305,348],[345,336],[160,352],[380,350]].forEach(function(d){
+      ctx.beginPath(); ctx.arc(d[0],d[1],4.5,0,Math.PI*2); ctx.fill();
+    });
+  }
 }
 
 /* Clip canvas to a polygon, draw the full bun sprite inside, then stroke the edge */
@@ -432,8 +491,8 @@ function drawChop(ts) {
   ctx.fillText(Math.max(0,Math.ceil((CHOP_DUR-elapsed)/1000))+'วิ',VW/2,SH+60);
 
   // Ingredient
-  if(isTom) sTomato(ICX,ICY,IR,G.chopSt);
-  else sCabbage(ICX,ICY,IR,G.chopSt);
+  if(isTom) drawTomatoSprite(ICX,ICY,IR,G.chopSt);
+  else drawCabbageSprite(ICX,ICY,IR,G.chopSt);
 
   // Knife
   var kA=0;
@@ -583,8 +642,8 @@ function drawCmb(ts) {
     ctx.beginPath(); ctx.moveTo(G.sX,240); ctx.lineTo(G.sX,BBY-14); ctx.stroke(); ctx.setLineDash([]);
 
     var ir=38;
-    if(cur==='tom') sTomato(G.sX,225,ir,2);
-    else if(cur==='cab') sCabbage(G.sX,225,ir,2);
+    if(cur==='tom') drawTomatoSprite(G.sX,225,ir,2);
+    else if(cur==='cab') drawCabbageSprite(G.sX,225,ir,2);
     else { ctx.fillStyle=C.sau; ctx.beginPath(); ctx.ellipse(G.sX,225,ir*1.5,ir*.52,0,0,Math.PI*2); ctx.fill(); }
   }
 
