@@ -320,13 +320,40 @@ function bestFit(pts) {
   return Math.atan(m)*180/Math.PI;
 }
 
-function drawPolygon(pts,fill,stroke) {
-  if(!pts||pts.length<2) return;
-  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-  for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+/* ── BUN SPRITE ─────────────────────────────────────────────────────
+   PLACEHOLDER: draws a coloured rectangle.
+   To use a real sprite later, replace the body of this function with:
+     ctx.drawImage(bunImg, BLX, BTY, BW, BH);
+   Everything else (clipping, polygon-split, scoring) stays unchanged.
+──────────────────────────────────────────────────────────────────── */
+function drawBunSprite() {
+  fillRR(BLX,BTY,BW,BH,14,C.bun);
+  ctx.strokeStyle=C.bunD; ctx.lineWidth=3; rr(BLX,BTY,BW,BH,14); ctx.stroke();
+  ctx.fillStyle=C.bunD;
+  [[185,338],[225,348],[265,336],[305,348],[345,336],[160,352],[380,350]].forEach(function(d){
+    ctx.beginPath(); ctx.arc(d[0],d[1],4.5,0,Math.PI*2); ctx.fill();
+  });
+}
+
+/* Clip canvas to a polygon, draw the full bun sprite inside, then stroke the edge */
+function drawBunPiece(poly,dx) {
+  if(!poly||poly.length<2) return;
+  ctx.save();
+  ctx.translate(dx,0);
+  // Clip to the polygon shape
+  ctx.beginPath(); ctx.moveTo(poly[0].x,poly[0].y);
+  for(var i=1;i<poly.length;i++) ctx.lineTo(poly[i].x,poly[i].y);
+  ctx.closePath(); ctx.clip();
+  // Draw sprite inside the clip (only the polygon region shows)
+  drawBunSprite();
+  ctx.restore();
+  // Draw the cut-edge outline on top
+  ctx.save(); ctx.translate(dx,0);
+  ctx.beginPath(); ctx.moveTo(poly[0].x,poly[0].y);
+  for(var i=1;i<poly.length;i++) ctx.lineTo(poly[i].x,poly[i].y);
   ctx.closePath();
-  ctx.fillStyle=fill; ctx.fill();
-  if(stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=3; ctx.stroke(); }
+  ctx.strokeStyle=C.bunD; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.restore();
 }
 
 function drawBunCut(ts) {
@@ -336,13 +363,9 @@ function drawBunCut(ts) {
   ctx.fillText('ลากตัดขนมปังเป็น 2 ชิ้น',VW/2,SH+28);
 
   if(G.split){
-    // Show actual split polygons, shifted apart to reveal the cut
-    ctx.save(); ctx.translate(-8,0);
-    drawPolygon(G.leftPiece,C.bun,C.bunD);
-    ctx.restore();
-    ctx.save(); ctx.translate(8,0);
-    drawPolygon(G.rightPiece,C.bunL,C.bunD);
-    ctx.restore();
+    // Each piece is the sprite clipped to the polygon, shifted apart
+    drawBunPiece(G.leftPiece,-8);
+    drawBunPiece(G.rightPiece,8);
     // Score
     ctx.font='bold 26px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
     ctx.fillText('ตัดได้ '+G.scores.bun+' คะแนน! '+(G.scores.bun>=80?'🎉':G.scores.bun>=50?'👍':'💪'),VW/2,BBY+52);
@@ -350,21 +373,15 @@ function drawBunCut(ts) {
     ctx.fillText(G.scores.bun>=80?'ตัดตรงมาก!':G.scores.bun>=50?'ดีพอใช้':'ลองใหม่นะ',VW/2,BBY+78);
     drawBtn(VW/2-85,BBY+98,170,52,'ต่อไป →',C.acc);
   } else {
-    // Draw bun as flat rectangle placeholder
-    fillRR(BLX,BTY,BW,BH,14,C.bun);
-    ctx.strokeStyle=C.bunD; ctx.lineWidth=3; rr(BLX,BTY,BW,BH,14); ctx.stroke();
-    // Sesame seed dots
-    ctx.fillStyle=C.bunD;
-    [[185,338],[225,348],[265,336],[305,348],[345,336],[160,352],[380,350]].forEach(function(d){
-      ctx.beginPath(); ctx.arc(d[0],d[1],4.5,0,Math.PI*2); ctx.fill();
-    });
-    // Guideline (dashed centre line)
+    // Full uncut bun sprite
+    drawBunSprite();
+    // Guideline
     ctx.setLineDash([9,6]); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(BCX,BTY-22); ctx.lineTo(BCX,BBY+22); ctx.stroke();
     ctx.setLineDash([]);
     ctx.font='10px Prompt'; ctx.fillStyle='rgba(255,255,255,.28)'; ctx.textAlign='center';
     ctx.fillText('แนวตัด',BCX,BTY-30);
-    // Cut trail drawn by player
+    // Cut trail
     if(G.pts.length>1){
       ctx.strokeStyle=C.acc; ctx.lineWidth=4.5; ctx.lineCap='round'; ctx.lineJoin='round';
       ctx.beginPath(); ctx.moveTo(G.pts[0].x,G.pts[0].y);
