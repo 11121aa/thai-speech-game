@@ -83,6 +83,11 @@
           <span class="mode-title">ข้ามถนน</span>
           <span class="mode-desc">โดดข้ามรถ ฝึกพูดคำทุกครั้งที่ข้ามได้</span>
         </div>
+        <div class="game-mode-card" id="cardCooking">
+          <span class="mode-icon">🌭</span>
+          <span class="mode-title">ทำอาหาร</span>
+          <span class="mode-desc">หั่น สับ ประกอบ Hot Dog ฝึกคำศัพท์อาหาร</span>
+        </div>
       </div>
     </div>
 
@@ -653,6 +658,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardFlashcard').addEventListener('click', function () { openSetup('flashcard'); });
   document.getElementById('cardPlatformer').addEventListener('click', function () { openSetup('platformer'); });
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
+  document.getElementById('cardCooking').addEventListener('click', function () { location.href = 'cooking.html'; });
 
   document.querySelectorAll('.diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
