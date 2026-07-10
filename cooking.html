@@ -333,21 +333,31 @@ function getSausageFraction() {
   return 1.0;
 }
 
-/* Draw a player-cut bun polygon into a target area, clipping the bun sprite inside */
+/* Draw a player-cut bun polygon into a target area with 90° CW rotation.
+   The bun was cut as a wide landscape rectangle; rotating it makes it appear
+   as a side-view bun half in the hot dog assembly.
+   After 90° CW rotation the bun's width (BW=320) becomes the target height
+   and its height (BH=150) becomes the target width. */
 function drawAssemblyBunPiece(poly, targetCX, targetCY, targetW, targetH) {
   if (!poly || poly.length < 2) return false;
-  var sx = targetW / BW, sy = targetH / BH;
-  var ox = BCX, oy = BTY + BH / 2;
-  var tx = targetCX - ox * sx, ty = targetCY - oy * sy;
+  var sx = targetW / BH;   // BH=150 → becomes the rotated width
+  var sy = targetH / BW;   // BW=320 → becomes the rotated height
+  var ox = BCX, oy = BTY + BH / 2;   // bun centre in original space
+  function applyTransform() {
+    ctx.translate(targetCX, targetCY);
+    ctx.scale(sx, sy);
+    ctx.rotate(Math.PI / 2);   // 90° clockwise
+    ctx.translate(-ox, -oy);
+  }
   ctx.save();
-  ctx.translate(tx, ty); ctx.scale(sx, sy);
+  applyTransform();
   ctx.beginPath(); ctx.moveTo(poly[0].x, poly[0].y);
   for (var i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
   ctx.closePath(); ctx.clip();
   drawBunSprite();
   ctx.restore();
   ctx.save();
-  ctx.translate(tx, ty); ctx.scale(sx, sy);
+  applyTransform();
   ctx.beginPath(); ctx.moveTo(poly[0].x, poly[0].y);
   for (var i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
   ctx.closePath();
