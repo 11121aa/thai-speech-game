@@ -595,22 +595,39 @@ function drawFinal() {
 }
 
 /* ══════════════════════════════════════════════
+   WORD POOL — loaded from game.html setup via sessionStorage
+══════════════════════════════════════════════ */
+var _pool = [];
+(function() {
+  try {
+    var raw = sessionStorage.getItem('cookingWords');
+    if (raw) { _pool = JSON.parse(raw); sessionStorage.removeItem('cookingWords'); }
+  } catch(e) {}
+  if (!_pool.length) { location.href = 'game.html'; }
+})();
+
+// Index per result state: BUN→0, TOM→1, CAB→2, SAU→3, CMB→4
+var STEP_IDX = {};
+STEP_IDX[S.BUN_R]=0; STEP_IDX[S.TOM_R]=1; STEP_IDX[S.CAB_R]=2;
+STEP_IDX[S.SAU_R]=3; STEP_IDX[S.CMB_R]=4;
+
+function getStepWord(fromSt) {
+  var idx = STEP_IDX[fromSt];
+  if (idx === undefined || !_pool.length) return null;
+  return _pool[idx % _pool.length];
+}
+
+/* ══════════════════════════════════════════════
    WORD POPUP
 ══════════════════════════════════════════════ */
-var WORDS = {};
-WORDS[S.BUN_R]  = { e:'🍞', w:'ขนมปัง',    r:'ขะ-นม-ปัง' };
-WORDS[S.TOM_R]  = { e:'🍅', w:'มะเขือเทศ', r:'มะ-เขือ-เทด' };
-WORDS[S.CAB_R]  = { e:'🥬', w:'กะหล่ำปลี', r:'กะ-หล่ำ-ปลี' };
-WORDS[S.SAU_R]  = { e:'🌭', w:'ไส้กรอก',   r:'ไส้-กรอก' };
-WORDS[S.CMB_R]  = { e:'🌭', w:'ฮอทดอก',    r:'ฮ็อต-ด็อก' };
-
 var pNext = null;
 function showPopup(fromSt, toSt) {
-  var w=WORDS[fromSt]; if(!w){ initSt(toSt); G.st=toSt; return; }
-  pNext=toSt;
-  document.getElementById('pE').textContent=w.e;
-  document.getElementById('pW').textContent=w.w;
-  document.getElementById('pR').textContent=w.r;
+  var w = getStepWord(fromSt);
+  if (!w) { initSt(toSt); G.st = toSt; return; }
+  pNext = toSt;
+  document.getElementById('pE').textContent = w.emoji || '📝';
+  document.getElementById('pW').textContent = w.word;
+  document.getElementById('pR').textContent = w.reading || '';
   document.getElementById('overlay').classList.add('show');
 }
 document.getElementById('pN').addEventListener('click',function(){
@@ -620,8 +637,8 @@ document.getElementById('pN').addEventListener('click',function(){
 document.getElementById('pL').addEventListener('click',function(){
   if('speechSynthesis' in window){
     speechSynthesis.cancel();
-    var u=new SpeechSynthesisUtterance(document.getElementById('pW').textContent);
-    u.lang='th-TH'; speechSynthesis.speak(u);
+    var txt=document.getElementById('pW').textContent;
+    if(txt){ var u=new SpeechSynthesisUtterance(txt); u.lang='th-TH'; speechSynthesis.speak(u); }
   }
 });
 

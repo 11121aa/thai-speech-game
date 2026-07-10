@@ -460,7 +460,7 @@ var _hwAssignments = [], _selectedHwAssignmentId = null, _hwPool = [];
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗' };
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
   // Reset to easy/normal mode
   document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
@@ -593,6 +593,12 @@ function launchGame() {
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
+  if (_setupMode === 'cooking') {
+    sessionStorage.setItem('cookingWords', JSON.stringify(pool));
+    location.href = 'cooking.html';
+    return;
+  }
+
   G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false;
   document.getElementById('hudPoints').textContent = 0;
   var names = {
@@ -658,7 +664,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardFlashcard').addEventListener('click', function () { openSetup('flashcard'); });
   document.getElementById('cardPlatformer').addEventListener('click', function () { openSetup('platformer'); });
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
-  document.getElementById('cardCooking').addEventListener('click', function () { location.href = 'cooking.html'; });
+  document.getElementById('cardCooking').addEventListener('click', function () { openSetup('cooking'); });
 
   document.querySelectorAll('.diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
