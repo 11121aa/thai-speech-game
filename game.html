@@ -121,6 +121,8 @@
       </div>
       <!-- Flashcard Game — Phaser renders here -->
       <div id="flashcardGame" style="display:none;"></div>
+      <!-- Cooking Game — Phaser portrait canvas -->
+      <div id="cookingGame" style="display:none;"><div class="game-canvas-wrap"></div></div>
       <!-- Crossy Road: Phaser canvas + 4-directional DOM buttons -->
       <div id="crossyGame" style="display:none;">
         <div class="platformer-wrap">
@@ -295,6 +297,7 @@
 <script src="js/game-matching.js"></script>
 <script src="js/game-flashcard.js"></script>
 <script src="js/game-crossy.js"></script>
+<script src="js/game-cooking.js"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -363,6 +366,7 @@ function finishGame() {
   FlashcardGame.stop();
   PlatformerGame.stop();
   CrossyGame.stop();
+  CookingGame.stop();
   var hs = G.highScores[G.mode] || 0;
   if (G.pts > hs) {
     G.highScores[G.mode] = G.pts;
@@ -594,8 +598,8 @@ function launchGame() {
   document.getElementById('screenSetup').style.display = 'none';
 
   if (_setupMode === 'cooking') {
-    sessionStorage.setItem('cookingWords', JSON.stringify(pool));
-    location.href = 'cooking.html';
+    document.getElementById('cookingGame').style.display = 'block';
+    CookingGame.start(pool, GAME_CBS);
     return;
   }
 
@@ -611,7 +615,7 @@ function launchGame() {
   };
   document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
 
-  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame'].forEach(function (id) {
+  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
@@ -686,7 +690,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
     restoreTimerPill();
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });
