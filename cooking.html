@@ -77,19 +77,31 @@ var SFX = {
   cut:   loadSfx('soundeffect/TomatoCut.mp3'),
   bread: loadSfx('soundeffect/SlicingToast.mp3'),
 };
+
+// Clone so rapid taps each get their own instance and never cut each other off
 function playSfx(sfx) {
-  try { sfx.currentTime = 0; var p = sfx.play(); if (p && p.catch) p.catch(function(){}); } catch(e) {}
+  try { var s = sfx.cloneNode(true); s.play().catch(function(){}); } catch(e) {}
 }
-// Browsers block audio until the user has interacted. On first touch, silently
-// play-then-pause every clip so subsequent calls to playSfx() work on mobile.
+
+// Bread loops while the player drags, stops on release
+function startBreadSfx() {
+  try { SFX.bread.loop = true; SFX.bread.currentTime = 0; SFX.bread.play().catch(function(){}); } catch(e) {}
+}
+function stopBreadSfx() {
+  try { SFX.bread.pause(); SFX.bread.currentTime = 0; SFX.bread.loop = false; } catch(e) {}
+}
+
+// First touch unlocks the AudioContext (required on iOS/Chrome mobile)
 var _sfxUnlocked = false;
 function unlockSfx() {
   if (_sfxUnlocked) return;
   _sfxUnlocked = true;
-  Object.keys(SFX).forEach(function(k) {
-    var a = SFX[k]; a.volume = 0;
+  var ctx = new (window.AudioContext || window.webkitAudioContext || function(){})();
+  if (ctx.resume) ctx.resume();
+  [SFX.chop, SFX.cut, SFX.bread].forEach(function(a) {
+    a.muted = true;
     var p = a.play();
-    if (p && p.then) p.then(function(){ a.pause(); a.currentTime = 0; a.volume = 1; }).catch(function(){});
+    if (p && p.then) p.then(function(){ a.pause(); a.muted = false; a.currentTime = 0; }).catch(function(){ a.muted = false; });
   });
 }
 var canvas = document.getElementById('c');
@@ -678,7 +690,7 @@ function drawChop(ts) {
   // Timer
   var elapsed=G.chopRun?Math.min(CHOP_DUR,ts-G.chopStart):0;
   var pct=Math.max(0,1-elapsed/CHOP_DUR);
-  if(G.chopRun&&!G.chopDone&&elapsed>=CHOP_DUR){ finishChop(); playSfx(SFX.cut); }
+  if(G.chopRun&&!G.chopDone&&elapsed>=CHOP_DUR) finishChop();
   fillRR(40,SH+48,VW-80,18,9,'#1a2035');
   fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
   ctx.font='bold 11px Prompt'; ctx.fillStyle=C.w;
@@ -987,7 +999,7 @@ canvas.addEventListener('pointerdown',function(e){
   }
   // Bun Cut
   if(G.st===S.BUN){
-    if(!G.split){ G.cutting=true; G.pts=[p]; playSfx(SFX.bread); }
+    if(!G.split){ G.cutting=true; G.pts=[p]; startBreadSfx(); }
     else if(hit(p.x,p.y,VW/2-85,BBY+98,170,52)){ G.st=S.BUN_R; }
     return;
   }
@@ -1004,8 +1016,8 @@ canvas.addEventListener('pointerdown',function(e){
       if(!G.chopRun){ G.chopRun=true; G.chopStart=now; }
       G.taps++; G.chopSt=G.taps>=8?2:G.taps>=4?1:0;
       G.kAnim=1; G.kAnimStart=now;
-      playSfx(SFX.chop);
-      if(G.chopSt>=2&&!G.chopDone){ finishChop(); playSfx(SFX.cut); }
+      playSfx(SFX.chop); playSfx(SFX.cut);
+      if(G.chopSt>=2&&!G.chopDone) finishChop();
     }
     return;
   }
@@ -1049,7 +1061,7 @@ canvas.addEventListener('pointermove',function(e){
 
 canvas.addEventListener('pointerup',function(e){
   e.preventDefault();
-  if(G.st===S.BUN&&G.cutting){
+  if(G.st===S.BUN&&G.cutting){ stopBreadSfx();
     var raw=G.pts.slice();
     G.cutting=false;
     if(raw.length<4){G.pts=[];return;}
