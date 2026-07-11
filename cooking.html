@@ -975,7 +975,7 @@ canvas.addEventListener('pointerdown',function(e){
   }
   // Bun Cut
   if(G.st===S.BUN){
-    if(!G.split){ G.cutting=true; G.pts=[p]; }
+    if(!G.split){ G.cutting=true; G.pts=[p]; playSfx(SFX.bread); }
     else if(hit(p.x,p.y,VW/2-85,BBY+98,170,52)){ G.st=S.BUN_R; }
     return;
   }
@@ -1089,7 +1089,6 @@ canvas.addEventListener('pointerup',function(e){
     G.scores.bun=Math.round(Math.max(0,100-fromVert*2.2));
     G.total+=G.scores.bun;
     G.split=true;
-    playSfx(SFX.bread);
   }
 },{passive:false});
 
