@@ -700,6 +700,7 @@ function finishChop() {
 var SCX=168, STOP=148, LH=64, LW=52, NL=5;
 var CUT_TY=[282,370];
 var KX=SCX+90;
+var DROP_DUR=480;
 
 function drawSau(ts) {
   drawBg();
@@ -779,9 +780,13 @@ function drawCmb(ts) {
   // Bottom bun — player's actual cut right-piece
   if (!drawAssemblyBunPiece(G.rightPiece, VW/2, BBY+23, 222, 46)) sBunBot(VW/2,BBY,222,46);
 
-  // Dropped ingredient layers — actual chop state + sausage fraction
-  G.dropped.forEach(function(d,i){
-    drawAssemblyLayer(d.ing,d.x,BBY-22-i*20,185);
+  // Dropped ingredient layers — animate each one falling to its stacked position
+  G.dropped.forEach(function(d){
+    var elapsed = ts - d.dropStart;
+    var t = Math.min(1, elapsed / DROP_DUR);
+    var ease = 1 - (1-t)*(1-t);   // ease-out quad
+    var cy = d.fromY + (d.toY - d.fromY) * ease;
+    drawAssemblyLayer(d.ing, d.x, cy, 185);
   });
 
   // Top bun after all done — player's actual left-piece
@@ -844,12 +849,17 @@ function drawFinal() {
   ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
   ctx.fillText('🎉 Hot Dog สำเร็จ! 🎉',VW/2,68);
 
-  var fc=VW/2, fy=250;
-  if (!drawAssemblyBunPiece(G.leftPiece, fc, fy-60+27, 216, 54)) sBunTop(fc,fy-60,216,54);
-  drawAssemblyLayer('cab',fc,fy-20,192);
-  drawAssemblyLayer('tom',fc,fy-7,175);
-  drawAssemblyLayer('sau',fc,fy+9,158);
-  if (!drawAssemblyBunPiece(G.rightPiece, fc, fy+25+22, 216, 44)) sBunBot(fc,fy+25,216,44);
+  // Mirror the CMB layout at a smaller scale, using the player's actual drop positions
+  var fc=VW/2, baseY=285;
+  // Bottom bun always centered
+  if (!drawAssemblyBunPiece(G.rightPiece, fc, baseY+23, 216, 44)) sBunBot(fc,baseY,216,44);
+  // Each layer at the x where the player actually dropped it
+  G.dropped.forEach(function(d,i){
+    drawAssemblyLayer(d.ing, d.x, baseY-22-i*20, 185);
+  });
+  // Top bun always centered
+  if (!drawAssemblyBunPiece(G.leftPiece, fc, baseY-G.dropped.length*20-33, 216, 55))
+    sBunTop(fc, baseY-G.dropped.length*20-60, 216, 55);
 
   fillRR(28,350,VW-56,210,16,C.ui);
   var rows=[['ตัดขนมปัง','bun'],['สับมะเขือเทศ','tom'],['สับกะหล่ำปลี','cab'],['ตัดไส้กรอก','sau'],['ใส่ส่วนผสม','cmb']];
@@ -989,7 +999,8 @@ canvas.addEventListener('pointerdown',function(e){
   if(G.st===S.CMB){
     if(G.cIdx<G.cList.length){
       var acc=Math.max(0,1-Math.abs(G.sX-VW/2)/(CTW/2));
-      G.dropped.push({ing:G.cList[G.cIdx],x:G.sX,acc:acc});
+      var toY=BBY-22-G.dropped.length*20;
+      G.dropped.push({ing:G.cList[G.cIdx],x:G.sX,acc:acc,dropStart:now,fromY:225,toY:toY});
       G.cIdx++;
     }
     return;
