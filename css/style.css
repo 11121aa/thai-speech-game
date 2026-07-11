@@ -791,6 +791,18 @@ a {
 /* Phaser.Scale.FIT handles canvas sizing — just cap it and block overflow */
 .game-canvas-wrap canvas { display: block; max-width: 100%; }
 
+/* Pin each container's aspect ratio via CSS so its height is never derived
+   from the canvas's own rendered size. Without this, height is "auto" (sized
+   to the canvas child) while Phaser sizes the canvas from the container's
+   height — that circular measurement compounds rounding on every resize
+   event (mobile URL-bar show/hide on scroll fires these repeatedly), so the
+   canvas visibly grows a little more each time you scroll. */
+#shootingGame > .game-canvas-wrap   { aspect-ratio: 800 / 450; }
+#airplaneGame > .game-canvas-wrap   { aspect-ratio: 800 / 480; }
+#cookingGame  > .game-canvas-wrap   { aspect-ratio: 480 / 800; max-width: 480px; }
+#platformerCanvas.game-canvas-wrap  { aspect-ratio: 800 / 400; }
+#crossyCanvas.game-canvas-wrap      { aspect-ratio: 800 / 400; }
+
 /* ============ Finish screen ============ */
 .finish-screen {
   min-height: 50vh;
@@ -1421,6 +1433,10 @@ section.bg-soft-yellow {
   overflow: hidden;
   box-shadow: var(--shadow-soft);
 }
+/* Same fixed-aspect-ratio fix as .game-canvas-wrap above — stops the
+   container/canvas circular sizing from growing on repeated resize events. */
+#matchingGame  { aspect-ratio: 800 / 500; }
+#flashcardGame { aspect-ratio: 800 / 460; }
 #matchingGame canvas,
 #flashcardGame canvas {
   display: block;
