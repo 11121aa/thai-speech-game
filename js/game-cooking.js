@@ -561,7 +561,16 @@ function createCookingGame(words, callbacks) {
       this.sfxCut  =this.sound.add('ck_cut',  {volume:0.8});
       this.sfxBread=this.sound.add('ck_bread',{volume:0.7,loop:true});
       resetG();
-      this.input.on('pointerdown', function(ptr){self.onDown(ptr.x,ptr.y,self.time.now);});
+      this.input.on('pointerdown', function(ptr){
+        // Each CookingGame.start() spins up a brand-new AudioContext, which
+        // browsers start suspended. Phaser's own unlock only resolves it on
+        // a later touch event, so the very first play() (bread drag-cut sfx)
+        // was silently queued and only became audible once the context
+        // resumed near the end of the gesture. Resume it synchronously here,
+        // inside the genuine user-gesture handler, so playback starts on cue.
+        if(self.sound.context && self.sound.context.state!=='running') self.sound.context.resume();
+        self.onDown(ptr.x,ptr.y,self.time.now);
+      });
       this.input.on('pointermove', function(ptr){if(ptr.isDown)self.onMove(ptr.x,ptr.y);});
       this.input.on('pointerup',   function(ptr){self.onUp(ptr.x,ptr.y);});
     },
