@@ -701,7 +701,14 @@ var CookingGame=(function(){
   return{
     start:function(words,cbs){
       if(game){try{game.destroy(true);}catch(e){}game=null;}
-      setTimeout(function(){game=createCookingGame(words,cbs);},60);
+      function boot(){ setTimeout(function(){game=createCookingGame(words,cbs);},60); }
+      // Safari can get stuck rendering canvas text with a fallback font's
+      // metrics if the web font ('Prompt') hasn't finished loading before
+      // the first fillText() call — later frames re-set ctx.font but the
+      // glyphs never re-measure. Wait for it so the tightly-sized step-bar
+      // boxes get the real Prompt widths from the very first draw.
+      if(document.fonts&&document.fonts.ready) document.fonts.ready.then(boot,boot);
+      else boot();
     },
     stop:function(){
       if(game){try{game.destroy(true);}catch(e){}game=null;}
