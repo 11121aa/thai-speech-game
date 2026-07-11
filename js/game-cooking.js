@@ -52,7 +52,7 @@ function createCookingGame(words, callbacks) {
       ing:'tom', taps:0, chopSt:0,
       chopRun:false, chopDone:false, chopStart:0,
       kAnim:0, kAnimStart:0, tomFinalSt:0, cabFinalSt:0,
-      kY:260, kDir:1, kSpd:2.8, cuts:0, cutSc:[],
+      kY:260, kDir:1, kSpd:2.8, cuts:0, cutSc:[], cutY:[],
       cList:['tom','cab','sau'], cIdx:0,
       sX:240, sDir:1, sSpd:3.2, dropped:[], allDone:false,
     };
@@ -190,8 +190,8 @@ function createCookingGame(words, callbacks) {
       ctx.fillRect(SCX-7,gy-4,14,STOP+(i+1)*LH-gy+8);
     }
     for(var i=0;i<NL;i++) sSauLink(SCX,STOP+i*LH+LH/2,LW,LH-10);
-    for(var ci=0;ci<Math.min(cuts,CUT_TY.length);ci++){
-      var ty=CUT_TY[ci];
+    for(var ci=0;ci<Math.min(cuts,G.cutY.length);ci++){
+      var ty=G.cutY[ci];
       ctx.save();
       ctx.strokeStyle='#fff'; ctx.lineWidth=3.5;
       ctx.shadowColor=C.acc; ctx.shadowBlur=10;
@@ -199,17 +199,18 @@ function createCookingGame(words, callbacks) {
       ctx.restore();
     }
     if(cuts>=2){
+      var y0=Math.min(G.cutY[0],G.cutY[1]), y1=Math.max(G.cutY[0],G.cutY[1]);
       ctx.save();
       ctx.fillStyle='rgba(240,165,0,0.2)';
-      ctx.fillRect(SCX-LW/2-5,CUT_TY[0],LW+10,CUT_TY[1]-CUT_TY[0]);
+      ctx.fillRect(SCX-LW/2-5,y0,LW+10,y1-y0);
       ctx.strokeStyle=C.gold; ctx.lineWidth=2; ctx.setLineDash([4,3]);
-      ctx.strokeRect(SCX-LW/2-5,CUT_TY[0],LW+10,CUT_TY[1]-CUT_TY[0]);
+      ctx.strokeRect(SCX-LW/2-5,y0,LW+10,y1-y0);
       ctx.setLineDash([]); ctx.restore();
     }
   }
   function drawAssemblySausagePiece(cx,cy,targetW,targetH){
-    var topY=G.cuts>=1?CUT_TY[0]:STOP;
-    var botY=G.cuts>=2?CUT_TY[1]:STOP+NL*LH;
+    var topY=G.cuts>=2?Math.min(G.cutY[0],G.cutY[1]):(G.cuts>=1?G.cutY[0]:STOP);
+    var botY=G.cuts>=2?Math.max(G.cutY[0],G.cutY[1]):STOP+NL*LH;
     var pieceH=botY-topY, srcCX=SCX, srcCY=(topY+botY)/2;
     var sx=targetW/pieceH, sy=targetH/LW;
     ctx.save();
@@ -526,7 +527,7 @@ function createCookingGame(words, callbacks) {
   function initSt(s){
     if(s===S.TOM){G.ing='tom';G.taps=0;G.chopSt=0;G.chopRun=false;G.chopDone=false;G.chopStart=0;G.kAnim=0;}
     if(s===S.CAB){G.ing='cab';G.taps=0;G.chopSt=0;G.chopRun=false;G.chopDone=false;G.chopStart=0;G.kAnim=0;}
-    if(s===S.SAU){G.kY=260;G.kDir=1;G.kSpd=2.8;G.cuts=0;G.cutSc=[];G.scores.sau=0;}
+    if(s===S.SAU){G.kY=260;G.kDir=1;G.kSpd=2.8;G.cuts=0;G.cutSc=[];G.cutY=[];G.scores.sau=0;}
     if(s===S.CMB){G.cList=['tom','cab','sau'];G.cIdx=0;G.sX=240;G.sDir=1;G.dropped=[];G.allDone=false;}
   }
   function getWord(fromSt){
@@ -609,7 +610,8 @@ function createCookingGame(words, callbacks) {
           if(!G.chopRun){G.chopRun=true;G.chopStart=now;}
           G.taps++;G.chopSt=G.taps>=8?2:G.taps>=4?1:0;
           G.kAnim=1;G.kAnimStart=now;
-          this.sfxChop.play();this.sfxCut.play();
+          this.sfxChop.play();
+          sc.time.delayedCall((this.sfxChop.duration||0.15)*1000,function(){sc.sfxCut.play();});
           if(G.chopSt>=2&&!G.chopDone)finishChop();
         }
         return;
@@ -619,7 +621,7 @@ function createCookingGame(words, callbacks) {
       if(G.st===S.SAU){
         if(G.cuts>=2){if(hit(x,y,VW/2-80,402,160,50))G.st=S.SAU_R;return;}
         var cs=Math.round(Math.max(10,100-Math.abs(G.kY-CUT_TY[G.cuts])*2));
-        G.cutSc.push(cs);G.cuts++;
+        G.cutSc.push(cs);G.cutY.push(G.kY);G.cuts++;
         if(G.cuts>=2){G.scores.sau=Math.round((G.cutSc[0]+G.cutSc[1])/2);G.total+=G.scores.sau;}
         return;
       }
