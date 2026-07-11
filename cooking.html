@@ -65,6 +65,20 @@ body { display: flex; align-items: center; justify-content: center; }
    SETUP
 ══════════════════════════════════════════════ */
 var VW = 480, VH = 800;
+
+/* ── Sound Effects ───────────────────────────── */
+function loadSfx(src) {
+  var a = new Audio(src);
+  a.preload = 'auto';
+  return a;
+}
+var SFX = {
+  chop: loadSfx('soundeffect/KifeChop.mp3'),
+  cut:  loadSfx('soundeffect/TomatoCut.mp3'),
+};
+function playSfx(sfx) {
+  try { sfx.currentTime = 0; sfx.play(); } catch(e) {}
+}
 var canvas = document.getElementById('c');
 var ctx = canvas.getContext('2d');
 var wrap = document.getElementById('wrap');
@@ -651,7 +665,7 @@ function drawChop(ts) {
   // Timer
   var elapsed=G.chopRun?Math.min(CHOP_DUR,ts-G.chopStart):0;
   var pct=Math.max(0,1-elapsed/CHOP_DUR);
-  if(G.chopRun&&!G.chopDone&&elapsed>=CHOP_DUR){ finishChop(); }
+  if(G.chopRun&&!G.chopDone&&elapsed>=CHOP_DUR){ finishChop(); playSfx(SFX.cut); }
   fillRR(40,SH+48,VW-80,18,9,'#1a2035');
   fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
   ctx.font='bold 11px Prompt'; ctx.fillStyle=C.w;
@@ -977,7 +991,8 @@ canvas.addEventListener('pointerdown',function(e){
       if(!G.chopRun){ G.chopRun=true; G.chopStart=now; }
       G.taps++; G.chopSt=G.taps>=8?2:G.taps>=4?1:0;
       G.kAnim=1; G.kAnimStart=now;
-      if(G.chopSt>=2&&!G.chopDone) finishChop();
+      playSfx(SFX.chop);
+      if(G.chopSt>=2&&!G.chopDone){ finishChop(); playSfx(SFX.cut); }
     }
     return;
   }
