@@ -326,6 +326,38 @@ function drawSausageSprite(cuts) {
   }
 }
 
+/* Draw the actual sausage segment between the player's cuts, rotated 90° CW.
+   topY/botY = cut boundaries; the links are clipped to that region then
+   rotated so the sausage lies horizontally in the hot dog. */
+function drawAssemblySausagePiece(cx, cy, targetW, targetH) {
+  var topY = G.cuts >= 1 ? CUT_TY[0] : STOP;
+  var botY = G.cuts >= 2 ? CUT_TY[1] : STOP + NL*LH;
+  var pieceH = botY - topY;
+  var srcCX = SCX, srcCY = (topY + botY) / 2;
+  // 90° CW: pieceH → screen width, LW → screen height
+  var sx = targetW / pieceH;
+  var sy = targetH / LW;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(sx, sy);
+  ctx.rotate(Math.PI / 2);
+  ctx.translate(-srcCX, -srcCY);
+  // Clip to the exact cut region
+  ctx.beginPath();
+  ctx.rect(SCX - LW/2 - 1, topY, LW + 2, pieceH);
+  ctx.clip();
+  // Draw connectors then links — clip handles the rest
+  for (var i = 0; i < NL-1; i++) {
+    var gy = STOP + i*LH + LH;
+    ctx.fillStyle = '#4a2008';
+    ctx.fillRect(SCX-7, gy-4, 14, STOP+(i+1)*LH-gy+8);
+  }
+  for (var i = 0; i < NL; i++) {
+    sSauLink(SCX, STOP+i*LH+LH/2, LW, LH-10);
+  }
+  ctx.restore();
+}
+
 /* Returns 0..1 fraction of sausage that forms the middle piece after the player's cuts */
 function getSausageFraction() {
   if (G.cuts >= 2) return (CUT_TY[1] - CUT_TY[0]) / (NL * LH);
@@ -394,10 +426,7 @@ function drawAssemblyLayer(ing, cx, cy, w) {
       ctx.beginPath(); ctx.moveTo(lx, cy-6); ctx.lineTo(lx, cy+6); ctx.stroke();
     }
   } else {
-    var fr = getSausageFraction();
-    var r = Math.max(8, (w/2 - 8) * fr);
-    ctx.fillStyle = C.sau; ctx.beginPath(); ctx.ellipse(cx, cy, r, 18, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = C.sauL; ctx.beginPath(); ctx.ellipse(cx-r*.28, cy-6, r*.2, 7, -0.2, 0, Math.PI*2); ctx.fill();
+    drawAssemblySausagePiece(cx, cy, w - 16, 36);
   }
   ctx.restore();
 }
@@ -775,11 +804,7 @@ function drawCmb(ts) {
     var ir=38;
     if(cur==='tom') drawTomatoSprite(G.sX,225,ir,G.tomFinalSt);
     else if(cur==='cab') drawCabbageSprite(G.sX,225,ir,G.cabFinalSt);
-    else {
-      var fr=getSausageFraction(); var sr=Math.max(8,ir*fr);
-      ctx.fillStyle=C.sau; ctx.beginPath(); ctx.ellipse(G.sX,225,sr*1.5,sr*.52,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle=C.sauL; ctx.beginPath(); ctx.ellipse(G.sX-sr*.3,225-sr*.18,sr*.22,sr*.14,0,0,Math.PI*2); ctx.fill();
-    }
+    else { drawAssemblySausagePiece(G.sX, 225, 80, 30); }
   }
 
   if(G.cIdx>=G.cList.length&&!G.allDone){
