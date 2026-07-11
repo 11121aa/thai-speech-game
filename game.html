@@ -597,12 +597,6 @@ function launchGame() {
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
-  if (_setupMode === 'cooking') {
-    document.getElementById('cookingGame').style.display = 'block';
-    CookingGame.start(pool, GAME_CBS);
-    return;
-  }
-
   G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false;
   document.getElementById('hudPoints').textContent = 0;
   var names = {
@@ -611,7 +605,8 @@ function launchGame() {
     airplane:   'ขับเครื่องบิน ✈️',
     flashcard:  'ไพ่คำศัพท์ 🎴',
     platformer: 'วิ่งเก็บเหรียญ 🍄',
-    crossy:     'ข้ามถนน 🚗'
+    crossy:     'ข้ามถนน 🚗',
+    cooking:    'ทำอาหาร 🌭'
   };
   document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
 
@@ -619,6 +614,15 @@ function launchGame() {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
+
+  if (_setupMode === 'cooking') {
+    var timerPillCk = document.getElementById('hudTimer') && document.getElementById('hudTimer').closest('.hud-pill');
+    if (timerPillCk) timerPillCk.style.visibility = 'hidden';
+    clearInterval(G.timerHandle);
+    document.getElementById('cookingGame').style.display = 'block';
+    CookingGame.start(pool, GAME_CBS);
+    return;
+  }
 
   var timerPill = document.getElementById('hudTimer') && document.getElementById('hudTimer').closest('.hud-pill');
   if (G.mode === 'matching') {
