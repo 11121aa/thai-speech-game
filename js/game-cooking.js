@@ -74,11 +74,24 @@ function createCookingGame(words, callbacks) {
     ctx.closePath();
   }
   function fillRR(x,y,w,h,r,col){ctx.fillStyle=col;rr(x,y,w,h,r);ctx.fill();}
+  /* Safari's canvas textAlign='center'/'right' doesn't measure Thai glyph
+     widths correctly and renders as if textAlign='left' (text starts at
+     what should be its center). Always align left and compute the draw
+     position ourselves from measureText() so Thai text lands centered on
+     every browser. */
+  function T(txt,cx,y,align){
+    align=align||'center';
+    ctx.textAlign='left';
+    var s=String(txt);
+    var w=ctx.measureText(s).width;
+    var x=align==='center'?cx-w/2:align==='right'?cx-w:cx;
+    ctx.fillText(s,x,y);
+  }
   function drawBtn(x,y,w,h,txt,col){
     fillRR(x,y,w,h,13,col);
     ctx.font='bold 15px Prompt,sans-serif'; ctx.fillStyle=C.w;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(txt,x+w/2,y+h/2); ctx.textBaseline='alphabetic';
+    ctx.textBaseline='middle';
+    T(txt,x+w/2,y+h/2,'center'); ctx.textBaseline='alphabetic';
   }
   function hit(px,py,x,y,w,h){return px>=x&&px<=x+w&&py>=y&&py<=y+h;}
 
@@ -297,33 +310,33 @@ function createCookingGame(words, callbacks) {
     STEPS.forEach(function(si,i){
       var sx=4+i*sw, bg=i<cs?C.sDone:i===cs?C.sAct:C.sOff;
       fillRR(sx,8,sw-5,SH-16,9,bg);
-      ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(si.icon,sx+(sw-5)/2,8+(SH-16)/2-7);
+      ctx.font='20px sans-serif'; ctx.textBaseline='middle';
+      T(si.icon,sx+(sw-5)/2,8+(SH-16)/2-7,'center');
       ctx.font='bold 9px Prompt,sans-serif'; ctx.fillStyle=C.w;
-      ctx.fillText(si.lbl,sx+(sw-5)/2,SH-13); ctx.textBaseline='alphabetic';
+      T(si.lbl,sx+(sw-5)/2,SH-13,'center'); ctx.textBaseline='alphabetic';
     });
     var bx=VW-100;
     fillRR(bx,8,95,SH-16,9,C.panel);
-    ctx.font='bold 10px Prompt,sans-serif'; ctx.fillStyle=C.gold; ctx.textAlign='center';
-    ctx.fillText('คะแนนรวม',bx+47,27);
+    ctx.font='bold 10px Prompt,sans-serif'; ctx.fillStyle=C.gold;
+    T('คะแนนรวม',bx+47,27,'center');
     ctx.font='bold 23px Prompt,sans-serif'; ctx.fillStyle=C.w;
-    ctx.fillText(G.total,bx+47,56);
+    T(G.total,bx+47,56,'center');
   }
 
   /* ── Screens ───────────────────────────────────────────────── */
   function drawSel(){
     drawBg();
-    ctx.font='bold 30px Prompt,sans-serif'; ctx.fillStyle=C.w; ctx.textAlign='center';
-    ctx.fillText('🍳 Cooking Game',VW/2,90);
-    ctx.font='16px Prompt'; ctx.fillStyle=C.acc; ctx.fillText('เลือกอาหารที่จะทำ',VW/2,124);
+    ctx.font='bold 30px Prompt,sans-serif'; ctx.fillStyle=C.w;
+    T('🍳 Cooking Game',VW/2,90,'center');
+    ctx.font='16px Prompt'; ctx.fillStyle=C.acc; T('เลือกอาหารที่จะทำ',VW/2,124,'center');
     var foods=[{l:'Hot Dog',e:'🌭',ok:true},{l:'Burger',e:'🍔',ok:false},{l:'Fries',e:'🍟',ok:false}];
     foods.forEach(function(f,i){
       var bx=30+i*145,by=160,bw=130,bh=162;
       fillRR(bx,by,bw,bh,16,f.ok?'#7B3F10':'#1e2440');
-      ctx.font='52px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.globalAlpha=f.ok?1:0.32; ctx.fillText(f.e,bx+bw/2,by+bh/2-14); ctx.globalAlpha=1;
+      ctx.font='52px sans-serif'; ctx.textBaseline='middle';
+      ctx.globalAlpha=f.ok?1:0.32; T(f.e,bx+bw/2,by+bh/2-14,'center'); ctx.globalAlpha=1;
       ctx.font=(f.ok?'bold ':'')+'14px Prompt'; ctx.fillStyle=f.ok?C.w:'#3a3d62'; ctx.textBaseline='alphabetic';
-      ctx.fillText(f.l,bx+bw/2,by+bh-18);
+      T(f.l,bx+bw/2,by+bh-18,'center');
     });
     var pc=VW/2, py=510;
     sBunTop(pc,py-60,210,52); sIngLayer('cab',pc,py-18,192);
@@ -332,14 +345,14 @@ function createCookingGame(words, callbacks) {
 
   function drawBunCut(ts){
     drawBg(); drawStepBar();
-    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.textAlign='center';
-    ctx.fillText('ลากตัดขนมปังเป็น 2 ชิ้น',VW/2,SH+28);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
+    T('ลากตัดขนมปังเป็น 2 ชิ้น',VW/2,SH+28,'center');
     if(G.split){
       drawBunPiece(G.leftPiece,-8); drawBunPiece(G.rightPiece,8);
-      ctx.font='bold 26px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
-      ctx.fillText('ตัดได้ '+G.scores.bun+' คะแนน! '+(G.scores.bun>=80?'🎉':G.scores.bun>=50?'👍':'💪'),VW/2,BUN_BBY+52);
+      ctx.font='bold 26px Prompt'; ctx.fillStyle=C.gold;
+      T('ตัดได้ '+G.scores.bun+' คะแนน! '+(G.scores.bun>=80?'🎉':G.scores.bun>=50?'👍':'💪'),VW/2,BUN_BBY+52,'center');
       ctx.font='14px Prompt'; ctx.fillStyle='rgba(255,255,255,.55)';
-      ctx.fillText(G.scores.bun>=80?'ตัดตรงมาก!':G.scores.bun>=50?'ดีพอใช้':'ลองใหม่นะ',VW/2,BUN_BBY+78);
+      T(G.scores.bun>=80?'ตัดตรงมาก!':G.scores.bun>=50?'ดีพอใช้':'ลองใหม่นะ',VW/2,BUN_BBY+78,'center');
       drawBtn(VW/2-85,BUN_BBY+98,170,52,'ต่อไป →',C.acc);
     }else{
       drawBunSprite();
@@ -361,15 +374,15 @@ function createCookingGame(words, callbacks) {
   function drawChop(ts){
     drawBg(); drawStepBar();
     var isTom=G.ing==='tom';
-    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)'; ctx.textAlign='center';
-    ctx.fillText('แตะสับ'+(isTom?'มะเขือเทศ':'กะหล่ำปลี')+'!',VW/2,SH+30);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+    T('แตะสับ'+(isTom?'มะเขือเทศ':'กะหล่ำปลี')+'!',VW/2,SH+30,'center');
     var elapsed=G.chopRun?Math.min(CHOP_DUR,ts-G.chopStart):0;
     var pct=Math.max(0,1-elapsed/CHOP_DUR);
     if(G.chopRun&&!G.chopDone&&elapsed>=CHOP_DUR) finishChop();
     fillRR(40,SH+48,VW-80,18,9,'#1a2035');
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
     ctx.font='bold 11px Prompt'; ctx.fillStyle=C.w;
-    ctx.fillText(Math.max(0,Math.ceil((CHOP_DUR-elapsed)/1000))+'วิ',VW/2,SH+60);
+    T(Math.max(0,Math.ceil((CHOP_DUR-elapsed)/1000))+'วิ',VW/2,SH+60,'center');
     if(isTom) sTomato(ICX,ICY,IR,G.chopSt); else sCabbage(ICX,ICY,IR,G.chopSt);
     var kA=0;
     if(G.kAnim){
@@ -378,24 +391,24 @@ function createCookingGame(words, callbacks) {
       if(ae>=dur){G.kAnim=0;kA=0;}
     }
     sKnife(ICX+IR+52,ICY-28,kA);
-    ctx.font='26px sans-serif'; ctx.textAlign='center'; ctx.fillStyle=C.gold;
-    ctx.fillText(G.chopSt===0?'☆☆☆':G.chopSt===1?'⭐☆☆':'⭐⭐⭐',VW/2+55,ICY+IR+40);
+    ctx.font='26px sans-serif'; ctx.fillStyle=C.gold;
+    T(G.chopSt===0?'☆☆☆':G.chopSt===1?'⭐☆☆':'⭐⭐⭐',VW/2+55,ICY+IR+40,'center');
     ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.4)';
-    ctx.fillText('สับ '+G.taps+' ครั้ง',VW/2+55,ICY+IR+60);
+    T('สับ '+G.taps+' ครั้ง',VW/2+55,ICY+IR+60,'center');
     if(G.chopDone){
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
-      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
-      ctx.fillText('เสร็จแล้ว!',VW/2,320);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('เสร็จแล้ว!',VW/2,320,'center');
       var sc=isTom?G.scores.tom:G.scores.cab;
-      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; ctx.fillText(sc+' คะแนน',VW/2,372);
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(sc+' คะแนน',VW/2,372,'center');
       drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc);
     }
   }
 
   function drawSau(ts){
     drawBg(); drawStepBar();
-    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.textAlign='center';
-    ctx.fillText('แตะตอนมีดผ่านรอยตัด! (2 ครั้ง)',VW/2,SH+26);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
+    T('แตะตอนมีดผ่านรอยตัด! (2 ครั้ง)',VW/2,SH+26,'center');
     if(G.cuts<2){G.kY+=G.kDir*G.kSpd; if(G.kY>STOP+NL*LH-12)G.kDir=-1; if(G.kY<STOP+12)G.kDir=1;}
     sSausageFull(G.cuts);
     if(G.cuts<2){
@@ -403,8 +416,8 @@ function createCookingGame(words, callbacks) {
         if(i>=G.cuts){
           ctx.strokeStyle='rgba(46,196,182,.5)'; ctx.lineWidth=2.5; ctx.setLineDash([6,4]);
           ctx.beginPath(); ctx.moveTo(SCX-36,ty); ctx.lineTo(SCX+36,ty); ctx.stroke(); ctx.setLineDash([]);
-          ctx.font='10px Prompt'; ctx.fillStyle=C.acc; ctx.textAlign='left';
-          ctx.fillText('ตัดที่นี่',SCX+40,ty+4);
+          ctx.font='10px Prompt'; ctx.fillStyle=C.acc;
+          T('ตัดที่นี่',SCX+40,ty+4,'left');
         }
       });
       CUT_TY.forEach(function(ty,i){
@@ -420,17 +433,17 @@ function createCookingGame(words, callbacks) {
     }
     if(G.cutSc.length>0){
       G.cutSc.forEach(function(cs,i){
-        ctx.font='bold 13px Prompt'; ctx.fillStyle=cs>=70?C.grn:C.gold; ctx.textAlign='center';
-        ctx.fillText(cs>=70?'🎯 ตรง! +'+cs:'📍 พอใช้ +'+cs,VW/2,680-i*22);
+        ctx.font='bold 13px Prompt'; ctx.fillStyle=cs>=70?C.grn:C.gold;
+        T(cs>=70?'🎯 ตรง! +'+cs:'📍 พอใช้ +'+cs,VW/2,680-i*22,'center');
       });
     }
-    ctx.font='bold 14px Prompt'; ctx.fillStyle=C.w; ctx.textAlign='center';
-    ctx.fillText('ตัดแล้ว '+G.cuts+'/2',VW/2,720);
+    ctx.font='bold 14px Prompt'; ctx.fillStyle=C.w;
+    T('ตัดแล้ว '+G.cuts+'/2',VW/2,720,'center');
     if(G.cuts>=2){
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
-      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
-      ctx.fillText('ตัดเสร็จ! ✂️',VW/2,310);
-      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; ctx.fillText(G.scores.sau+' คะแนน',VW/2,362);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('ตัดเสร็จ! ✂️',VW/2,310,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(G.scores.sau+' คะแนน',VW/2,362,'center');
       drawBtn(VW/2-80,402,160,50,'ต่อไป →',C.acc);
     }
   }
@@ -439,8 +452,8 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar();
     var cur=G.cList[G.cIdx];
     if(G.cIdx<G.cList.length){
-      ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)'; ctx.textAlign='center';
-      ctx.fillText('แตะเพื่อวาง'+(ING_LABELS[cur]||cur)+'!',VW/2,SH+26);
+      ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+      T('แตะเพื่อวาง'+(ING_LABELS[cur]||cur)+'!',VW/2,SH+26,'center');
       G.sX+=G.sDir*G.sSpd; if(G.sX>VW-45)G.sDir=-1; if(G.sX<45)G.sDir=1;
     }
     if(!drawAssemblyBunPiece(G.rightPiece,VW/2,CMB_BBY+23,222,46)) sBunBot(VW/2,CMB_BBY,222,46);
@@ -474,23 +487,23 @@ function createCookingGame(words, callbacks) {
   function drawResult(key){
     drawBg(); drawStepBar();
     fillRR(45,SH+28,VW-90,205,18,C.ui);
-    ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
-    ctx.fillText('เสร็จสิ้น! 🎉',VW/2,SH+76);
+    ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
+    T('เสร็จสิ้น! 🎉',VW/2,SH+76,'center');
     var score=G.scores[key];
-    ctx.font='bold 46px Prompt'; ctx.fillStyle=C.w; ctx.fillText(score,VW/2,SH+142);
-    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillText('คะแนน',VW/2,SH+166);
+    ctx.font='bold 46px Prompt'; ctx.fillStyle=C.w; T(score,VW/2,SH+142,'center');
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.45)'; T('คะแนน',VW/2,SH+166,'center');
     ctx.font='16px Prompt';
     ctx.fillStyle=score>=80?C.sDone:score>=50?C.gold:C.red;
-    ctx.fillText(score>=80?'⭐⭐⭐ ยอดเยี่ยม!':score>=50?'⭐⭐ ดีมาก!':'⭐ ลองใหม่นะ',VW/2,SH+200);
+    T(score>=80?'⭐⭐⭐ ยอดเยี่ยม!':score>=50?'⭐⭐ ดีมาก!':'⭐ ลองใหม่นะ',VW/2,SH+200,'center');
     ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.35)';
-    ctx.fillText('คะแนนรวม: '+G.total,VW/2,SH+228);
+    T('คะแนนรวม: '+G.total,VW/2,SH+228,'center');
     drawBtn(VW/2-100,SH+258,200,54,'🎤 พูดคำนี้ด้วย!',C.acc);
   }
 
   function drawFinal(){
     drawBg();
-    ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold; ctx.textAlign='center';
-    ctx.fillText('🎉 Hot Dog สำเร็จ! 🎉',VW/2,68);
+    ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
+    T('🎉 Hot Dog สำเร็จ! 🎉',VW/2,68,'center');
     var fc=VW/2, baseY=285;
     if(!drawAssemblyBunPiece(G.rightPiece,fc,baseY+23,216,44)) sBunBot(fc,baseY,216,44);
     G.dropped.forEach(function(d,i){drawAssemblyLayer(d.ing,d.x,baseY-22-i*20,185);});
@@ -500,12 +513,12 @@ function createCookingGame(words, callbacks) {
     var rows=[['ตัดขนมปัง','bun'],['สับมะเขือเทศ','tom'],['สับกะหล่ำปลี','cab'],['ตัดไส้กรอก','sau'],['ใส่ส่วนผสม','cmb']];
     rows.forEach(function(r,i){
       var ry=382+i*34;
-      ctx.font='14px Prompt'; ctx.fillStyle='rgba(255,255,255,.72)'; ctx.textAlign='left'; ctx.fillText(r[0],48,ry);
-      ctx.textAlign='right'; ctx.fillStyle=C.gold; ctx.fillText(G.scores[r[1]]+' pts',VW-48,ry);
+      ctx.font='14px Prompt'; ctx.fillStyle='rgba(255,255,255,.72)'; T(r[0],48,ry,'left');
+      ctx.fillStyle=C.gold; T(G.scores[r[1]]+' pts',VW-48,ry,'right');
     });
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,558,VW-56,1);
-    ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w; ctx.textAlign='center';
-    ctx.fillText('คะแนนรวม: '+G.total+' คะแนน',VW/2,584);
+    ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
+    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,584,'center');
     drawBtn(VW/2-94,614,188,52,'🔄 เล่นอีกครั้ง',C.acc);
   }
 
