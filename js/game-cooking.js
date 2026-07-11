@@ -597,7 +597,7 @@ function createCookingGame(words, callbacks) {
     onDown:function(x,y,now){
       if(G.st===S.SEL){if(hit(x,y,30,160,130,162))G.st=S.BUN;return;}
       if(G.st===S.BUN){
-        if(!G.split){G.cutting=true;G.pts=[{x:x,y:y}];this.sfxBread.play();}
+        if(!G.split){G.cutting=true;G.pts=[{x:x,y:y}];this.sfxBread.play(undefined,{seek:1});}
         else if(hit(x,y,VW/2-85,BUN_BBY+98,170,52))G.st=S.BUN_R;
         return;
       }
