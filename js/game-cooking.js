@@ -688,7 +688,7 @@ function createCookingGame(words, callbacks) {
     width:  VW, height: VH,
     render: {clearBeforeRender:false},
     backgroundColor: '#111827',
-    scale:  {mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH},
+    scale:  {mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH, autoRound:true},
     scene:  CookScene,
   });
 }

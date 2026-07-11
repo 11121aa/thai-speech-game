@@ -342,7 +342,7 @@ function createMatchingGame(words, callbacks) {
     width:           W,
     height:          H,
     backgroundColor: '#f0f4f8',
-    scale:           { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
+    scale:           { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:           MatchScene
   });
 }

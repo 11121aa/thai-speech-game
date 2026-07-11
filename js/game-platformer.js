@@ -552,7 +552,7 @@ function createPlatformerGame(words, callbacks) {
     parent: 'platformerCanvas', // injects canvas INSIDE platformer-wrap so buttons overlay correctly
     width:  W,
     height: H,
-    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:  PlatScene,
     audio:  { noAudio: false }
   });

@@ -518,7 +518,7 @@ function createShootingGame(words, callbacks) {
     type:   Phaser.AUTO,
     parent: 'shootingGame',
     width:  W, height: H,
-    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:  ShootScene
   });
 }

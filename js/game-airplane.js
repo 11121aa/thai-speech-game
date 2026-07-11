@@ -526,7 +526,7 @@ function createAirplaneGame(words, callbacks) {
     parent: 'airplaneGame',
     width:  W,
     height: H,
-    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:  FlapScene,
     audio:  { noAudio: true }
   });
