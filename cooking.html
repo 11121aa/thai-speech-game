@@ -967,6 +967,7 @@ canvas.addEventListener('pointerdown',function(e){
       if(!G.chopRun){ G.chopRun=true; G.chopStart=now; }
       G.taps++; G.chopSt=G.taps>=8?2:G.taps>=4?1:0;
       G.kAnim=1; G.kAnimStart=now;
+      if(G.chopSt>=2&&!G.chopDone) finishChop();
     }
     return;
   }
