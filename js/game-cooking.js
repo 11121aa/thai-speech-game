@@ -62,6 +62,7 @@ function createCookingGame(words, callbacks) {
   /* ── Canvas 2D context — set in create() ───────────────── */
   var ctx;
   var sc; // Phaser scene reference
+  var bgImg = null; // kitchen background image — set in create() if it loaded
 
   /* ══ Draw helpers ══════════════════════════════════════════ */
   function rr(x,y,w,h,r){
@@ -81,7 +82,16 @@ function createCookingGame(words, callbacks) {
   }
   function hit(px,py,x,y,w,h){return px>=x&&px<=x+w&&py>=y&&py<=y+h;}
 
-  function drawBg(){ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);}
+  function drawBg(){
+    if(bgImg){
+      var iw=bgImg.naturalWidth||bgImg.width, ih=bgImg.naturalHeight||bgImg.height;
+      var scale=Math.max(VW/iw,VH/ih);
+      var dw=iw*scale, dh=ih*scale;
+      ctx.drawImage(bgImg,(VW-dw)/2,(VH-dh)/2,dw,dh);
+    }else{
+      ctx.fillStyle=C.bg; ctx.fillRect(0,0,VW,VH);
+    }
+  }
 
   /* ── Bun ─────────────────────────────────────────────────── */
   function drawBunSprite(){
@@ -540,11 +550,13 @@ function createCookingGame(words, callbacks) {
       this.load.audio('ck_chop', 'soundeffect/KifeChop.mp3');
       this.load.audio('ck_cut',  'soundeffect/TomatoCut.mp3');
       this.load.audio('ck_bread','soundeffect/SlicingToast.mp3');
+      this.load.image('ck_bg', 'img/cooking/bg.jpg');
     },
 
     create:function(){
       var self=this; sc=this;
       ctx=this.sys.game.canvas.getContext('2d');
+      if(this.textures.exists('ck_bg')) bgImg=this.textures.get('ck_bg').getSourceImage();
       this.sfxChop =this.sound.add('ck_chop', {volume:0.7});
       this.sfxCut  =this.sound.add('ck_cut',  {volume:0.8});
       this.sfxBread=this.sound.add('ck_bread',{volume:0.7,loop:true});

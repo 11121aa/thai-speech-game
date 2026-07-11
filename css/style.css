@@ -788,8 +788,12 @@ a {
   margin: 0 auto;
   cursor: crosshair;
 }
-/* Phaser.Scale.FIT handles canvas sizing — just cap it and block overflow */
-.game-canvas-wrap canvas { display: block; max-width: 100%; }
+/* Phaser.Scale.FIT handles canvas sizing — just cap it and block overflow.
+   touch-action:none stops mobile browsers from treating a finger-drag over
+   the canvas as a page scroll/pull gesture (which otherwise swallows the
+   touchmove before Phaser's pointermove ever sees it — breaks e.g. the
+   cooking game's bun-cut drag). */
+.game-canvas-wrap canvas { display: block; max-width: 100%; touch-action: none; }
 
 /* Pin each container's aspect ratio via CSS so its height is never derived
    from the canvas's own rendered size. Without this, height is "auto" (sized
@@ -797,9 +801,9 @@ a {
    height — that circular measurement compounds rounding on every resize
    event (mobile URL-bar show/hide on scroll fires these repeatedly), so the
    canvas visibly grows a little more each time you scroll. */
-#shootingGame > .game-canvas-wrap   { aspect-ratio: 800 / 450; }
-#airplaneGame > .game-canvas-wrap   { aspect-ratio: 800 / 480; }
-#cookingGame  > .game-canvas-wrap   { aspect-ratio: 480 / 800; max-width: 480px; }
+#shootingGame.game-canvas-wrap      { aspect-ratio: 800 / 450; }
+#airplaneGame.game-canvas-wrap      { aspect-ratio: 800 / 480; }
+#cookingGame.game-canvas-wrap       { aspect-ratio: 480 / 800; max-width: 480px; }
 #platformerCanvas.game-canvas-wrap  { aspect-ratio: 800 / 400; }
 #crossyCanvas.game-canvas-wrap      { aspect-ratio: 800 / 400; }
 
@@ -1441,6 +1445,7 @@ section.bg-soft-yellow {
 #flashcardGame canvas {
   display: block;
   max-width: 100%;
+  touch-action: none;
 }
 
 /* ── Phone  (≤ 575px) ───────────────────────────────────── */
