@@ -73,8 +73,9 @@ function loadSfx(src) {
   return a;
 }
 var SFX = {
-  chop: loadSfx('soundeffect/KifeChop.mp3'),
-  cut:  loadSfx('soundeffect/TomatoCut.mp3'),
+  chop:  loadSfx('soundeffect/KifeChop.mp3'),
+  cut:   loadSfx('soundeffect/TomatoCut.mp3'),
+  bread: loadSfx('soundeffect/SlicingToast.mp3'),
 };
 function playSfx(sfx) {
   try { sfx.currentTime = 0; sfx.play(); } catch(e) {}
@@ -1088,6 +1089,7 @@ canvas.addEventListener('pointerup',function(e){
     G.scores.bun=Math.round(Math.max(0,100-fromVert*2.2));
     G.total+=G.scores.bun;
     G.split=true;
+    playSfx(SFX.bread);
   }
 },{passive:false});
 
