@@ -78,7 +78,19 @@ var SFX = {
   bread: loadSfx('soundeffect/SlicingToast.mp3'),
 };
 function playSfx(sfx) {
-  try { sfx.currentTime = 0; sfx.play(); } catch(e) {}
+  try { sfx.currentTime = 0; var p = sfx.play(); if (p && p.catch) p.catch(function(){}); } catch(e) {}
+}
+// Browsers block audio until the user has interacted. On first touch, silently
+// play-then-pause every clip so subsequent calls to playSfx() work on mobile.
+var _sfxUnlocked = false;
+function unlockSfx() {
+  if (_sfxUnlocked) return;
+  _sfxUnlocked = true;
+  Object.keys(SFX).forEach(function(k) {
+    var a = SFX[k]; a.volume = 0;
+    var p = a.play();
+    if (p && p.then) p.then(function(){ a.pause(); a.currentTime = 0; a.volume = 1; }).catch(function(){});
+  });
 }
 var canvas = document.getElementById('c');
 var ctx = canvas.getContext('2d');
@@ -967,7 +979,7 @@ function getPos(e) {
 }
 
 canvas.addEventListener('pointerdown',function(e){
-  e.preventDefault(); var p=getPos(e);
+  e.preventDefault(); unlockSfx(); var p=getPos(e);
 
   // Food Select
   if(G.st===S.SEL){
