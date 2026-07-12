@@ -74,7 +74,7 @@ function createPlatformerGame(words, callbacks) {
       ]
     },
     // 3) A small spike, then a platform immediately followed by a spike so
-    // tall (195 — taller than the ~175px max jump height, given
+    // tall (185 — taller than the ~175px max jump height, given
     // JUMP_VY/GRAVITY below) that it can't be jumped from the ground at
     // all. You're forced onto the platform first, then jump from its
     // raised height to clear it.
@@ -83,7 +83,7 @@ function createPlatformerGame(words, callbacks) {
       platforms: [ { x: 480, y: GROUND_Y - 110, w: 140 } ],
       obstacles: [
         { x: 180, y: GROUND_Y - 40,  w: 22, h: 40,  type: 'ground' },
-        { x: 630, y: GROUND_Y - 195, w: 30, h: 195, type: 'ground' }
+        { x: 630, y: GROUND_Y - 185, w: 30, h: 185, type: 'ground' }
       ]
     }
   ];
