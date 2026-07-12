@@ -57,15 +57,15 @@ function createPlatformerGame(words, callbacks) {
       ],
       obstacles: []
     },
-    // 2) Overhead spike row (slide under), then a small spike and a big
-    // spike with real space between them
+    // 2) Overhead spike row (slide under), then two equal-height spikes
+    // spaced further apart
     {
       gaps: [],
       platforms: [],
       obstacles: [
         { x: 200, y: GROUND_Y - 80, w: 240, h: 45, type: 'ceiling' },
-        { x: 560, y: GROUND_Y - 40, w: 22,  h: 40, type: 'ground'  },
-        { x: 750, y: GROUND_Y - 75, w: 30,  h: 75, type: 'ground'  }
+        { x: 560, y: GROUND_Y - 55, w: 25,  h: 55, type: 'ground'  },
+        { x: 820, y: GROUND_Y - 55, w: 25,  h: 55, type: 'ground'  }
       ]
     },
     // 3) A small spike, then a platform immediately followed by a spike so
