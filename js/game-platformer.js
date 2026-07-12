@@ -57,16 +57,15 @@ function createPlatformerGame(words, callbacks) {
       ],
       obstacles: []
     },
-    // 2) Overhead spike row (slide under), then one double-peaked ground
-    // spike (a single 'twinspike' hazard, drawn as an M-shape whose valley
-    // never touches the ground) — no safe pocket to land in the middle,
-    // so you must clear the whole thing in one jump.
+    // 2) Overhead spike row (slide under), then a small spike and a big
+    // spike with real space between them
     {
       gaps: [],
       platforms: [],
       obstacles: [
-        { x: 200, y: GROUND_Y - 80, w: 240, h: 45, type: 'ceiling'   },
-        { x: 560, y: GROUND_Y - 65, w: 60,  h: 65, type: 'twinspike' }
+        { x: 200, y: GROUND_Y - 80, w: 240, h: 45, type: 'ceiling' },
+        { x: 560, y: GROUND_Y - 40, w: 22,  h: 40, type: 'ground'  },
+        { x: 750, y: GROUND_Y - 75, w: 30,  h: 75, type: 'ground'  }
       ]
     },
     // 3) A small spike, then a platform immediately followed by a spike so
@@ -432,10 +431,7 @@ function createPlatformerGame(words, callbacks) {
       });
 
       // Obstacles — triangular spikes. 'ground' points up, 'ceiling' hangs
-      // down as a row of small teeth (must slide under, or jump over),
-      // 'twinspike' is a single double-peaked ground hazard (M-shape)
-      // whose middle valley never dips back down to the ground, so it
-      // reads as one connected obstacle instead of two separate spikes.
+      // down as a row of small teeth (must slide under, or jump over).
       this.obstacles.forEach(function (ob) {
         var ox = ob.x - self.scrollX;
         if (ox < -100 || ox > W + 100) return;
@@ -453,16 +449,6 @@ function createPlatformerGame(words, callbacks) {
             g.closePath();
             g.fillPath(); g.strokePath();
           }
-        } else if (ob.type === 'twinspike') {
-          var base = ob.y + ob.h, valleyY = ob.y + ob.h * 0.5;
-          g.beginPath();
-          g.moveTo(ox,               base);
-          g.lineTo(ox + ob.w * 0.25, ob.y);
-          g.lineTo(ox + ob.w * 0.5,  valleyY);
-          g.lineTo(ox + ob.w * 0.75, ob.y);
-          g.lineTo(ox + ob.w,        base);
-          g.closePath();
-          g.fillPath(); g.strokePath();
         } else {
           g.beginPath();
           g.moveTo(ox,          ob.y + ob.h);
