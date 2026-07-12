@@ -2,7 +2,7 @@
 //  PLATFORMER GAME — Phaser 3  (Jump & Slide side-scroller)
 // ============================================================
 //  [TUNE]      Speed, gravity, jump strength      (~line 18)
-//  [WORDS]     Word spawn interval                (~line 21, WORD_INTERVAL)
+//  [WORDS]     Word spawn interval                (~line 30, WORD_INTERVAL_MIN/MAX)
 //  [PATTERNS]  Hand-designed level chunks         (~PATTERNS array)
 //  [PLAYER]    Player art (currently a placeholder cube) (~drawCharacter)
 //  [SKY]       Sky / hill colours                 (~create bg)
@@ -16,7 +16,7 @@
 //    - Ground pits → fall through and it's game over
 //    - Ground spikes → touch one and it's game over (unless shielded)
 //    - Ceiling spike rows → must SLIDE under (or jump over, if timed well)
-//    - A word bubble spawns every WORD_INTERVAL ms → pronunciation practice
+//    - A word bubble spawns every 5-10s (randomized) → pronunciation practice
 //      modal; succeeding grants a brief shield (p.invincible) that lets you
 //      pass through the next hazard safely
 // ============================================================
@@ -27,7 +27,7 @@ function createPlatformerGame(words, callbacks) {
   var SCROLL_SPD    = 3.8;
   var GRAVITY       = 0.52;
   var JUMP_VY       = -13.5;
-  var WORD_INTERVAL = 5000; // [WORDS] ms between word-bubble spawns
+  var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 10000; // [WORDS] random ms range between word-bubble spawns
   var W = 800, H = 400;
   var GROUND_Y   = H - 55;
   var PLAYER_X   = 110;
@@ -41,7 +41,10 @@ function createPlatformerGame(words, callbacks) {
   // spawnPattern() shifts them into world space when the chunk is spawned.
   // Obstacle "type" is 'ground' (spike sitting on the ground — jump over)
   // or 'ceiling' (spike row hanging down — slide under, or jump if timed).
-  var CHUNK_W = 1000; // world-space width reserved per chunk
+  // Widest pattern content only reaches ~790px in, so CHUNK_W leaves a
+  // clear obstacle-free breather (~500-700px, roughly 2-3s of scrolling)
+  // before the next pattern's first hazard.
+  var CHUNK_W = 1300; // world-space width reserved per chunk
 
   var PATTERNS = [
     // 1) A pit in the ground, crossed via 3 ascending stair-step platforms
@@ -98,6 +101,7 @@ function createPlatformerGame(words, callbacks) {
       this.player     = null;
       this.nextChunkX = W + 300; // clear runway before the first pattern
       this.wordTimer  = 0; // [WORDS] ms accumulated since the last word spawn
+      this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
       this.slideHeld  = false; // true while the mobile slide button is pressed
     },
 
@@ -310,12 +314,14 @@ function createPlatformerGame(words, callbacks) {
         this.spawnPattern(this.nextChunkX);
         this.nextChunkX += CHUNK_W;
       }
-      // [WORDS] Time-based spawn — one word bubble every WORD_INTERVAL ms,
-      // regardless of scroll distance. Only accumulates while not paused,
-      // so it naturally waits out the practice modal like everything else.
+      // [WORDS] Time-based spawn — a word bubble every 5-10s (randomized
+      // fresh after each spawn), regardless of scroll distance. Only
+      // accumulates while not paused, so it naturally waits out the
+      // practice modal like everything else.
       this.wordTimer += delta;
-      if (this.wordTimer >= WORD_INTERVAL) {
-        this.wordTimer -= WORD_INTERVAL;
+      if (this.wordTimer >= this.nextWordDelay) {
+        this.wordTimer -= this.nextWordDelay;
+        this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
         this.spawnWordItem(this.scrollX + W + 60);
       }
 
