@@ -88,6 +88,11 @@
           <span class="mode-title">ทำอาหาร</span>
           <span class="mode-desc">หั่น สับ ประกอบ Hot Dog ฝึกคำศัพท์อาหาร</span>
         </div>
+        <div class="game-mode-card" id="cardDressup">
+          <span class="mode-icon">👗</span>
+          <span class="mode-title">แต่งตัวตุ๊กตา</span>
+          <span class="mode-desc">พูดคำศัพท์เพื่อปลดล็อกชุดแต่งตัว</span>
+        </div>
       </div>
     </div>
 
@@ -119,6 +124,8 @@
       <div id="flashcardGame" style="display:none;"></div>
       <!-- Cooking Game — Phaser portrait canvas -->
       <div id="cookingGame" class="game-canvas-wrap" style="display:none;"></div>
+      <!-- Dress-Up Game — Phaser canvas -->
+      <div id="dressupGame" class="game-canvas-wrap" style="display:none;"></div>
       <!-- Crossy Road: Phaser canvas + 4-directional DOM buttons -->
       <div id="crossyGame" style="display:none;">
         <div class="platformer-wrap">
@@ -286,14 +293,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phaser 3 game engine -->
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-<!-- One file per Phaser game — open the file to polish that game -->
-<script src="js/game-shooting.js"></script>
-<script src="js/game-airplane.js"></script>
-<script src="js/game-platformer.js"></script>
-<script src="js/game-matching.js"></script>
-<script src="js/game-flashcard.js"></script>
-<script src="js/game-crossy.js"></script>
-<script src="js/game-cooking.js"></script>
+<!-- One file per Phaser game — open the file to polish that game.
+     ?v= is a cache-buster: bump it whenever a game-*.js file changes so
+     Safari (which caches far more aggressively than Chrome) is forced to
+     fetch the new version instead of silently serving a stale copy. -->
+<script src="js/game-shooting.js?v=1"></script>
+<script src="js/game-airplane.js?v=1"></script>
+<script src="js/game-platformer.js?v=1"></script>
+<script src="js/game-matching.js?v=1"></script>
+<script src="js/game-flashcard.js?v=1"></script>
+<script src="js/game-crossy.js?v=1"></script>
+<script src="js/game-cooking.js?v=2"></script>
+<script src="js/game-dressup.js?v=1"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -363,6 +374,7 @@ function finishGame() {
   PlatformerGame.stop();
   CrossyGame.stop();
   CookingGame.stop();
+  DressupGame.stop();
   var hs = G.highScores[G.mode] || 0;
   if (G.pts > hs) {
     G.highScores[G.mode] = G.pts;
@@ -371,7 +383,7 @@ function finishGame() {
   document.getElementById('finalPoints').textContent = G.pts;
   document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
 
-  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗' };
+  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', dressup:'แต่งตัวตุ๊กตา 👗' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
   document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
 
@@ -384,7 +396,7 @@ function finishGame() {
 }
 
 /* ── Leaderboard helpers ── */
-var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน' };
+var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', dressup:'แต่งตัวตุ๊กตา' };
 
 async function saveGameScore(gameKey, score) {
   try {
@@ -460,7 +472,7 @@ var _hwAssignments = [], _selectedHwAssignmentId = null, _hwPool = [];
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭' };
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭', dressup: 'แต่งตัวตุ๊กตา 👗' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
   // Reset to easy/normal mode
   document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
@@ -602,11 +614,12 @@ function launchGame() {
     flashcard:  'ไพ่คำศัพท์ 🎴',
     platformer: 'วิ่งเก็บเหรียญ 🍄',
     crossy:     'ข้ามถนน 🚗',
-    cooking:    'ทำอาหาร 🌭'
+    cooking:    'ทำอาหาร 🌭',
+    dressup:    'แต่งตัวตุ๊กตา 👗'
   };
   document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
 
-  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame'].forEach(function (id) {
+  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
@@ -631,6 +644,7 @@ function launchGame() {
     var limit = G.mode === 'flashcard' ? 180 :
                 G.mode === 'platformer' ? 90  :
                 G.mode === 'crossy'     ? 90  :
+                G.mode === 'dressup'    ? 120 :
                 60;
     startTimer(limit);
   }
@@ -650,6 +664,9 @@ function launchGame() {
   } else if (G.mode === 'crossy') {
     document.getElementById('crossyGame').style.display = 'block';
     CrossyGame.start(pool, GAME_CBS);     // Phaser game (crossy road)
+  } else if (G.mode === 'dressup') {
+    document.getElementById('dressupGame').style.display = 'block';
+    DressupGame.start(pool, GAME_CBS);    // Phaser game (dress-up avatar)
   } else {
     document.getElementById('airplaneGame').style.display = 'block';
     AirplaneGame.start(pool, GAME_CBS);   // Phaser game
@@ -669,6 +686,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardPlatformer').addEventListener('click', function () { openSetup('platformer'); });
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
   document.getElementById('cardCooking').addEventListener('click', function () { openSetup('cooking'); });
+  document.getElementById('cardDressup').addEventListener('click', function () { openSetup('dressup'); });
 
   document.querySelectorAll('.diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -690,7 +708,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
     restoreTimerPill();
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop(); DressupGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });

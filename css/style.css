@@ -806,6 +806,7 @@ a {
 #cookingGame.game-canvas-wrap       { aspect-ratio: 480 / 800; max-width: 480px; }
 #platformerCanvas.game-canvas-wrap  { aspect-ratio: 800 / 400; }
 #crossyCanvas.game-canvas-wrap      { aspect-ratio: 800 / 400; }
+#dressupGame.game-canvas-wrap       { aspect-ratio: 800 / 500; }
 
 /* ============ Finish screen ============ */
 .finish-screen {
