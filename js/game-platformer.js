@@ -27,8 +27,8 @@
 function createPlatformerGame(words, callbacks) {
 
   // ── [TUNE] ────────────────────────────────────────────────────
-  var SCROLL_SPD_BASE = 3.8;  // starting scroll speed
-  var SCROLL_SPD_MAX  = 8;    // speed cap so it never becomes unplayable
+  var SCROLL_SPD_BASE = 4.6;  // starting scroll speed
+  var SCROLL_SPD_MAX  = 9.5;  // speed cap so it never becomes unplayable
   var SPEED_RAMP      = 0.05; // +px/frame of scroll speed per second survived
   var GRAVITY       = 0.52;
   var JUMP_VY       = -13.5;
@@ -81,7 +81,7 @@ function createPlatformerGame(words, callbacks) {
     // raised height to clear it.
     {
       gaps: [],
-      platforms: [ { x: 480, y: GROUND_Y - 110, w: 140 } ],
+      platforms: [ { x: 440, y: GROUND_Y - 110, w: 180 } ],
       obstacles: [
         { x: 180, y: GROUND_Y - 40,  w: 22, h: 40,  type: 'ground' },
         { x: 630, y: GROUND_Y - 185, w: 30, h: 185, type: 'ground' }
