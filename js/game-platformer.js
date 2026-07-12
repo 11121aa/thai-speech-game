@@ -263,8 +263,34 @@ function createPlatformerGame(words, callbacks) {
       this.isPaused = true;
       if (this.sfxDamage) this.sfxDamage.play();
       this.showPop(PLAYER_X + PW / 2, this.player.y - 20, msg);
+      var self = this;
       var cbs = callbacks;
-      this.time.delayedCall(900, function () { cbs.onFinish(); });
+      this.time.delayedCall(900, function () { self.showTipScreen(function () { cbs.onFinish(); }); });
+    },
+
+    // [TIPS] Shown every time the player dies, before handing off to the
+    // finish screen — quick reminders of mechanics that would have helped.
+    showTipScreen: function (onDone) {
+      var self = this;
+      var tips = [
+        'กดไสลด์กลางอากาศเพื่อดิ่งลง',
+        'ออกเสียงคําเพื่อเป็นอมตะ',
+        'ระวังอย่าเหยียบหนาม'
+      ];
+      var overlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.72).setDepth(20);
+      var title = this.add.text(W / 2, H / 2 - 70, '💡 เคล็ดลับ', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '22px', fontStyle: 'bold', color: '#f0a500'
+      }).setOrigin(0.5).setDepth(21);
+      var tipTexts = tips.map(function (t, i) {
+        return self.add.text(W / 2, H / 2 - 20 + i * 30, '• ' + t, {
+          fontFamily: 'Prompt, sans-serif', fontSize: '15px', color: '#ffffff'
+        }).setOrigin(0.5).setDepth(21);
+      });
+      this.time.delayedCall(2600, function () {
+        overlay.destroy(); title.destroy();
+        tipTexts.forEach(function (t) { t.destroy(); });
+        onDone();
+      });
     },
 
     update: function (time, delta) {
