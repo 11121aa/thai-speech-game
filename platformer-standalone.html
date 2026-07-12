@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Platformer — Standalone Dev Build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#111827; height:100%; overflow:hidden; }
+  body {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:100vh; font-family:'Prompt', sans-serif; gap:10px;
+  }
+  h1 { color:#fff; font-size:1rem; margin:0; opacity:0.7; }
+  .platformer-wrap { position:relative; width:100%; max-width:800px; }
+  #platformerCanvas { width:100%; border-radius:12px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,.5); touch-action:none; }
+  #platformerCanvas canvas { display:block; width:100%; touch-action:none; }
+  .platformer-btns {
+    position:absolute; bottom:14px; right:14px; display:flex; gap:10px; z-index:5;
+  }
+  .pf-btn {
+    width:64px; height:64px; border-radius:50%; border:2px solid rgba(255,255,255,.5);
+    background:rgba(30,30,45,.55); color:#fff; font-size:1.3rem; font-weight:700;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    user-select:none; -webkit-user-select:none; touch-action:none; cursor:pointer;
+  }
+  .pf-btn:active { background:rgba(46,196,182,.6); }
+  .pf-btn small { font-size:.6rem; font-weight:400; }
+</style>
+</head>
+<body>
+
+<h1>🐒 Platformer — standalone dev build (item blocks, no speech required)</h1>
+<div class="platformer-wrap">
+  <div id="platformerCanvas"></div>
+  <div class="platformer-btns">
+    <button class="pf-btn" id="pfBtnSlide">↙<br><small>สไลด์</small></button>
+    <button class="pf-btn" id="pfBtnJump">↑<br><small>กระโดด</small></button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<script>
+// ============================================================
+//  PLATFORMER GAME — STANDALONE DEV BUILD
+// ============================================================
+//  Forked from js/game-platformer.js for local testing outside the
+//  main speech-therapy app. Differences from the production version:
+//    - No dependency on words/callbacks/Supabase/practice modal at all
+//    - Word bubbles are replaced with "item blocks" — hitting one just
+//      awards points and the run continues immediately, no pronunciation
+//      needed
+//    - No shield/invincibility system (it existed only as a reward for
+//      successful word practice, which doesn't exist in this build)
+//    - Game over shows an in-canvas restart prompt instead of routing
+//      back to an external finish screen
+//  Open this file directly in a browser, or serve it with VS Code's
+//  Live Server extension. soundeffect/*.mp3 paths are relative to this
+//  file's location in the repo, so keep it at the project root.
+// ============================================================
+//  [TUNE]      Speed, gravity, jump strength      (~line below)
+//  [ITEMS]     Item block spawn interval + points (~ITEM_INTERVAL_MIN/MAX, ITEM_POINTS)
+//  [PATTERNS]  Hand-designed level chunks         (~PATTERNS array)
+//  [PLAYER]    Player art (placeholder cube)      (~drawCharacter)
+// ============================================================
+
+function createPlatformerGame() {
+
+  // ── [TUNE] ────────────────────────────────────────────────────
+  var SCROLL_SPD_BASE = 4.6;  // starting scroll speed
+  var SCROLL_SPD_MAX  = 9.5;  // speed cap so it never becomes unplayable
+  var SPEED_RAMP      = 0.05; // +px/frame of scroll speed per second survived
+  var GRAVITY       = 0.52;
+  var JUMP_VY       = -13.5;
+  var FAST_FALL     = 1.0; // extra downward accel while airborne + slide held
+  var ITEM_INTERVAL_MIN = 5000, ITEM_INTERVAL_MAX = 10000; // [ITEMS] random ms range between item-block spawns
+  var ITEM_POINTS   = 10; // [ITEMS] points awarded per item block hit
+  var W = 800, H = 400;
+  var GROUND_Y   = H - 55;
+  var PLAYER_X   = 110;
+  var PW = 32, PH = 62;
+  var PH_SLIDE   = 26;
+
+  // ── [PATTERNS] Hand-designed level chunks ───────────────────────
+  // Same fixed layouts as the production game — every jump is guaranteed
+  // makeable. Each pattern's pieces use x offsets relative to the chunk's
+  // start x; spawnPattern() shifts them into world space when spawned.
+  var CHUNK_W = 1300;
+
+  var PATTERNS = [
+    // 1) A pit in the ground, crossed via 3 ascending stair-step platforms
+    {
+      gaps: [ { x: 220, w: 480 } ],
+      platforms: [
+        { x: 250, y: GROUND_Y - 70,  w: 100 },
+        { x: 470, y: GROUND_Y - 115, w: 100 },
+        { x: 690, y: GROUND_Y - 160, w: 100 }
+      ],
+      obstacles: []
+    },
+    // 2) Overhead spike row (slide under), then two equal-height spikes
+    // spaced further apart
+    {
+      gaps: [],
+      platforms: [],
+      obstacles: [
+        { x: 200, y: GROUND_Y - 80, w: 240, h: 45, type: 'ceiling' },
+        { x: 560, y: GROUND_Y - 55, w: 25,  h: 55, type: 'ground'  },
+        { x: 820, y: GROUND_Y - 55, w: 25,  h: 55, type: 'ground'  }
+      ]
+    },
+    // 3) A small spike, then a platform immediately followed by a spike so
+    // tall it can't be jumped from the ground — forces the platform first.
+    {
+      gaps: [],
+      platforms: [ { x: 440, y: GROUND_Y - 110, w: 180 } ],
+      obstacles: [
+        { x: 180, y: GROUND_Y - 40,  w: 22, h: 40,  type: 'ground' },
+        { x: 630, y: GROUND_Y - 185, w: 30, h: 185, type: 'ground', hw: 14 }
+      ]
+    }
+  ];
+
+  var PlatScene = new Phaser.Class({
+    Extends: Phaser.Scene,
+
+    initialize: function () {
+      Phaser.Scene.call(this, { key: 'platformer' });
+      this.isPaused   = false;
+      this.scrollX    = 0;
+      this.patternIdx = 0;
+      this.platforms  = [];
+      this.gaps       = [];
+      this.items      = [];
+      this.obstacles  = [];
+      this.clouds     = [];
+      this.player     = null;
+      this.score      = 0;
+      this.nextChunkX = W + 300; // clear runway before the first pattern
+      this.itemTimer  = 0; // [ITEMS] ms accumulated since the last item spawn
+      this.nextItemDelay = ITEM_INTERVAL_MIN + Math.random() * (ITEM_INTERVAL_MAX - ITEM_INTERVAL_MIN);
+      this.slideHeld  = false; // true while the mobile slide button is pressed
+      this.surviveMs  = 0; // total time survived — drives the speed ramp
+      this.pointTimer = 0; // ms accumulated since the last +1 survival point
+    },
+
+    preload: function () {
+      this.load.audio('PixelJump',   'soundeffect/PixelJump.mp3');
+      this.load.audio('PixelDamage', 'soundeffect/PixelDamage.mp3');
+    },
+
+    create: function () {
+      var self = this;
+
+      // Static sky gradient
+      var bgGfx = this.add.graphics();
+      var bands = 20;
+      for (var i = 0; i < bands; i++) {
+        var t  = i / bands;
+        var r  = Math.round(Phaser.Math.Linear(91,  170, t));
+        var gv = Math.round(Phaser.Math.Linear(163, 212, t));
+        var bv = Math.round(Phaser.Math.Linear(224, 245, t));
+        bgGfx.fillStyle(Phaser.Display.Color.GetColor(r, gv, bv));
+        bgGfx.fillRect(0, i * (GROUND_Y / bands), W, GROUND_Y / bands + 1);
+      }
+      // Ground — thick and clearly visible
+      bgGfx.fillStyle(0x4caf50); bgGfx.fillRect(0, GROUND_Y,      W, 10); // grass
+      bgGfx.fillStyle(0x388e3c); bgGfx.fillRect(0, GROUND_Y + 2,  W, 3);  // dark edge
+      bgGfx.fillStyle(0x795548); bgGfx.fillRect(0, GROUND_Y + 10, W, H - GROUND_Y - 10); // dirt
+      bgGfx.fillStyle(0x6d4c41, 0.35);
+      bgGfx.fillRect(0, GROUND_Y + 18, W, 2);
+      bgGfx.fillRect(0, GROUND_Y + 30, W, 2);
+
+      // Clouds
+      for (var c = 0; c < 4; c++) {
+        this.clouds.push({
+          x:  100 + c * 190,
+          y:  35 + Math.random() * 55,
+          rw: 60 + Math.random() * 70
+        });
+      }
+
+      this.dynGfx  = this.add.graphics().setDepth(1);
+      this.hillGfx = this.add.graphics().setDepth(0);
+
+      this.player = {
+        y: GROUND_Y - PH, vy: 0, h: PH,
+        onGround: true, sliding: false,
+        legPhase: 0
+      };
+
+      this.keys = this.input.keyboard.addKeys({
+        up:    Phaser.Input.Keyboard.KeyCodes.UP,
+        space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+        down:  Phaser.Input.Keyboard.KeyCodes.DOWN
+      });
+
+      // Mobile buttons — slide tracks press/release so it lasts exactly as
+      // long as the button is held, same as the keyboard's key.isDown.
+      var bj = document.getElementById('pfBtnJump');
+      var bs = document.getElementById('pfBtnSlide');
+      this._jumpFn      = function () { self.doJump(); };
+      this._slideDownFn = function () { self.slideHeld = true; };
+      this._slideUpFn   = function () { self.slideHeld = false; };
+      if (bj) {
+        bj.addEventListener('mousedown',  this._jumpFn);
+        bj.addEventListener('touchstart', this._jumpFn, { passive: true });
+      }
+      if (bs) {
+        bs.addEventListener('mousedown',   this._slideDownFn);
+        bs.addEventListener('touchstart',  this._slideDownFn, { passive: true });
+        bs.addEventListener('mouseup',     this._slideUpFn);
+        bs.addEventListener('mouseleave',  this._slideUpFn);
+        bs.addEventListener('touchend',    this._slideUpFn);
+        bs.addEventListener('touchcancel', this._slideUpFn);
+      }
+
+      this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
+      this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
+
+      this.scoreTxt = this.add.text(W - 14, 14, 'คะแนน: 0', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff',
+        backgroundColor: '#00000055', padding: { x: 8, y: 4 }
+      }).setOrigin(1, 0).setDepth(10);
+
+      this.hint = this.add.text(W / 2, 26,
+        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   เก็บบล็อกไอเทม 🎁   ชนหนาม/ตกหลุม = จบเกม!', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
+          backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
+        }).setOrigin(0.5).setDepth(10);
+      this.time.delayedCall(4000, function () {
+        self.tweens.add({ targets: self.hint, alpha: 0, duration: 600,
+          onComplete: function () { self.hint.destroy(); self.hint = null; }
+        });
+      });
+    },
+
+    doJump: function () {
+      if (this.isPaused) return;
+      if (this.player.onGround) {
+        this.player.vy = JUMP_VY;
+        this.player.onGround = false;
+        this.player.sliding  = false;
+        this.player.h        = PH;
+        if (this.sfxJump) this.sfxJump.play();
+      }
+    },
+
+    addScore: function (n) {
+      this.score += n;
+      this.scoreTxt.setText('คะแนน: ' + this.score);
+    },
+
+    // [ITEMS] A floating collectible block — hitting it just awards points
+    // and removes the block; no pronunciation/pause required.
+    spawnItemBlock: function (x) {
+      this.items.push({
+        x: x, y: GROUND_Y - 90 - Math.random() * 70,
+        collected: false
+      });
+    },
+
+    // [PATTERNS] Spawns the next pattern in the rotation at world-x startX,
+    // shifting every piece's relative offset into world space.
+    spawnPattern: function (startX) {
+      var pat = PATTERNS[this.patternIdx];
+      this.patternIdx = (this.patternIdx + 1) % PATTERNS.length;
+      var self = this;
+      pat.gaps.forEach(function (gp) {
+        self.gaps.push({ x: startX + gp.x, w: gp.w });
+      });
+      pat.platforms.forEach(function (pl) {
+        self.platforms.push({ x: startX + pl.x, y: pl.y, w: pl.w });
+      });
+      pat.obstacles.forEach(function (ob) {
+        self.obstacles.push({
+          x: startX + ob.x, y: ob.y, w: ob.w, h: ob.h, type: ob.type, hw: ob.hw
+        });
+      });
+    },
+
+    // True if the player's x-span currently overlaps an open ground pit
+    isOverGap: function () {
+      var wx = PLAYER_X + this.scrollX;
+      for (var i = 0; i < this.gaps.length; i++) {
+        var gp = this.gaps[i];
+        if (wx + PW > gp.x && wx < gp.x + gp.w) return true;
+      }
+      return false;
+    },
+
+    // Shared game-over flow — obstacles and falling in a pit both use this.
+    // Standalone build: shows an in-canvas restart prompt instead of
+    // routing back to an external finish screen.
+    gameOver: function (msg) {
+      if (this.isPaused) return;
+      this.isPaused = true;
+      if (this.sfxDamage) this.sfxDamage.play();
+      this.showPop(PLAYER_X + PW / 2, this.player.y - 20, msg);
+
+      var self = this;
+      this.time.delayedCall(700, function () {
+        self.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(20);
+        self.add.text(W / 2, H / 2 - 30, 'จบเกม! 💥', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '32px', fontStyle: 'bold', color: '#f0a500'
+        }).setOrigin(0.5).setDepth(21);
+        self.add.text(W / 2, H / 2 + 14, 'คะแนน: ' + self.score, {
+          fontFamily: 'Prompt, sans-serif', fontSize: '20px', color: '#fff'
+        }).setOrigin(0.5).setDepth(21);
+        self.add.text(W / 2, H / 2 + 50, 'กด Space หรือแตะหน้าจอเพื่อเริ่มใหม่', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '14px', color: '#cbd5e1'
+        }).setOrigin(0.5).setDepth(21);
+
+        var restart = function () { self.scene.restart(); };
+        self.input.keyboard.once('keydown-SPACE', restart);
+        self.input.once('pointerdown', restart);
+      });
+    },
+
+    update: function (time, delta) {
+      if (this.isPaused) return;
+      var p    = this.player;
+      var self = this;
+
+      if (Phaser.Input.Keyboard.JustDown(this.keys.up) ||
+          Phaser.Input.Keyboard.JustDown(this.keys.space)) this.doJump();
+
+      // Survival scoring + speed ramp — no countdown timer; the run only
+      // ends on death. +1 point per second survived, and scroll speed
+      // climbs the longer you last, capped at SCROLL_SPD_MAX.
+      this.surviveMs  += delta;
+      this.pointTimer += delta;
+      if (this.pointTimer >= 1000) {
+        this.pointTimer -= 1000;
+        this.addScore(1);
+      }
+      var scrollSpd = Math.min(SCROLL_SPD_MAX, SCROLL_SPD_BASE + (this.surviveMs / 1000) * SPEED_RAMP);
+
+      this.scrollX += scrollSpd;
+
+      // Slide held while airborne pulls the player toward the ground faster
+      // (a fast-fall), on top of normal gravity.
+      var slideHeld = this.keys.down.isDown || this.slideHeld;
+
+      p.vy += GRAVITY;
+      if (slideHeld && !p.onGround) p.vy += FAST_FALL;
+      p.y  += p.vy;
+
+      // Ground collision — skipped while over an open pit
+      if (!this.isOverGap() && p.y + p.h >= GROUND_Y) {
+        p.y = GROUND_Y - p.h; p.vy = 0; p.onGround = true;
+      } else {
+        p.onGround = false;
+      }
+
+      // Hold-to-slide — lasts exactly as long as the key/button is held,
+      // rather than a fixed duration. Only takes effect on the ground.
+      if (slideHeld && p.onGround && !p.sliding) {
+        p.sliding = true; p.h = PH_SLIDE;
+      } else if (!slideHeld && p.sliding) {
+        p.sliding = false; p.h = PH;
+      }
+
+      // Platform landing
+      this.platforms.forEach(function (plat) {
+        var sx = plat.x - self.scrollX;
+        if (PLAYER_X + PW > sx && PLAYER_X < sx + plat.w) {
+          var feet = p.y + p.h, prev = feet - p.vy;
+          if (p.vy >= 0 && feet >= plat.y && prev <= plat.y + 4) {
+            p.y = plat.y - p.h; p.vy = 0; p.onGround = true;
+          }
+        }
+      });
+
+      // Fell through a pit and off the bottom of the screen
+      if (p.y > H + 40) { this.gameOver('💀 ตกหลุม!'); return; }
+
+      if (p.onGround && !p.sliding) p.legPhase += 0.26;
+
+      this.clouds.forEach(function (c) {
+        c.x -= 0.5;
+        if (c.x < -150) c.x = W + 100;
+      });
+
+      // Cull off-screen objects
+      this.platforms = this.platforms.filter(function (pl) { return pl.x - self.scrollX > -250; });
+      this.items     = this.items.filter(function (it)     { return it.x - self.scrollX > -80; });
+      this.obstacles = this.obstacles.filter(function (ob) { return ob.x - self.scrollX > -100; });
+      this.gaps      = this.gaps.filter(function (gp)      { return gp.x + gp.w - self.scrollX > -50; });
+
+      // [PATTERNS] Spawn the next chunk once the previous one has scrolled
+      // far enough onto screen.
+      if (this.scrollX + W > this.nextChunkX) {
+        this.spawnPattern(this.nextChunkX);
+        this.nextChunkX += CHUNK_W;
+      }
+      // [ITEMS] Time-based spawn — an item block every 5-10s (randomized
+      // fresh after each spawn), regardless of scroll distance.
+      this.itemTimer += delta;
+      if (this.itemTimer >= this.nextItemDelay) {
+        this.itemTimer -= this.nextItemDelay;
+        this.nextItemDelay = ITEM_INTERVAL_MIN + Math.random() * (ITEM_INTERVAL_MAX - ITEM_INTERVAL_MIN);
+        this.spawnItemBlock(this.scrollX + W + 60);
+      }
+
+      var px = PLAYER_X, py = p.y, ph = p.h;
+
+      // Item block collection — instant points, no pause
+      this.items.forEach(function (it) {
+        if (it.collected) return;
+        var cx = it.x - self.scrollX, bw = 24;
+        if (px < cx + bw && px + PW > cx - bw && py < it.y + bw && py + ph > it.y - bw) {
+          it.collected = true;
+          self.addScore(ITEM_POINTS);
+          self.showPop(cx, it.y - 20, '+' + ITEM_POINTS + ' 🎁');
+        }
+      });
+
+      // Obstacle collision — instant game over. hw (if set) narrows the
+      // hitbox below the drawn width, centered, for a fairer feel.
+      if (!this.isPaused) {
+        this.obstacles.forEach(function (ob) {
+          if (self.isPaused) return; // already game-overed this frame
+          var hw = ob.hw !== undefined ? ob.hw : ob.w;
+          var hx = ob.x - self.scrollX + (ob.w - hw) / 2;
+          if (px < hx + hw && px + PW > hx && py + ph > ob.y && py < ob.y + ob.h) {
+            self.gameOver('💥 Game Over');
+          }
+        });
+      }
+
+      this.draw(time);
+    },
+
+    draw: function (time) {
+      var g    = this.dynGfx;
+      var hg   = this.hillGfx;
+      var self = this;
+      g.clear(); hg.clear();
+
+      // Parallax hills
+      hg.fillStyle(0x81c784);
+      var hoff = ((-this.scrollX * 0.15) % 200 + 200) % 200;
+      for (var hx = hoff - 110; hx < W + 110; hx += 200) {
+        hg.fillCircle(hx, GROUND_Y + 12, 100);
+      }
+
+      // Clouds
+      this.clouds.forEach(function (c) {
+        g.fillStyle(0xffffff, 0.88);
+        g.fillEllipse(c.x,               c.y,     c.rw * 2,    44);
+        g.fillEllipse(c.x - c.rw * 0.38, c.y + 9, c.rw * 1.16, 34);
+        g.fillEllipse(c.x + c.rw * 0.32, c.y + 7, c.rw,         30);
+      });
+
+      // Scrolling ground grass tufts (make ground feel alive)
+      var goff = ((-this.scrollX) % 52 + 52) % 52;
+      for (var gx = goff - 52; gx < W + 52; gx += 52) {
+        g.fillStyle(0x1b5e20);
+        g.fillRect(gx,      GROUND_Y - 5, 3, 5);
+        g.fillRect(gx + 8,  GROUND_Y - 3, 2, 3);
+        g.fillRect(gx + 15, GROUND_Y - 6, 3, 6);
+        g.fillRect(gx + 23, GROUND_Y - 4, 2, 4);
+        g.fillStyle(0x6d4c41);
+        g.fillCircle(gx + 38, GROUND_Y + 15, 3);
+      }
+
+      // Ground pits — punch a hole through the ground bar drawn above
+      this.gaps.forEach(function (gp) {
+        var gx2 = gp.x - self.scrollX;
+        if (gx2 > W + 20 || gx2 + gp.w < -20) return;
+        g.fillStyle(0x1b1425);
+        g.fillRect(gx2, GROUND_Y, gp.w, H - GROUND_Y);
+      });
+
+      // Platforms
+      this.platforms.forEach(function (plat) {
+        var sx = plat.x - self.scrollX;
+        if (sx > W + 10 || sx + plat.w < -10) return;
+        g.fillStyle(0x43a047); g.fillRect(sx, plat.y,      plat.w, 10);
+        g.fillStyle(0x795548); g.fillRect(sx, plat.y + 10, plat.w, 12);
+        g.lineStyle(1.5, 0x2e7d32);
+        g.strokeRect(sx, plat.y, plat.w, 22);
+      });
+
+      var now = this.time.now;
+
+      // Item blocks — Mario-style floating "?" block
+      this.items.forEach(function (it) {
+        if (it.collected) return;
+        var cx  = it.x - self.scrollX;
+        if (cx < -40 || cx > W + 40) return;
+        var bob = Math.sin(now * 0.004 + cx * 0.01) * 4;
+        var s = 36;
+        g.fillStyle(0xf0a500);
+        g.fillRoundedRect(cx - s / 2, it.y - s / 2 + bob, s, s, 6);
+        g.lineStyle(2.5, 0xb87400);
+        g.strokeRoundedRect(cx - s / 2, it.y - s / 2 + bob, s, s, 6);
+        var qt = self.add.text(cx, it.y + bob, '?', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '20px', fontStyle: 'bold', color: '#ffffff'
+        }).setOrigin(0.5).setDepth(5);
+        self.time.delayedCall(16, function () { qt.destroy(); });
+      });
+
+      // Obstacles — triangular spikes. 'ground' points up, 'ceiling' hangs
+      // down as a row of small teeth (must slide under, or jump over).
+      this.obstacles.forEach(function (ob) {
+        var ox = ob.x - self.scrollX;
+        if (ox < -100 || ox > W + 100) return;
+        g.fillStyle(0xd32f2f);
+        g.lineStyle(1.5, 0x7f1010);
+        if (ob.type === 'ceiling') {
+          var n  = Math.max(3, Math.round(ob.w / 22));
+          var tw = ob.w / n;
+          for (var i = 0; i < n; i++) {
+            var tx = ox + i * tw;
+            g.beginPath();
+            g.moveTo(tx,        ob.y);
+            g.lineTo(tx + tw/2, ob.y + ob.h);
+            g.lineTo(tx + tw,   ob.y);
+            g.closePath();
+            g.fillPath(); g.strokePath();
+          }
+        } else {
+          g.beginPath();
+          g.moveTo(ox,          ob.y + ob.h);
+          g.lineTo(ox + ob.w/2, ob.y);
+          g.lineTo(ox + ob.w,   ob.y + ob.h);
+          g.closePath();
+          g.fillPath(); g.strokePath();
+        }
+      });
+
+      this.drawCharacter(g);
+    },
+
+    // ── [PLAYER] Placeholder cube — swap for real art later. Drawn as a
+    // plain rounded rect exactly matching the collision hitbox.
+    drawCharacter: function (g) {
+      var p = this.player;
+      g.fillStyle(0x8d6e63);
+      g.fillRoundedRect(PLAYER_X, p.y, PW, p.h, 6);
+      g.lineStyle(2, 0x5d4037);
+      g.strokeRoundedRect(PLAYER_X, p.y, PW, p.h, 6);
+    },
+
+    showPop: function (x, y, text) {
+      var isNeg = text.charAt(0) === '-';
+      var pop = this.add.text(x, y, text, {
+        fontFamily: 'Prompt, sans-serif', fontSize: '18px', fontStyle: 'bold',
+        color: isNeg ? '#e74c3c' : '#ff9f1c',
+        stroke: '#ffffff', strokeThickness: 3
+      }).setOrigin(0.5).setDepth(12);
+      this.tweens.add({
+        targets: pop, y: y - 40, alpha: 0, duration: 800, ease: 'Power2',
+        onComplete: function () { pop.destroy(); }
+      });
+    },
+
+    shutdown: function () {
+      var bj = document.getElementById('pfBtnJump');
+      var bs = document.getElementById('pfBtnSlide');
+      if (bj && this._jumpFn) {
+        bj.removeEventListener('mousedown',  this._jumpFn);
+        bj.removeEventListener('touchstart', this._jumpFn);
+      }
+      if (bs && this._slideDownFn) {
+        bs.removeEventListener('mousedown',   this._slideDownFn);
+        bs.removeEventListener('touchstart',  this._slideDownFn);
+        bs.removeEventListener('mouseup',     this._slideUpFn);
+        bs.removeEventListener('mouseleave',  this._slideUpFn);
+        bs.removeEventListener('touchend',    this._slideUpFn);
+        bs.removeEventListener('touchcancel', this._slideUpFn);
+      }
+    }
+  });
+
+  return new Phaser.Game({
+    type:   Phaser.AUTO,
+    parent: 'platformerCanvas',
+    width:  800,
+    height: 400,
+    scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
+    scene:  PlatScene,
+    audio:  { noAudio: false }
+  });
+}
+
+createPlatformerGame();
+</script>
+</body>
+</html>
