@@ -10,8 +10,10 @@
 //  How the game works:
 //    - The world scrolls left; the monkey stays in place
 //    - JUMP (↑ / Space / Jump button)  SLIDE (↓ / Slide button)
-//    - Obstacles → -5s timer
-//    - A word bubble spawns every WORD_INTERVAL ms → pronunciation practice modal
+//    - Obstacles → instant game over (unless shielded — see below)
+//    - A word bubble spawns every WORD_INTERVAL ms → pronunciation practice
+//      modal; succeeding grants a brief shield (p.invincible) that lets you
+//      pass through the next obstacle safely
 // ============================================================
 
 function createPlatformerGame(words, callbacks) {
@@ -115,7 +117,7 @@ function createPlatformerGame(words, callbacks) {
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
 
       this.hint = this.add.text(W / 2, 26,
-        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   ฟังคำศัพท์ทุก 10 วิ 💬   หลีกสิ่งกีดขวาง 🪨', {
+        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   ชนสิ่งกีดขวาง 🪨 = จบเกม!', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
           backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
         }).setOrigin(0.5).setDepth(10);
@@ -250,15 +252,16 @@ function createPlatformerGame(words, callbacks) {
         }
       });
 
-      // Obstacle collision
-      if (p.invincible === 0) {
+      // Obstacle collision — instant game over
+      if (p.invincible === 0 && !this.isPaused) {
         this.obstacles.forEach(function (ob) {
+          if (self.isPaused) return; // already game-overed this frame
           var ox = ob.x - self.scrollX;
           if (px < ox + ob.w && px + PW > ox && py + ph > ob.y && py < ob.y + ob.h) {
-            p.invincible = 80;
+            self.isPaused = true;
             if (self.sfxDamage) self.sfxDamage.play();
-            if (callbacks.onTime) callbacks.onTime(-5);
-            self.showPop(px + PW / 2, py - 20, '-5s 💥');
+            self.showPop(px + PW / 2, py - 20, '💥 Game Over');
+            self.time.delayedCall(900, function () { callbacks.onFinish(); });
           }
         });
       }
