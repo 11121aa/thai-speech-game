@@ -3,17 +3,22 @@
 // ============================================================
 //  [TUNE]      Speed, gravity, jump strength      (~line 18)
 //  [WORDS]     Word spawn interval                (~line 21, WORD_INTERVAL)
-//  [OBSTACLES] Obstacle spacing / types           (~spawnObstacle)
+//  [PATTERNS]  Hand-designed level chunks         (~PATTERNS array)
 //  [PLAYER]    Player art (currently a placeholder cube) (~drawCharacter)
 //  [SKY]       Sky / hill colours                 (~create bg)
 // ============================================================
 //  How the game works:
-//    - The world scrolls left; the monkey stays in place
+//    - The world scrolls left; the player stays in place
 //    - JUMP (↑ / Space / Jump button)  SLIDE (↓ / Slide button)
-//    - Obstacles → instant game over (unless shielded — see below)
+//    - The level is built from fixed hand-designed "patterns" spawned back
+//      to back (cycling through PATTERNS), instead of independently random
+//      platforms/obstacles — every jump is guaranteed makeable
+//    - Ground pits → fall through and it's game over
+//    - Ground spikes → touch one and it's game over (unless shielded)
+//    - Ceiling spike rows → must SLIDE under (or jump over, if timed well)
 //    - A word bubble spawns every WORD_INTERVAL ms → pronunciation practice
 //      modal; succeeding grants a brief shield (p.invincible) that lets you
-//      pass through the next obstacle safely
+//      pass through the next hazard safely
 // ============================================================
 
 function createPlatformerGame(words, callbacks) {
@@ -29,22 +34,64 @@ function createPlatformerGame(words, callbacks) {
   var PW = 32, PH = 62;
   var PH_SLIDE   = 26;
 
+  // ── [PATTERNS] Hand-designed level chunks ───────────────────────
+  // Replaces independently-random platform/obstacle spawning so the level
+  // is always fair — no more impossible-to-clear random combinations.
+  // Each pattern's pieces use x offsets relative to the chunk's start x;
+  // spawnPattern() shifts them into world space when the chunk is spawned.
+  // Obstacle "type" is 'ground' (spike sitting on the ground — jump over)
+  // or 'ceiling' (spike row hanging down — slide under, or jump if timed).
+  var CHUNK_W = 1000; // world-space width reserved per chunk
+
+  var PATTERNS = [
+    // 1) A pit in the ground, crossed via 3 staggered platforms
+    {
+      gaps: [ { x: 220, w: 480 } ],
+      platforms: [
+        { x: 250, y: GROUND_Y - 90,  w: 110 },
+        { x: 430, y: GROUND_Y - 150, w: 110 },
+        { x: 610, y: GROUND_Y - 100, w: 140 }
+      ],
+      obstacles: []
+    },
+    // 2) Overhead spike row (slide under), then two rising ground spikes
+    {
+      gaps: [],
+      platforms: [],
+      obstacles: [
+        { x: 200, y: GROUND_Y - 80, w: 240, h: 45, type: 'ceiling' },
+        { x: 560, y: GROUND_Y - 40, w: 22,  h: 40, type: 'ground'  },
+        { x: 760, y: GROUND_Y - 75, w: 30,  h: 75, type: 'ground'  }
+      ]
+    },
+    // 3) A small spike, a floating platform, then a big spike
+    {
+      gaps: [],
+      platforms: [ { x: 480, y: GROUND_Y - 110, w: 140 } ],
+      obstacles: [
+        { x: 180, y: GROUND_Y - 40, w: 22, h: 40, type: 'ground' },
+        { x: 780, y: GROUND_Y - 75, w: 30, h: 75, type: 'ground' }
+      ]
+    }
+  ];
+
   var PlatScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
     initialize: function () {
       Phaser.Scene.call(this, { key: 'platformer' });
-      this.isPaused  = false;
-      this.scrollX   = 0;
-      this.wordIdx   = 0;
-      this.platforms = [];
-      this.words2    = [];
-      this.obstacles = [];
-      this.clouds    = [];
-      this.player    = null;
-      this.nextPlatX = W + 200;
-      this.wordTimer = 0; // [WORDS] ms accumulated since the last word spawn
-      this.nextObsX  = W + 520; // first obstacle further away
+      this.isPaused   = false;
+      this.scrollX    = 0;
+      this.wordIdx    = 0;
+      this.patternIdx = 0;
+      this.platforms  = [];
+      this.gaps       = [];
+      this.words2     = [];
+      this.obstacles  = [];
+      this.clouds     = [];
+      this.player     = null;
+      this.nextChunkX = W + 300; // clear runway before the first pattern
+      this.wordTimer  = 0; // [WORDS] ms accumulated since the last word spawn
     },
 
     preload: function () {
@@ -117,7 +164,7 @@ function createPlatformerGame(words, callbacks) {
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
 
       this.hint = this.add.text(W / 2, 26,
-        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   ชนสิ่งกีดขวาง 🪨 = จบเกม!', {
+        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   ชนหนาม/ตกหลุม = จบเกม!', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
           backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
         }).setOrigin(0.5).setDepth(10);
@@ -155,19 +202,43 @@ function createPlatformerGame(words, callbacks) {
       });
     },
 
-    spawnPlatform: function (x) {
-      var py = GROUND_Y - 115 - Math.random() * 65;
-      var pw = 110 + Math.random() * 100;
-      this.platforms.push({ x: x, y: py, w: pw });
+    // [PATTERNS] Spawns the next pattern in the rotation at world-x startX,
+    // shifting every piece's relative offset into world space.
+    spawnPattern: function (startX) {
+      var pat = PATTERNS[this.patternIdx];
+      this.patternIdx = (this.patternIdx + 1) % PATTERNS.length;
+      var self = this;
+      pat.gaps.forEach(function (gp) {
+        self.gaps.push({ x: startX + gp.x, w: gp.w });
+      });
+      pat.platforms.forEach(function (pl) {
+        self.platforms.push({ x: startX + pl.x, y: pl.y, w: pl.w });
+      });
+      pat.obstacles.forEach(function (ob) {
+        self.obstacles.push({
+          x: startX + ob.x, y: ob.y, w: ob.w, h: ob.h, type: ob.type
+        });
+      });
     },
 
-    // [OBSTACLES] 3 types; more y-position variety coming from varied h values
-    spawnObstacle: function (x) {
-      var roll = Math.random();
-      var type = roll < 0.38 ? 'rock' : roll < 0.72 ? 'cactus' : 'bigrock';
-      var w = type === 'rock' ? 36 : type === 'cactus' ? 20 : 52;
-      var h = type === 'rock' ? 28 : type === 'cactus' ? 50 : 34;
-      this.obstacles.push({ x: x, y: GROUND_Y - h, w: w, h: h, type: type });
+    // True if the player's x-span currently overlaps an open ground pit
+    isOverGap: function () {
+      var wx = PLAYER_X + this.scrollX;
+      for (var i = 0; i < this.gaps.length; i++) {
+        var gp = this.gaps[i];
+        if (wx + PW > gp.x && wx < gp.x + gp.w) return true;
+      }
+      return false;
+    },
+
+    // Shared game-over flow — obstacles and falling in a pit both use this
+    gameOver: function (msg) {
+      if (this.isPaused) return;
+      this.isPaused = true;
+      if (this.sfxDamage) this.sfxDamage.play();
+      this.showPop(PLAYER_X + PW / 2, this.player.y - 20, msg);
+      var cbs = callbacks;
+      this.time.delayedCall(900, function () { cbs.onFinish(); });
     },
 
     update: function (time, delta) {
@@ -186,8 +257,8 @@ function createPlatformerGame(words, callbacks) {
       if (p.sliding && --p.slideTimer <= 0) { p.sliding = false; p.h = PH; }
       if (p.invincible > 0) p.invincible--;
 
-      // Ground collision
-      if (p.y + p.h >= GROUND_Y) {
+      // Ground collision — skipped while over an open pit
+      if (!this.isOverGap() && p.y + p.h >= GROUND_Y) {
         p.y = GROUND_Y - p.h; p.vy = 0; p.onGround = true;
       } else {
         p.onGround = false;
@@ -204,6 +275,9 @@ function createPlatformerGame(words, callbacks) {
         }
       });
 
+      // Fell through a pit and off the bottom of the screen
+      if (p.y > H + 40) { this.gameOver('💀 ตกหลุม!'); return; }
+
       if (p.onGround && !p.sliding) p.legPhase += 0.26;
 
       this.clouds.forEach(function (c) {
@@ -215,11 +289,13 @@ function createPlatformerGame(words, callbacks) {
       this.platforms = this.platforms.filter(function (pl) { return pl.x - self.scrollX > -250; });
       this.words2    = this.words2.filter(function (w)     { return w.x  - self.scrollX > -80; });
       this.obstacles = this.obstacles.filter(function (ob) { return ob.x - self.scrollX > -100; });
+      this.gaps      = this.gaps.filter(function (gp)      { return gp.x + gp.w - self.scrollX > -50; });
 
-      // Spawn new objects — wider gaps for obstacles and platforms
-      if (this.scrollX + W > this.nextPlatX) {
-        this.spawnPlatform(this.nextPlatX);
-        this.nextPlatX += 320 + Math.random() * 280;
+      // [PATTERNS] Spawn the next chunk once the previous one has scrolled
+      // far enough onto screen — replaces the old independent random timers.
+      if (this.scrollX + W > this.nextChunkX) {
+        this.spawnPattern(this.nextChunkX);
+        this.nextChunkX += CHUNK_W;
       }
       // [WORDS] Time-based spawn — one word bubble every WORD_INTERVAL ms,
       // regardless of scroll distance. Only accumulates while not paused,
@@ -228,11 +304,6 @@ function createPlatformerGame(words, callbacks) {
       if (this.wordTimer >= WORD_INTERVAL) {
         this.wordTimer -= WORD_INTERVAL;
         this.spawnWordItem(this.scrollX + W + 60);
-      }
-      // [OBSTACLES] 380–700px between each — much more breathing room
-      if (this.scrollX + W > this.nextObsX) {
-        this.spawnObstacle(this.nextObsX);
-        this.nextObsX += 380 + Math.random() * 320;
       }
 
       var px = PLAYER_X, py = p.y, ph = p.h;
@@ -258,10 +329,7 @@ function createPlatformerGame(words, callbacks) {
           if (self.isPaused) return; // already game-overed this frame
           var ox = ob.x - self.scrollX;
           if (px < ox + ob.w && px + PW > ox && py + ph > ob.y && py < ob.y + ob.h) {
-            self.isPaused = true;
-            if (self.sfxDamage) self.sfxDamage.play();
-            self.showPop(px + PW / 2, py - 20, '💥 Game Over');
-            self.time.delayedCall(900, function () { callbacks.onFinish(); });
+            self.gameOver('💥 Game Over');
           }
         });
       }
@@ -303,6 +371,14 @@ function createPlatformerGame(words, callbacks) {
         g.fillCircle(gx + 38, GROUND_Y + 15, 3);
       }
 
+      // Ground pits — punch a hole through the ground bar drawn above
+      this.gaps.forEach(function (gp) {
+        var gx2 = gp.x - self.scrollX;
+        if (gx2 > W + 20 || gx2 + gp.w < -20) return;
+        g.fillStyle(0x1b1425);
+        g.fillRect(gx2, GROUND_Y, gp.w, H - GROUND_Y);
+      });
+
       // Platforms
       this.platforms.forEach(function (plat) {
         var sx = plat.x - self.scrollX;
@@ -336,31 +412,32 @@ function createPlatformerGame(words, callbacks) {
         self.time.delayedCall(16, function () { et.destroy(); wt.destroy(); });
       });
 
-      // Obstacles
+      // Obstacles — triangular spikes. 'ground' points up, 'ceiling' hangs
+      // down as a row of small teeth (must slide under, or jump over).
       this.obstacles.forEach(function (ob) {
         var ox = ob.x - self.scrollX;
-        if (ox < -80 || ox > W + 80) return;
-        if (ob.type === 'cactus') {
-          g.fillStyle(0x388e3c);
-          g.fillRect(ox,        ob.y + 14, ob.w,    ob.h - 14);
-          g.fillRect(ox - 10,   ob.y + 18, 10,      16);
-          g.fillRect(ox + ob.w, ob.y + 22, 10,      12);
-          g.fillRoundedRect(ox,           ob.y,      ob.w, 18, 4);
-          g.fillRoundedRect(ox - 10,   ob.y + 10, 10,  6, 3);
-          g.fillRoundedRect(ox + ob.w, ob.y + 14, 10,  6, 3);
-          g.lineStyle(1.5, 0x2e7d32);
-          g.strokeRoundedRect(ox, ob.y, ob.w, ob.h, 4);
-        } else {
-          // Rock / bigrock
-          g.fillStyle(0x78909c);
-          g.fillRoundedRect(ox, ob.y, ob.w, ob.h, 8);
-          g.lineStyle(2, 0x546e7a);
-          g.strokeRoundedRect(ox, ob.y, ob.w, ob.h, 8);
-          g.lineStyle(1, 0x90a4ae, 0.6);
-          g.lineBetween(ox + ob.w * 0.3, ob.y + 4, ox + ob.w * 0.55, ob.y + ob.h - 4);
-          if (ob.type === 'bigrock') {
-            g.lineBetween(ox + ob.w * 0.6, ob.y + 6, ox + ob.w * 0.78, ob.y + ob.h - 6);
+        if (ox < -100 || ox > W + 100) return;
+        g.fillStyle(0xd32f2f);
+        g.lineStyle(1.5, 0x7f1010);
+        if (ob.type === 'ceiling') {
+          var n  = Math.max(3, Math.round(ob.w / 22));
+          var tw = ob.w / n;
+          for (var i = 0; i < n; i++) {
+            var tx = ox + i * tw;
+            g.beginPath();
+            g.moveTo(tx,        ob.y);
+            g.lineTo(tx + tw/2, ob.y + ob.h);
+            g.lineTo(tx + tw,   ob.y);
+            g.closePath();
+            g.fillPath(); g.strokePath();
           }
+        } else {
+          g.beginPath();
+          g.moveTo(ox,          ob.y + ob.h);
+          g.lineTo(ox + ob.w/2, ob.y);
+          g.lineTo(ox + ob.w,   ob.y + ob.h);
+          g.closePath();
+          g.fillPath(); g.strokePath();
         }
       });
 
