@@ -4,7 +4,7 @@
 //  [TUNE]      Speed, gravity, jump strength      (~line 18)
 //  [WORDS]     Word spawn interval                (~line 21, WORD_INTERVAL)
 //  [OBSTACLES] Obstacle spacing / types           (~spawnObstacle)
-//  [PLAYER]    Monkey character art               (~drawCharacter)
+//  [PLAYER]    Player art (currently a placeholder cube) (~drawCharacter)
 //  [SKY]       Sky / hill colours                 (~create bg)
 // ============================================================
 //  How the game works:
@@ -369,116 +369,15 @@ function createPlatformerGame(words, callbacks) {
       if (!flash) this.drawCharacter(g);
     },
 
-    // ── Running monkey character ──────────────────────────────────
+    // ── [PLAYER] Placeholder cube — swap back to a drawn character later.
+    // Drawn as a plain rounded rect exactly matching the collision hitbox
+    // (PLAYER_X, p.y, PW, p.h), so what you see is exactly what you hit.
     drawCharacter: function (g) {
-      var p  = this.player;
-      var cx = PLAYER_X + PW / 2;
-      var cy = p.y;
-
-      var BROWN  = 0x8d6e63; // main body brown
-      var DBROWN = 0x5d4037; // dark brown — tail, feet, nostrils
-      var TAN    = 0xffcc80; // light tan — face, belly
-      var CREAM  = 0xffe0b2; // muzzle
-      var PINK   = 0xf48fb1; // inner ear
-      var DARK   = 0x1a1a2e; // eyes
-
-      if (p.sliding) {
-        // Sliding pose: flat on belly, tail up, head peeking forward
-        g.fillStyle(DBROWN);
-        g.fillCircle(cx - 10, cy + 13, 4);
-        g.fillCircle(cx - 17, cy + 7,  3.5);
-        g.fillCircle(cx - 20, cy + 1,  3);
-        g.fillCircle(cx - 18, cy - 3,  2.5);
-        g.fillStyle(BROWN);
-        g.fillEllipse(cx - 4, cy + 13, 30, PH_SLIDE - 2);
-        g.fillStyle(TAN, 0.5);
-        g.fillEllipse(cx - 4, cy + 14, 16, 10);
-        g.fillStyle(BROWN);
-        g.fillCircle(cx + 14, cy + 10, 10);
-        g.fillStyle(TAN);
-        g.fillCircle(cx + 15, cy + 11, 7);
-        g.fillStyle(BROWN);
-        g.fillCircle(cx + 13, cy + 2, 5);
-        g.fillStyle(PINK);
-        g.fillCircle(cx + 13, cy + 2, 3);
-        g.fillStyle(DARK);
-        g.fillCircle(cx + 17, cy + 10, 2.5);
-        g.fillStyle(0xffffff);
-        g.fillCircle(cx + 18, cy + 9, 1);
-        g.fillStyle(CREAM);
-        g.fillEllipse(cx + 20, cy + 14, 10, 7);
-        return;
-      }
-
-      var sw = p.onGround ? Math.sin(p.legPhase) * 8 : 3;
-
-      // TAIL — series of circles curving up from left hip
-      g.fillStyle(DBROWN);
-      g.fillCircle(cx - 7,  cy + 58, 4);
-      g.fillCircle(cx - 15, cy + 49, 3.5);
-      g.fillCircle(cx - 21, cy + 37, 3);
-      g.fillCircle(cx - 22, cy + 24, 2.5);
-      g.fillCircle(cx - 18, cy + 13, 2);
-      g.fillCircle(cx - 12, cy + 8,  1.5);
-
-      // ARMS — swing opposite to opposite leg
-      g.fillStyle(BROWN);
-      g.fillRect(cx - 20, cy + 32 - sw * 0.7, 10, 13);
-      g.fillRect(cx + 10, cy + 32 + sw * 0.7, 10, 13);
-      // Hands
-      g.fillStyle(TAN);
-      g.fillCircle(cx - 15, cy + 45 - sw * 0.7, 4);
-      g.fillCircle(cx + 15, cy + 45 + sw * 0.7, 4);
-
-      // BODY
-      g.fillStyle(BROWN);
-      g.fillEllipse(cx, cy + 44, 24, 22);
-      // Belly patch
-      g.fillStyle(TAN, 0.5);
-      g.fillEllipse(cx, cy + 46, 13, 12);
-
-      // HEAD outer (brown halo behind face)
-      g.fillStyle(BROWN);
-      g.fillCircle(cx, cy + 16, 14);
-
-      // EARS
-      g.fillStyle(BROWN);
-      g.fillCircle(cx - 13, cy + 9, 7);
-      g.fillCircle(cx + 13, cy + 9, 7);
-      g.fillStyle(PINK);
-      g.fillCircle(cx - 13, cy + 9, 4);
-      g.fillCircle(cx + 13, cy + 9, 4);
-
-      // FACE (inner lighter area)
-      g.fillStyle(TAN);
-      g.fillCircle(cx, cy + 17, 11);
-
-      // MUZZLE
-      g.fillStyle(CREAM);
-      g.fillEllipse(cx, cy + 22, 13, 9);
-
-      // EYES
-      g.fillStyle(DARK);
-      g.fillCircle(cx - 4, cy + 14, 2.5);
-      g.fillCircle(cx + 4, cy + 14, 2.5);
-      g.fillStyle(0xffffff);
-      g.fillCircle(cx - 3, cy + 13, 1);
-      g.fillCircle(cx + 5, cy + 13, 1);
-
-      // NOSTRILS
-      g.fillStyle(DBROWN);
-      g.fillCircle(cx - 2, cy + 21, 1.2);
-      g.fillCircle(cx + 2, cy + 21, 1.2);
-
-      // LEGS
-      g.fillStyle(BROWN);
-      g.fillRect(cx - 10, cy + 54, 9, 12 + sw);
-      g.fillRect(cx + 1,  cy + 54, 9, 12 - sw);
-
-      // FEET (big monkey feet)
-      g.fillStyle(DBROWN);
-      g.fillEllipse(cx - 8, cy + 67 + sw, 15, 8);
-      g.fillEllipse(cx + 4, cy + 67 - sw, 15, 8);
+      var p = this.player;
+      g.fillStyle(0x8d6e63);
+      g.fillRoundedRect(PLAYER_X, p.y, PW, p.h, 6);
+      g.lineStyle(2, 0x5d4037);
+      g.strokeRoundedRect(PLAYER_X, p.y, PW, p.h, 6);
     },
 
     showPop: function (x, y, text) {
