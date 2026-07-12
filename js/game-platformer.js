@@ -101,7 +101,6 @@ function createPlatformerGame(words, callbacks) {
       this.isPaused   = false;
       this.scrollX    = 0;
       this.wordIdx    = 0;
-      this.patternIdx = 0;
       this.platforms  = [];
       this.gaps       = [];
       this.words2     = [];
@@ -229,11 +228,11 @@ function createPlatformerGame(words, callbacks) {
       });
     },
 
-    // [PATTERNS] Spawns the next pattern in the rotation at world-x startX,
-    // shifting every piece's relative offset into world space.
+    // [PATTERNS] Spawns a random pattern at world-x startX, shifting every
+    // piece's relative offset into world space. Fully random each time —
+    // the same pattern can repeat back-to-back, no need to see all 3 first.
     spawnPattern: function (startX) {
-      var pat = PATTERNS[this.patternIdx];
-      this.patternIdx = (this.patternIdx + 1) % PATTERNS.length;
+      var pat = PATTERNS[Math.floor(Math.random() * PATTERNS.length)];
       var self = this;
       pat.gaps.forEach(function (gp) {
         self.gaps.push({ x: startX + gp.x, w: gp.w });
