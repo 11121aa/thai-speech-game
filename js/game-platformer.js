@@ -49,8 +49,8 @@ function createPlatformerGame(words, callbacks) {
       gaps: [ { x: 220, w: 480 } ],
       platforms: [
         { x: 250, y: GROUND_Y - 70,  w: 100 },
-        { x: 400, y: GROUND_Y - 115, w: 100 },
-        { x: 550, y: GROUND_Y - 160, w: 100 }
+        { x: 470, y: GROUND_Y - 115, w: 100 },
+        { x: 690, y: GROUND_Y - 160, w: 100 }
       ],
       obstacles: []
     },
