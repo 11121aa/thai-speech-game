@@ -33,6 +33,7 @@ function createPlatformerGame(words, callbacks) {
   var GRAVITY       = 0.52;
   var JUMP_VY       = -13.5;
   var FAST_FALL     = 1.0; // extra downward accel while airborne + slide held
+  var IMMORTAL_FRAMES = 180; // "อมตะ" (immortal) shield duration after a successful word practice
   var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 10000; // [WORDS] random ms range between word-bubble spawns
   var W = 800, H = 400;
   var GROUND_Y   = H - 55;
@@ -82,9 +83,12 @@ function createPlatformerGame(words, callbacks) {
     {
       gaps: [],
       platforms: [ { x: 440, y: GROUND_Y - 110, w: 180 } ],
+      // The big spike's hitbox (hw) is narrower than its drawn width (w) —
+      // a triangle's actual danger is a thin sliver near the top, so a
+      // full-width box there feels unfairly punishing when grazing past.
       obstacles: [
         { x: 180, y: GROUND_Y - 40,  w: 22, h: 40,  type: 'ground' },
-        { x: 630, y: GROUND_Y - 185, w: 30, h: 185, type: 'ground' }
+        { x: 630, y: GROUND_Y - 185, w: 30, h: 185, type: 'ground', hw: 14 }
       ]
     }
   ];
@@ -197,6 +201,12 @@ function createPlatformerGame(words, callbacks) {
           onComplete: function () { self.hint.destroy(); self.hint = null; }
         });
       });
+
+      // "อมตะ" (immortal) shield duration bar — top-left, only visible
+      // while the shield from a successful word practice is active.
+      this.immortalTxt = this.add.text(10, 14, '🛡️ อมตะ', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#2ec4b6'
+      }).setDepth(10).setVisible(false);
     },
 
     doJump: function () {
@@ -233,7 +243,7 @@ function createPlatformerGame(words, callbacks) {
       });
       pat.obstacles.forEach(function (ob) {
         self.obstacles.push({
-          x: startX + ob.x, y: ob.y, w: ob.w, h: ob.h, type: ob.type
+          x: startX + ob.x, y: ob.y, w: ob.w, h: ob.h, type: ob.type, hw: ob.hw
         });
       });
     },
@@ -361,18 +371,20 @@ function createPlatformerGame(words, callbacks) {
           self.isPaused = true;
           callbacks.onPractice(wi.word, null, function () {
             self.isPaused = false;
-            p.invincible = 180; // 3 s immunity after word practice
-            self.showPop(PLAYER_X + PW / 2, p.y - 20, '🛡️ คุ้มกัน!');
+            p.invincible = IMMORTAL_FRAMES;
+            self.showPop(PLAYER_X + PW / 2, p.y - 20, '🛡️ อมตะ!');
           });
         }
       });
 
-      // Obstacle collision — instant game over
+      // Obstacle collision — instant game over. hw (if set) narrows the
+      // hitbox below the drawn width, centered, for a fairer feel.
       if (p.invincible === 0 && !this.isPaused) {
         this.obstacles.forEach(function (ob) {
           if (self.isPaused) return; // already game-overed this frame
-          var ox = ob.x - self.scrollX;
-          if (px < ox + ob.w && px + PW > ox && py + ph > ob.y && py < ob.y + ob.h) {
+          var hw = ob.hw !== undefined ? ob.hw : ob.w;
+          var hx = ob.x - self.scrollX + (ob.w - hw) / 2;
+          if (px < hx + hw && px + PW > hx && py + ph > ob.y && py < ob.y + ob.h) {
             self.gameOver('💥 Game Over');
           }
         });
@@ -488,6 +500,18 @@ function createPlatformerGame(words, callbacks) {
       // Player (flash during invincibility)
       var flash = this.player.invincible > 0 && Math.floor(this.player.invincible / 6) % 2 === 1;
       if (!flash) this.drawCharacter(g);
+
+      // "อมตะ" shield duration bar — top-left, counts down while active
+      if (this.player.invincible > 0) {
+        var frac = this.player.invincible / IMMORTAL_FRAMES;
+        g.fillStyle(0x000000, 0.35);
+        g.fillRoundedRect(10, 32, 130, 14, 6);
+        g.fillStyle(0x2ec4b6);
+        g.fillRoundedRect(12, 34, 126 * frac, 10, 4);
+        this.immortalTxt.setVisible(true);
+      } else {
+        this.immortalTxt.setVisible(false);
+      }
     },
 
     // ── [PLAYER] Placeholder cube — swap back to a drawn character later.
