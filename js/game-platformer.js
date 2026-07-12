@@ -32,6 +32,7 @@ function createPlatformerGame(words, callbacks) {
   var SPEED_RAMP      = 0.05; // +px/frame of scroll speed per second survived
   var GRAVITY       = 0.52;
   var JUMP_VY       = -13.5;
+  var FAST_FALL     = 1.0; // extra downward accel while airborne + slide held
   var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 10000; // [WORDS] random ms range between word-bubble spawns
   var W = 800, H = 400;
   var GROUND_Y   = H - 55;
@@ -277,7 +278,14 @@ function createPlatformerGame(words, callbacks) {
       var scrollSpd = Math.min(SCROLL_SPD_MAX, SCROLL_SPD_BASE + (this.surviveMs / 1000) * SPEED_RAMP);
 
       this.scrollX += scrollSpd;
+
+      // Slide held while airborne pulls the player toward the ground faster
+      // (a fast-fall), on top of normal gravity — held on the ground it
+      // still just crouches, handled further below once onGround is known.
+      var slideHeld = this.keys.down.isDown || this.slideHeld;
+
       p.vy += GRAVITY;
+      if (slideHeld && !p.onGround) p.vy += FAST_FALL;
       p.y  += p.vy;
 
       if (p.invincible > 0) p.invincible--;
@@ -292,7 +300,6 @@ function createPlatformerGame(words, callbacks) {
 
       // Hold-to-slide — lasts exactly as long as the key/button is held,
       // rather than a fixed duration. Only takes effect on the ground.
-      var slideHeld = this.keys.down.isDown || this.slideHeld;
       if (slideHeld && p.onGround && !p.sliding) {
         p.sliding = true; p.h = PH_SLIDE;
       } else if (!slideHeld && p.sliding) {
