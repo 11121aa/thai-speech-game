@@ -19,12 +19,17 @@
 //    - A word bubble spawns every 5-10s (randomized) → pronunciation practice
 //      modal; succeeding grants a brief shield (p.invincible) that lets you
 //      pass through the next hazard safely
+//    - No countdown timer — the run only ends on death. +1 point per
+//      second survived, and scroll speed ramps up the longer you last
+//      (SCROLL_SPD_BASE → SCROLL_SPD_MAX)
 // ============================================================
 
 function createPlatformerGame(words, callbacks) {
 
   // ── [TUNE] ────────────────────────────────────────────────────
-  var SCROLL_SPD    = 3.8;
+  var SCROLL_SPD_BASE = 3.8;  // starting scroll speed
+  var SCROLL_SPD_MAX  = 8;    // speed cap so it never becomes unplayable
+  var SPEED_RAMP      = 0.05; // +px/frame of scroll speed per second survived
   var GRAVITY       = 0.52;
   var JUMP_VY       = -13.5;
   var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 10000; // [WORDS] random ms range between word-bubble spawns
@@ -102,6 +107,8 @@ function createPlatformerGame(words, callbacks) {
       this.wordTimer  = 0; // [WORDS] ms accumulated since the last word spawn
       this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
       this.slideHeld  = false; // true while the mobile slide button is pressed
+      this.surviveMs  = 0; // total time survived — drives the speed ramp
+      this.pointTimer = 0; // ms accumulated since the last +1 survival point
     },
 
     preload: function () {
@@ -258,7 +265,18 @@ function createPlatformerGame(words, callbacks) {
       if (Phaser.Input.Keyboard.JustDown(this.keys.up) ||
           Phaser.Input.Keyboard.JustDown(this.keys.space)) this.doJump();
 
-      this.scrollX += SCROLL_SPD;
+      // Survival scoring + speed ramp — no countdown timer; the run only
+      // ends on death. +1 point per second survived, and scroll speed
+      // climbs the longer you last, capped at SCROLL_SPD_MAX.
+      this.surviveMs  += delta;
+      this.pointTimer += delta;
+      if (this.pointTimer >= 1000) {
+        this.pointTimer -= 1000;
+        callbacks.onPoints(1);
+      }
+      var scrollSpd = Math.min(SCROLL_SPD_MAX, SCROLL_SPD_BASE + (this.surviveMs / 1000) * SPEED_RAMP);
+
+      this.scrollX += scrollSpd;
       p.vy += GRAVITY;
       p.y  += p.vy;
 

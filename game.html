@@ -634,15 +634,15 @@ function launchGame() {
   }
 
   var timerPill = document.getElementById('hudTimer') && document.getElementById('hudTimer').closest('.hud-pill');
-  if (G.mode === 'matching') {
-    // No countdown — score starts at 100k, deducts 100 per flip
+  if (G.mode === 'matching' || G.mode === 'platformer') {
+    // No countdown — matching scores by flips, platformer ends on death
+    // (survival scoring + speed ramp are handled inside the game itself)
     if (timerPill) timerPill.style.visibility = 'hidden';
     clearInterval(G.timerHandle);
     G.timeLeft = 9999;
   } else {
     if (timerPill) timerPill.style.visibility = '';
     var limit = G.mode === 'flashcard' ? 180 :
-                G.mode === 'platformer' ? 90  :
                 G.mode === 'crossy'     ? 90  :
                 G.mode === 'dressup'    ? 120 :
                 60;
