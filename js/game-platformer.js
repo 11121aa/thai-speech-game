@@ -44,13 +44,13 @@ function createPlatformerGame(words, callbacks) {
   var CHUNK_W = 1000; // world-space width reserved per chunk
 
   var PATTERNS = [
-    // 1) A pit in the ground, crossed via 3 staggered platforms
+    // 1) A pit in the ground, crossed via 3 ascending stair-step platforms
     {
       gaps: [ { x: 220, w: 480 } ],
       platforms: [
-        { x: 250, y: GROUND_Y - 90,  w: 110 },
-        { x: 430, y: GROUND_Y - 150, w: 110 },
-        { x: 610, y: GROUND_Y - 100, w: 140 }
+        { x: 250, y: GROUND_Y - 70,  w: 100 },
+        { x: 400, y: GROUND_Y - 115, w: 100 },
+        { x: 550, y: GROUND_Y - 160, w: 100 }
       ],
       obstacles: []
     },
