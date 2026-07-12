@@ -4,7 +4,7 @@
 //  [TUNE]      Speed, gravity, jump strength      (~line 18)
 //  [WORDS]     Word spawn interval                (~line 30, WORD_INTERVAL_MIN/MAX)
 //  [PATTERNS]  Hand-designed level chunks         (~PATTERNS array)
-//  [PLAYER]    Player art (currently a placeholder cube) (~drawCharacter)
+//  [PLAYER]    Sprite atlas + animation state machine   (~create, doJump, update)
 //  [SKY]       Sky / hill colours                 (~create bg)
 // ============================================================
 //  How the game works:
@@ -118,6 +118,7 @@ function createPlatformerGame(words, callbacks) {
     preload: function () {
       this.load.audio('PixelJump',   'soundeffect/PixelJump.mp3');
       this.load.audio('PixelDamage', 'soundeffect/PixelDamage.mp3');
+      this.load.atlas('playerAnim', 'img/player/player-anim.png', 'img/player/player-anim.json');
     },
 
     create: function () {
@@ -160,6 +161,34 @@ function createPlatformerGame(words, callbacks) {
         onGround: true, sliding: false,
         legPhase: 0, invincible: 0
       };
+
+      // [PLAYER] Sprite atlas + animation state machine — hand-drawn stick
+      // figure frames (img/player/player-anim.png). Default is 'run'
+      // (looping); jump plays once then hands off to a held 'airbound'
+      // pose; sliding plays a transition once then loops the roll.
+      this.anims.create({ key: 'run', frameRate: 12, repeat: -1,
+        frames: this.anims.generateFrameNames('playerAnim', { prefix: 'run_', start: 0, end: 6 }) });
+      this.anims.create({ key: 'jump', frameRate: 10, repeat: 0,
+        frames: this.anims.generateFrameNames('playerAnim', { prefix: 'jump_', start: 0, end: 2 }) });
+      this.anims.create({ key: 'airbound', frameRate: 1, repeat: -1,
+        frames: [ { key: 'playerAnim', frame: 'airbound_0' } ] });
+      this.anims.create({ key: 'slidein', frameRate: 14, repeat: 0,
+        frames: this.anims.generateFrameNames('playerAnim', { prefix: 'slidein_', start: 0, end: 2 }) });
+      this.anims.create({ key: 'slide', frameRate: 8, repeat: -1,
+        frames: this.anims.generateFrameNames('playerAnim', { prefix: 'slide_', start: 0, end: 2 }) });
+
+      // Anchored bottom-center at the hitbox's feet (PLAYER_X+PW/2, p.y+p.h)
+      // so frames of differing native size never jitter vertically.
+      this.playerSprite = this.add.sprite(PLAYER_X + PW / 2, GROUND_Y, 'playerAnim', 'run_0')
+        .setOrigin(0.5, 1).setScale(0.5).setDepth(2);
+      this.playerSprite.play('run');
+      this.playerSprite.on('animationcomplete', function (anim) {
+        if (anim.key === 'jump' && !self.player.onGround) {
+          self.playerSprite.play('airbound', true);
+        } else if (anim.key === 'slidein' && self.player.sliding) {
+          self.playerSprite.play('slide', true);
+        }
+      });
 
       this.keys = this.input.keyboard.addKeys({
         up:    Phaser.Input.Keyboard.KeyCodes.UP,
@@ -216,6 +245,7 @@ function createPlatformerGame(words, callbacks) {
         this.player.sliding  = false;
         this.player.h        = PH;
         if (this.sfxJump) this.sfxJump.play();
+        if (this.playerSprite) this.playerSprite.play('jump', true);
       }
     },
 
@@ -315,6 +345,7 @@ function createPlatformerGame(words, callbacks) {
       // (a fast-fall), on top of normal gravity — held on the ground it
       // still just crouches, handled further below once onGround is known.
       var slideHeld = this.keys.down.isDown || this.slideHeld;
+      var wasOnGround = p.onGround;
 
       p.vy += GRAVITY;
       if (slideHeld && !p.onGround) p.vy += FAST_FALL;
@@ -332,10 +363,17 @@ function createPlatformerGame(words, callbacks) {
 
       // Hold-to-slide — lasts exactly as long as the key/button is held,
       // rather than a fixed duration. Only takes effect on the ground.
+      // These three cases are mutually exclusive: starting a slide (which
+      // also covers landing while the button is already held), releasing
+      // it, or landing normally without sliding — each resets the anim.
       if (slideHeld && p.onGround && !p.sliding) {
         p.sliding = true; p.h = PH_SLIDE;
+        if (this.playerSprite) this.playerSprite.play('slidein', true);
       } else if (!slideHeld && p.sliding) {
         p.sliding = false; p.h = PH;
+        if (this.playerSprite) this.playerSprite.play('run', true);
+      } else if (!wasOnGround && p.onGround && !p.sliding && this.playerSprite) {
+        this.playerSprite.play('run', true);
       }
 
       // Platform landing
@@ -410,6 +448,15 @@ function createPlatformerGame(words, callbacks) {
             self.gameOver('💥 Game Over');
           }
         });
+      }
+
+      // Player sprite follows the physics hitbox each frame — anchored
+      // bottom-center at the feet (PLAYER_X+PW/2, p.y+p.h) — and flashes
+      // (hides on alternating frames) while the "อมตะ" shield is active.
+      if (this.playerSprite) {
+        this.playerSprite.setPosition(PLAYER_X + PW / 2, p.y + p.h);
+        var flash = p.invincible > 0 && Math.floor(p.invincible / 6) % 2 === 1;
+        this.playerSprite.setVisible(!flash);
       }
 
       this.draw(time);
@@ -519,11 +566,9 @@ function createPlatformerGame(words, callbacks) {
         }
       });
 
-      // Player (flash during invincibility)
-      var flash = this.player.invincible > 0 && Math.floor(this.player.invincible / 6) % 2 === 1;
-      if (!flash) this.drawCharacter(g);
-
       // "อมตะ" shield duration bar — top-left, counts down while active
+      // (the player sprite itself is a real GameObject positioned/flashed
+      // in update(), not drawn here like the rest of this Graphics layer)
       if (this.player.invincible > 0) {
         var frac = this.player.invincible / IMMORTAL_FRAMES;
         g.fillStyle(0x000000, 0.35);
@@ -534,17 +579,6 @@ function createPlatformerGame(words, callbacks) {
       } else {
         this.immortalTxt.setVisible(false);
       }
-    },
-
-    // ── [PLAYER] Placeholder cube — swap back to a drawn character later.
-    // Drawn as a plain rounded rect exactly matching the collision hitbox
-    // (PLAYER_X, p.y, PW, p.h), so what you see is exactly what you hit.
-    drawCharacter: function (g) {
-      var p = this.player;
-      g.fillStyle(0x8d6e63);
-      g.fillRoundedRect(PLAYER_X, p.y, PW, p.h, 6);
-      g.lineStyle(2, 0x5d4037);
-      g.strokeRoundedRect(PLAYER_X, p.y, PW, p.h, 6);
     },
 
     showPop: function (x, y, text) {
