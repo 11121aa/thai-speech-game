@@ -2,24 +2,25 @@
 //  PLATFORMER GAME — Phaser 3  (Jump & Slide side-scroller)
 // ============================================================
 //  [TUNE]      Speed, gravity, jump strength      (~line 18)
+//  [WORDS]     Word spawn interval                (~line 21, WORD_INTERVAL)
 //  [OBSTACLES] Obstacle spacing / types           (~spawnObstacle)
 //  [PLAYER]    Monkey character art               (~drawCharacter)
-//  [COINS]     Coin spawn rate                    (~update spawning)
 //  [SKY]       Sky / hill colours                 (~create bg)
 // ============================================================
 //  How the game works:
 //    - The world scrolls left; the monkey stays in place
 //    - JUMP (↑ / Space / Jump button)  SLIDE (↓ / Slide button)
-//    - Coins → +5 pts   |   Obstacles → -5s timer
-//    - Word bubbles → pronunciation practice modal
+//    - Obstacles → -5s timer
+//    - A word bubble spawns every WORD_INTERVAL ms → pronunciation practice modal
 // ============================================================
 
 function createPlatformerGame(words, callbacks) {
 
   // ── [TUNE] ────────────────────────────────────────────────────
-  var SCROLL_SPD = 3.8;
-  var GRAVITY    = 0.52;
-  var JUMP_VY    = -13.5;
+  var SCROLL_SPD    = 3.8;
+  var GRAVITY       = 0.52;
+  var JUMP_VY       = -13.5;
+  var WORD_INTERVAL = 10000; // [WORDS] ms between word-bubble spawns
   var W = 800, H = 400;
   var GROUND_Y   = H - 55;
   var PLAYER_X   = 110;
@@ -35,19 +36,16 @@ function createPlatformerGame(words, callbacks) {
       this.scrollX   = 0;
       this.wordIdx   = 0;
       this.platforms = [];
-      this.coins     = [];
       this.words2    = [];
       this.obstacles = [];
       this.clouds    = [];
       this.player    = null;
       this.nextPlatX = W + 200;
-      this.nextCoinX = W + 80;
-      this.nextWordX = W + 400;
+      this.wordTimer = 0; // [WORDS] ms accumulated since the last word spawn
       this.nextObsX  = W + 520; // first obstacle further away
     },
 
     preload: function () {
-      this.load.audio('CoinSFX',     'soundeffect/CoinSFX.mp3');
       this.load.audio('PixelJump',   'soundeffect/PixelJump.mp3');
       this.load.audio('PixelDamage', 'soundeffect/PixelDamage.mp3');
     },
@@ -93,9 +91,6 @@ function createPlatformerGame(words, callbacks) {
         legPhase: 0, invincible: 0
       };
 
-      // Pre-spawn 3 coins (fewer than before)
-      for (var ci = 0; ci < 3; ci++) this.spawnCoin(W + 80 + ci * 180);
-
       this.keys = this.input.keyboard.addKeys({
         up:    Phaser.Input.Keyboard.KeyCodes.UP,
         space: Phaser.Input.Keyboard.KeyCodes.SPACE,
@@ -116,12 +111,11 @@ function createPlatformerGame(words, callbacks) {
         bs.addEventListener('touchstart', this._slideFn, { passive: true });
       }
 
-      this.sfxCoin   = this.sound.add('CoinSFX',     { volume: 0.7 });
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
 
       this.hint = this.add.text(W / 2, 26,
-        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   เก็บเหรียญ 🪙   หลีกสิ่งกีดขวาง 🪨', {
+        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   ฟังคำศัพท์ทุก 10 วิ 💬   หลีกสิ่งกีดขวาง 🪨', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
           backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
         }).setOrigin(0.5).setDepth(10);
@@ -150,15 +144,6 @@ function createPlatformerGame(words, callbacks) {
       this.player.slideTimer = 48;
     },
 
-    spawnCoin: function (x, y) {
-      this.coins.push({
-        x: x,
-        y: y !== undefined ? y : GROUND_Y - 22 - Math.random() * 55,
-        collected: false,
-        phase: Math.random() * Math.PI * 2
-      });
-    },
-
     spawnWordItem: function (x) {
       if (!words.length) return;
       var word = words[this.wordIdx++ % words.length];
@@ -172,8 +157,6 @@ function createPlatformerGame(words, callbacks) {
       var py = GROUND_Y - 115 - Math.random() * 65;
       var pw = 110 + Math.random() * 100;
       this.platforms.push({ x: x, y: py, w: pw });
-      var n = 2 + Math.floor(Math.random() * 3);
-      for (var i = 0; i < n; i++) this.spawnCoin(x + 18 + i * 30, py - 25);
     },
 
     // [OBSTACLES] 3 types; more y-position variety coming from varied h values
@@ -185,7 +168,7 @@ function createPlatformerGame(words, callbacks) {
       this.obstacles.push({ x: x, y: GROUND_Y - h, w: w, h: h, type: type });
     },
 
-    update: function (time) {
+    update: function (time, delta) {
       if (this.isPaused) return;
       var p    = this.player;
       var self = this;
@@ -228,7 +211,6 @@ function createPlatformerGame(words, callbacks) {
 
       // Cull off-screen objects
       this.platforms = this.platforms.filter(function (pl) { return pl.x - self.scrollX > -250; });
-      this.coins     = this.coins.filter(function (c)      { return c.x  - self.scrollX > -80; });
       this.words2    = this.words2.filter(function (w)     { return w.x  - self.scrollX > -80; });
       this.obstacles = this.obstacles.filter(function (ob) { return ob.x - self.scrollX > -100; });
 
@@ -237,13 +219,13 @@ function createPlatformerGame(words, callbacks) {
         this.spawnPlatform(this.nextPlatX);
         this.nextPlatX += 320 + Math.random() * 280;
       }
-      if (this.scrollX + W > this.nextCoinX) {
-        this.spawnCoin(this.nextCoinX);
-        this.nextCoinX += 130 + Math.random() * 110;
-      }
-      if (this.scrollX + W > this.nextWordX) {
-        this.spawnWordItem(this.nextWordX);
-        this.nextWordX += 300 + Math.random() * 260;
+      // [WORDS] Time-based spawn — one word bubble every WORD_INTERVAL ms,
+      // regardless of scroll distance. Only accumulates while not paused,
+      // so it naturally waits out the practice modal like everything else.
+      this.wordTimer += delta;
+      if (this.wordTimer >= WORD_INTERVAL) {
+        this.wordTimer -= WORD_INTERVAL;
+        this.spawnWordItem(this.scrollX + W + 60);
       }
       // [OBSTACLES] 380–700px between each — much more breathing room
       if (this.scrollX + W > this.nextObsX) {
@@ -251,20 +233,7 @@ function createPlatformerGame(words, callbacks) {
         this.nextObsX += 380 + Math.random() * 320;
       }
 
-      // Coin collection
       var px = PLAYER_X, py = p.y, ph = p.h;
-      this.coins.forEach(function (c) {
-        if (c.collected) return;
-        var cx = c.x - self.scrollX;
-        var nx = Math.max(px, Math.min(cx, px + PW));
-        var ny = Math.max(py, Math.min(c.y, py + ph));
-        if ((cx - nx) * (cx - nx) + (c.y - ny) * (c.y - ny) < 13 * 13) {
-          c.collected = true;
-          callbacks.onPoints(5);
-          if (self.sfxCoin) self.sfxCoin.play();
-          self.showPop(cx, c.y - 14, '+5 ⭐');
-        }
-      });
 
       // Word bubble collection
       this.words2.forEach(function (wi) {
@@ -341,18 +310,7 @@ function createPlatformerGame(words, callbacks) {
         g.strokeRect(sx, plat.y, plat.w, 22);
       });
 
-      // Coins (spinning)
       var now = this.time.now;
-      this.coins.forEach(function (c) {
-        if (c.collected) return;
-        var cx = c.x - self.scrollX;
-        if (cx < -70 || cx > W + 70) return;
-        var spin = Math.abs(Math.sin(now * 0.004 + (c.phase || 0)));
-        g.fillStyle(0xFFD700);
-        g.lineStyle(1.5, 0xc8a000);
-        g.fillEllipse(  cx, c.y, 22 * (0.15 + spin * 0.85), 22);
-        g.strokeEllipse(cx, c.y, 22 * (0.15 + spin * 0.85), 22);
-      });
 
       // Word bubbles
       this.words2.forEach(function (wi) {
