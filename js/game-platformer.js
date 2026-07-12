@@ -20,7 +20,7 @@ function createPlatformerGame(words, callbacks) {
   var SCROLL_SPD    = 3.8;
   var GRAVITY       = 0.52;
   var JUMP_VY       = -13.5;
-  var WORD_INTERVAL = 10000; // [WORDS] ms between word-bubble spawns
+  var WORD_INTERVAL = 5000; // [WORDS] ms between word-bubble spawns
   var W = 800, H = 400;
   var GROUND_Y   = H - 55;
   var PLAYER_X   = 110;
