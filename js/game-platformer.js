@@ -264,8 +264,9 @@ function createPlatformerGame(words, callbacks) {
 
       if (p.invincible > 0) p.invincible--;
 
-      // Ground collision — skipped while over an open pit
-      if (!this.isOverGap() && p.y + p.h >= GROUND_Y) {
+      // Ground collision — skipped while over an open pit, unless shielded
+      // (invincible), in which case the pit is safely walked/jumped over.
+      if ((!this.isOverGap() || p.invincible > 0) && p.y + p.h >= GROUND_Y) {
         p.y = GROUND_Y - p.h; p.vy = 0; p.onGround = true;
       } else {
         p.onGround = false;
@@ -292,7 +293,7 @@ function createPlatformerGame(words, callbacks) {
       });
 
       // Fell through a pit and off the bottom of the screen
-      if (p.y > H + 40) { this.gameOver('💀 ตกหลุม!'); return; }
+      if (p.y > H + 40 && p.invincible === 0) { this.gameOver('💀 ตกหลุม!'); return; }
 
       if (p.onGround && !p.sliding) p.legPhase += 0.26;
 
