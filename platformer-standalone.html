@@ -315,32 +315,31 @@ function createPlatformerGame() {
       this.showPop(PLAYER_X + PW / 2, this.player.y - 20, msg);
 
       var self = this;
-      // [TIPS] Shown every time the player dies, on the same game-over
-      // overlay. Tip #2 is item-based here — this build has no speech
-      // mechanic, unlike production where the shield comes from word
-      // practice.
+      // [TIPS] One random reminder shown every time the player dies, on
+      // the same game-over overlay. Tip #2 is item-based here — this
+      // build has no speech mechanic, unlike production where the shield
+      // comes from word practice.
       var tips = [
         'กดไสลด์กลางอากาศเพื่อดิ่งลง',
         'เก็บไอเทมเพื่อเป็นอมตะ',
         'ระวังอย่าเหยียบหนาม'
       ];
+      var tip = tips[Math.floor(Math.random() * tips.length)];
       this.time.delayedCall(700, function () {
         self.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setDepth(20);
-        self.add.text(W / 2, H / 2 - 110, 'จบเกม! 💥', {
+        self.add.text(W / 2, H / 2 - 90, 'จบเกม! 💥', {
           fontFamily: 'Prompt, sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#f0a500'
         }).setOrigin(0.5).setDepth(21);
-        self.add.text(W / 2, H / 2 - 74, 'คะแนน: ' + self.score, {
+        self.add.text(W / 2, H / 2 - 54, 'คะแนน: ' + self.score, {
           fontFamily: 'Prompt, sans-serif', fontSize: '18px', color: '#fff'
         }).setOrigin(0.5).setDepth(21);
-        self.add.text(W / 2, H / 2 - 42, '💡 เคล็ดลับ', {
+        self.add.text(W / 2, H / 2 - 18, '💡 เคล็ดลับ', {
           fontFamily: 'Prompt, sans-serif', fontSize: '16px', fontStyle: 'bold', color: '#2ec4b6'
         }).setOrigin(0.5).setDepth(21);
-        tips.forEach(function (t, i) {
-          self.add.text(W / 2, H / 2 - 14 + i * 26, '• ' + t, {
-            fontFamily: 'Prompt, sans-serif', fontSize: '14px', color: '#ffffff'
-          }).setOrigin(0.5).setDepth(21);
-        });
-        self.add.text(W / 2, H / 2 + 84, 'กด Space หรือแตะหน้าจอเพื่อเริ่มใหม่', {
+        self.add.text(W / 2, H / 2 + 10, tip, {
+          fontFamily: 'Prompt, sans-serif', fontSize: '14px', color: '#ffffff'
+        }).setOrigin(0.5).setDepth(21);
+        self.add.text(W / 2, H / 2 + 50, 'กด Space หรือแตะหน้าจอเพื่อเริ่มใหม่', {
           fontFamily: 'Prompt, sans-serif', fontSize: '14px', color: '#cbd5e1'
         }).setOrigin(0.5).setDepth(21);
 
