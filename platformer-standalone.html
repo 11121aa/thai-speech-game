@@ -126,8 +126,17 @@ function createPlatformerGame() {
   var PlatScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
+    // Phaser.Class constructor — runs exactly once, ever, when this Scene
+    // object is first created. NOT re-run by scene.restart(), so none of
+    // the per-run reset state lives here; see init() below instead.
     initialize: function () {
       Phaser.Scene.call(this, { key: 'platformer' });
+    },
+
+    // Real Phaser lifecycle hook — runs before preload()/create() on the
+    // very first start AND every subsequent scene.restart(), so this is
+    // where all per-run state must be (re)initialized.
+    init: function () {
       this.isPaused   = false;
       this.scrollX    = 0;
       this.patternIdx = 0;
