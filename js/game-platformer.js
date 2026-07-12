@@ -54,14 +54,17 @@ function createPlatformerGame(words, callbacks) {
       ],
       obstacles: []
     },
-    // 2) Overhead spike row (slide under), then two rising ground spikes
+    // 2) Overhead spike row (slide under), then a double-peaked ground
+    // spike — the two peaks sit flush against each other with no gap, so
+    // there's no safe pocket to land in between; you must clear both in
+    // one jump instead of hopping each spike individually.
     {
       gaps: [],
       platforms: [],
       obstacles: [
         { x: 200, y: GROUND_Y - 80, w: 240, h: 45, type: 'ceiling' },
         { x: 560, y: GROUND_Y - 40, w: 22,  h: 40, type: 'ground'  },
-        { x: 760, y: GROUND_Y - 75, w: 30,  h: 75, type: 'ground'  }
+        { x: 582, y: GROUND_Y - 75, w: 30,  h: 75, type: 'ground'  }
       ]
     },
     // 3) A small spike, a floating platform, then a big spike
@@ -92,6 +95,7 @@ function createPlatformerGame(words, callbacks) {
       this.player     = null;
       this.nextChunkX = W + 300; // clear runway before the first pattern
       this.wordTimer  = 0; // [WORDS] ms accumulated since the last word spawn
+      this.slideHeld  = false; // true while the mobile slide button is pressed
     },
 
     preload: function () {
@@ -136,7 +140,7 @@ function createPlatformerGame(words, callbacks) {
 
       this.player = {
         y: GROUND_Y - PH, vy: 0, h: PH,
-        onGround: true, sliding: false, slideTimer: 0,
+        onGround: true, sliding: false,
         legPhase: 0, invincible: 0
       };
 
@@ -146,18 +150,24 @@ function createPlatformerGame(words, callbacks) {
         down:  Phaser.Input.Keyboard.KeyCodes.DOWN
       });
 
-      // Mobile buttons
+      // Mobile buttons — slide tracks press/release so it lasts exactly as
+      // long as the button is held, same as the keyboard's key.isDown.
       var bj = document.getElementById('pfBtnJump');
       var bs = document.getElementById('pfBtnSlide');
-      this._jumpFn  = function () { self.doJump(); };
-      this._slideFn = function () { self.doSlide(); };
+      this._jumpFn      = function () { self.doJump(); };
+      this._slideDownFn = function () { self.slideHeld = true; };
+      this._slideUpFn   = function () { self.slideHeld = false; };
       if (bj) {
         bj.addEventListener('mousedown',  this._jumpFn);
         bj.addEventListener('touchstart', this._jumpFn, { passive: true });
       }
       if (bs) {
-        bs.addEventListener('mousedown',  this._slideFn);
-        bs.addEventListener('touchstart', this._slideFn, { passive: true });
+        bs.addEventListener('mousedown',   this._slideDownFn);
+        bs.addEventListener('touchstart',  this._slideDownFn, { passive: true });
+        bs.addEventListener('mouseup',     this._slideUpFn);
+        bs.addEventListener('mouseleave',  this._slideUpFn);
+        bs.addEventListener('touchend',    this._slideUpFn);
+        bs.addEventListener('touchcancel', this._slideUpFn);
       }
 
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
@@ -184,13 +194,6 @@ function createPlatformerGame(words, callbacks) {
         this.player.h        = PH;
         if (this.sfxJump) this.sfxJump.play();
       }
-    },
-
-    doSlide: function () {
-      if (this.isPaused || !this.player.onGround) return;
-      this.player.sliding    = true;
-      this.player.h          = PH_SLIDE;
-      this.player.slideTimer = 48;
     },
 
     spawnWordItem: function (x) {
@@ -248,13 +251,11 @@ function createPlatformerGame(words, callbacks) {
 
       if (Phaser.Input.Keyboard.JustDown(this.keys.up) ||
           Phaser.Input.Keyboard.JustDown(this.keys.space)) this.doJump();
-      if (Phaser.Input.Keyboard.JustDown(this.keys.down)) this.doSlide();
 
       this.scrollX += SCROLL_SPD;
       p.vy += GRAVITY;
       p.y  += p.vy;
 
-      if (p.sliding && --p.slideTimer <= 0) { p.sliding = false; p.h = PH; }
       if (p.invincible > 0) p.invincible--;
 
       // Ground collision — skipped while over an open pit
@@ -262,6 +263,15 @@ function createPlatformerGame(words, callbacks) {
         p.y = GROUND_Y - p.h; p.vy = 0; p.onGround = true;
       } else {
         p.onGround = false;
+      }
+
+      // Hold-to-slide — lasts exactly as long as the key/button is held,
+      // rather than a fixed duration. Only takes effect on the ground.
+      var slideHeld = this.keys.down.isDown || this.slideHeld;
+      if (slideHeld && p.onGround && !p.sliding) {
+        p.sliding = true; p.h = PH_SLIDE;
+      } else if (!slideHeld && p.sliding) {
+        p.sliding = false; p.h = PH;
       }
 
       // Platform landing
@@ -477,9 +487,13 @@ function createPlatformerGame(words, callbacks) {
         bj.removeEventListener('mousedown',  this._jumpFn);
         bj.removeEventListener('touchstart', this._jumpFn);
       }
-      if (bs && this._slideFn) {
-        bs.removeEventListener('mousedown',  this._slideFn);
-        bs.removeEventListener('touchstart', this._slideFn);
+      if (bs && this._slideDownFn) {
+        bs.removeEventListener('mousedown',   this._slideDownFn);
+        bs.removeEventListener('touchstart',  this._slideDownFn);
+        bs.removeEventListener('mouseup',     this._slideUpFn);
+        bs.removeEventListener('mouseleave',  this._slideUpFn);
+        bs.removeEventListener('touchend',    this._slideUpFn);
+        bs.removeEventListener('touchcancel', this._slideUpFn);
       }
     }
   });
