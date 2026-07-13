@@ -171,7 +171,7 @@
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
 <script>
-  const redirectTarget = new URLSearchParams(location.search).get("redirect") || "index.html";
+  const redirectTarget = new URLSearchParams(location.search).get("redirect") || "game.html";
 
   document.addEventListener("DOMContentLoaded", async function () {
     // Check if this is a password-reset redirect (Supabase puts type=recovery in the URL hash)

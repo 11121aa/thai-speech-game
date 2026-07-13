@@ -46,7 +46,7 @@ const PracticePanel = (function () {
   async function open(word, cbs) {
     const session = await Auth.getSession();
     if (!session) {
-      const page = location.pathname.split("/").pop() || "index.html";
+      const page = location.pathname.split("/").pop() || "game.html";
       location.href = "login.html?redirect=" + encodeURIComponent(page);
       return;
     }

@@ -15,8 +15,7 @@
 
 ## หน้าเว็บไซต์
 
-- **index.html** — หน้าหลัก, hero section
-- **about.html** — ความสำคัญของการฝึกออกเสียง, ปัญหา/ความยากลำบากของเด็ก SSD, งานวิจัยอ้างอิง 3 รายการ (NIDCD, ASHA, Eadie et al. 2015)
+- **index.html** — redirect stub เข้า game.html (หน้าเริ่มต้นของเว็บไซต์คือ game.html โดยตรง)
 - **contact.html** — โปรไฟล์ผู้จัดทำเว็บไซต์
 - **app.html** — แบบฝึกหัดฝึกออกเสียงแบบลิสต์ แยกตามอายุ (4/5/6/7 ขวบ) และหมวดตัวอักษร แต่ละแบบฝึกหัดมีคำพร้อมปุ่มฟังตัวอย่างและปุ่มฝึกออกเสียง
 - **game.html** — เกมผจญภัย 2D top-down (Phaser 3) เดินสำรวจหมู่บ้าน ชนของวิเศษเพื่อสุ่มคำฝึกออกเสียง
@@ -34,7 +33,8 @@
 ## โครงสร้างโค้ด
 
 ```
-index.html, about.html, contact.html      หน้าข้อมูลทั่วไป
+index.html                                redirect stub -> game.html
+contact.html                              หน้าข้อมูลทั่วไป
 app.html, game.html                       แบบฝึกหัด/เกมฝึกออกเสียง
 login.html, management.html               auth + แดชบอร์ดตามบทบาท
 css/style.css                             ธีมและสไตล์ร่วมทุกหน้า

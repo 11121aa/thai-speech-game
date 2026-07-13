@@ -1,6 +1,8 @@
 const Auth = (function () {
   function pageNameFromPath() {
-    return location.pathname.split("/").pop() || "index.html";
+    // Root path (no filename) resolves to game.html — that's the site's
+    // effective landing page (index.html is just a redirect stub to it).
+    return location.pathname.split("/").pop() || "game.html";
   }
 
   async function getSession() {
@@ -38,7 +40,7 @@ const Auth = (function () {
     const session = await getSession();
     if (session) await logActivity("logout", pageNameFromPath());
     await sb.auth.signOut();
-    location.href = "index.html";
+    location.href = "game.html";
   }
 
   async function requireLogin(redirectTo) {
