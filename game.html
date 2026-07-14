@@ -557,10 +557,35 @@ async function loadHwSelectorList() {
     .select('id, homework(id, name, repeat_count, homework_words(word_id, words(id, word, emoji, level, letter_category)))')
     .eq('patient_user_id', session.user.id)
     .order('assigned_at', { ascending: false });
-  _hwAssignments = data || [];
+  var allAssignments = data || [];
+
+  // Drop assignments that are already fully done — same "done" rule
+  // used in management.html: every assigned word has been practiced
+  // at least repeat_count times.
+  var hadAny = allAssignments.length > 0;
+  if (allAssignments.length) {
+    var aIds = allAssignments.map(function (a) { return a.id; });
+    var { data: pData } = await sb.from('practice').select('word_id, homework_assignment_id').in('homework_assignment_id', aIds);
+    var practiceData = pData || [];
+    allAssignments = allAssignments.filter(function (a) {
+      var hw = a.homework;
+      if (!hw) return false;
+      var words = hw.homework_words || [];
+      var repeatCount = hw.repeat_count || 5;
+      var hwP = practiceData.filter(function (p) { return p.homework_assignment_id === a.id; });
+      var allDone = words.length > 0 && words.every(function (w) {
+        return hwP.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+      });
+      return !allDone;
+    });
+  }
+
+  _hwAssignments = allAssignments;
   list.innerHTML = '';
   if (!_hwAssignments.length) {
-    list.innerHTML = '<div class="text-secondary small text-center py-2">ยังไม่มีการบ้านที่ได้รับมอบหมาย</div>';
+    list.innerHTML = hadAny
+      ? '<div class="text-secondary small text-center py-2">ทำการบ้านครบทุกชิ้นแล้ว! 🎉</div>'
+      : '<div class="text-secondary small text-center py-2">ยังไม่มีการบ้านที่ได้รับมอบหมาย</div>';
     return;
   }
   _hwAssignments.forEach(function (a) {
