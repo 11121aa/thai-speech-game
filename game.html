@@ -182,7 +182,7 @@
 
     <div class="setup-row">
       <label>ความยาก / โหมด</label>
-      <div class="diff-btns">
+      <div class="diff-btns" id="hwDiffBtns">
         <button class="diff-btn active" data-diff="easy">ง่าย <small class="text-secondary">มีตัวอย่างเสียง</small></button>
         <button class="diff-btn" data-diff="hard">ยาก <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
         <button class="diff-btn" data-diff="hw" style="background:#e74c3c;color:#fff;border-color:#e74c3c;">การบ้าน</button>
@@ -192,6 +192,15 @@
     <div id="hwSelectorRow" class="setup-row" style="display:none;">
       <label>เลือกการบ้าน</label>
       <div id="hwSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto;"></div>
+    </div>
+
+    <div id="pfDiffRow" class="setup-row" style="display:none;">
+      <label>ความเร็วเกม</label>
+      <div class="diff-btns">
+        <button class="pf-diff-btn diff-btn" data-pfdiff="ง่าย">ง่าย</button>
+        <button class="pf-diff-btn diff-btn active" data-pfdiff="ธรรมดา">ธรรมดา</button>
+        <button class="pf-diff-btn diff-btn" data-pfdiff="ยาก">ยาก</button>
+      </div>
     </div>
 
     <div id="soundLevelRows">
@@ -209,6 +218,15 @@
     <div class="setup-row" style="align-items:center;">
       <label>จำนวนคำที่จะใช้</label>
       <span id="setupWordCount" class="badge bg-warning text-dark" style="font-size:1rem;padding:5px 12px;">0</span>
+    </div>
+
+    <div class="setup-row" style="align-items:center;">
+      <label>ออกเสียงคำละกี่ครั้ง</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPronounceMinus" style="width:34px;">−</button>
+        <span id="setupPronounceCount" style="font-size:1.1rem;font-weight:700;min-width:20px;text-align:center;">1</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPronouncePlus" style="width:34px;">+</button>
+      </div>
     </div>
 
     <div class="setup-row">
@@ -238,6 +256,7 @@
         <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
         <div class="challenge-word" id="ppWord">บ้าน</div>
         <p class="text-secondary" id="ppReading"></p>
+        <p class="small fw-bold" id="ppRepCounter" style="display:none;color:#8a5cf6;"></p>
         <div class="practice-stage" id="ppPracticeStage">
           <div class="mouth-animation-box" id="ppMouthAnimation" style="display:none;"></div>
           <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
@@ -300,8 +319,8 @@
      Safari (which caches far more aggressively than Chrome) is forced to
      fetch the new version instead of silently serving a stale copy. -->
 <script src="js/game-shooting.js?v=1"></script>
-<script src="js/game-airplane.js?v=1"></script>
-<script src="js/game-platformer.js?v=18"></script>
+<script src="js/game-airplane.js?v=2"></script>
+<script src="js/game-platformer.js?v=20"></script>
 <script src="js/game-matching.js?v=2"></script>
 <script src="js/game-flashcard.js?v=2"></script>
 <script src="js/game-crossy.js?v=1"></script>
@@ -313,14 +332,14 @@
 <script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/recorder.js"></script>
-<script src="js/practice-panel.js?v=1"></script>
+<script src="js/practice-panel.js?v=2"></script>
 <script src="js/main.js"></script>
 <script>
 /* ===== Global game-session state ===== */
 var G = {
   mode: null, words: [], pts: 0, timeLeft: 60,
   paused: false, timerHandle: null, hardMode: false,
-  hwMode: false, hwAssignmentId: null,
+  hwMode: false, hwAssignmentId: null, pronounceCount: 1,
   highScores: JSON.parse(localStorage.getItem('ghsv2') || '{}')
 };
 
@@ -338,12 +357,29 @@ function addPts(n) {
 
 function openPractice(word, onCorrect, onClosed) {
   G.paused = true;
-  PracticePanel.open(word, {
-    showListen: !G.hardMode,
-    hwAssignmentId: G.hwAssignmentId,
-    onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
-    onClosed:  function () { G.paused = false; if (onClosed) onClosed(); }
-  });
+  var total = G.pronounceCount || 1;
+  var repIndex = 1;
+  function doRep() {
+    PracticePanel.open(word, {
+      showListen: !G.hardMode,
+      hwAssignmentId: G.hwAssignmentId,
+      repIndex: repIndex,
+      repTotal: total,
+      onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
+      // Fires once this rep's pop-up closes (correct or skipped) — once all
+      // reps for this word are done, hand off to the game's own success callback.
+      onClosed: function () {
+        if (repIndex < total) {
+          repIndex++;
+          doRep();
+        } else {
+          G.paused = false;
+          if (onClosed) onClosed();
+        }
+      }
+    });
+  }
+  doRep();
 }
 
 // Callback bundle passed into each Phaser game so they can
@@ -471,17 +507,26 @@ function startTimer(limit) {
 var _allWords = [], _setupMode = null, _setupCam = null;
 var LEVELS_ALL = ['เสียง', '1 พยางค์ไม่มีตัวสะกด', '1 พยางค์', '2 พยางค์', '3 พยางค์', 'ประโยค'];
 var _hwAssignments = [], _selectedHwAssignmentId = null, _hwPool = [];
+var _pronounceCount = 1;
+var PRONOUNCE_COUNT_MIN = 1, PRONOUNCE_COUNT_MAX = 10;
 
 function openSetup(mode) {
   _setupMode = mode;
   var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭', dressup: 'แต่งตัวตุ๊กตา 👗' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
   // Reset to easy/normal mode
-  document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
-  document.querySelector('.diff-btn[data-diff="easy"]').classList.add('active');
+  document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelector('#hwDiffBtns .diff-btn[data-diff="easy"]').classList.add('active');
   document.getElementById('hwSelectorRow').style.display = 'none';
   document.getElementById('soundLevelRows').style.display = 'block';
   _selectedHwAssignmentId = null; _hwPool = [];
+  // Platformer speed selector — only shown for the platformer mode, reset to ธรรมดา (normal)
+  document.getElementById('pfDiffRow').style.display = (mode === 'platformer') ? 'block' : 'none';
+  document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelector('.pf-diff-btn[data-pfdiff="ธรรมดา"]').classList.add('active');
+  // How many times a word must be pronounced per practice pop-up — reset to default (1)
+  _pronounceCount = 1;
+  document.getElementById('setupPronounceCount').textContent = _pronounceCount;
   populateSounds();
   populateLevels();
   updateWordCount();
@@ -519,8 +564,13 @@ function populateLevels() {
 }
 
 function isHwMode() {
-  var btn = document.querySelector('.diff-btn.active');
+  var btn = document.querySelector('#hwDiffBtns .diff-btn.active');
   return btn && btn.getAttribute('data-diff') === 'hw';
+}
+
+function getPfDifficulty() {
+  var btn = document.querySelector('.pf-diff-btn.active');
+  return btn ? btn.getAttribute('data-pfdiff') : 'ธรรมดา';
 }
 
 function getSetupPool() {
@@ -621,7 +671,7 @@ function stopSetupCam() {
 }
 
 function launchGame() {
-  var diffBtn = document.querySelector('.diff-btn.active');
+  var diffBtn = document.querySelector('#hwDiffBtns .diff-btn.active');
   var diff = diffBtn ? diffBtn.getAttribute('data-diff') : 'easy';
   G.hwMode = diff === 'hw';
   G.hwAssignmentId = G.hwMode ? _selectedHwAssignmentId : null;
@@ -632,7 +682,7 @@ function launchGame() {
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
-  G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false;
+  G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false; G.pronounceCount = _pronounceCount;
   document.getElementById('hudPoints').textContent = 0;
   var names = {
     matching:   'จับคู่ภาพ 🃏',
@@ -687,7 +737,7 @@ function launchGame() {
     FlashcardGame.start(pool, GAME_CBS);  // Phaser game
   } else if (G.mode === 'platformer') {
     document.getElementById('platformerGame').style.display = 'block';
-    PlatformerGame.start(pool, GAME_CBS); // Phaser game (jump + slide + obstacles)
+    PlatformerGame.start(pool, GAME_CBS, getPfDifficulty()); // Phaser game (jump + slide + obstacles)
   } else if (G.mode === 'crossy') {
     document.getElementById('crossyGame').style.display = 'block';
     CrossyGame.start(pool, GAME_CBS);     // Phaser game (crossy road)
@@ -716,9 +766,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardCooking').addEventListener('click', function () { openSetup('cooking'); });
   document.getElementById('cardDressup').addEventListener('click', function () { openSetup('dressup'); });
 
-  document.querySelectorAll('.diff-btn').forEach(function (btn) {
+  document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      document.querySelectorAll('.diff-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
       var hw = btn.getAttribute('data-diff') === 'hw';
       document.getElementById('hwSelectorRow').style.display = hw ? 'block' : 'none';
@@ -726,6 +776,22 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (hw) { _selectedHwAssignmentId = null; _hwPool = []; loadHwSelectorList(); }
       updateWordCount();
     });
+  });
+
+  document.querySelectorAll('.pf-diff-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
+
+  document.getElementById('btnPronounceMinus').addEventListener('click', function () {
+    _pronounceCount = Math.max(PRONOUNCE_COUNT_MIN, _pronounceCount - 1);
+    document.getElementById('setupPronounceCount').textContent = _pronounceCount;
+  });
+  document.getElementById('btnPronouncePlus').addEventListener('click', function () {
+    _pronounceCount = Math.min(PRONOUNCE_COUNT_MAX, _pronounceCount + 1);
+    document.getElementById('setupPronounceCount').textContent = _pronounceCount;
   });
 
   document.getElementById('btnSetupCancel').addEventListener('click', function () {

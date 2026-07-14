@@ -44,7 +44,7 @@ function createAirplaneGame(words, callbacks) {
       this.score        = 0;
       this.pipeCount    = 0;
       this.wordIdx      = 0;
-      this.frameCount   = 0;
+      this.pipeSpawnMs  = 0;
       this.scrollOff    = 0;
       this.isPaused     = false;
       this.immuneFrames = 0; // >0 = invincible (flashes, can't die from pipes/ground)
@@ -135,7 +135,7 @@ function createAirplaneGame(words, callbacks) {
       this.score        = 0;
       this.pipeCount    = 0;
       this.wordIdx      = 0;
-      this.frameCount   = 0;
+      this.pipeSpawnMs  = 0;
       this.scrollOff    = 0;
       this.immuneFrames = 0;
       // Reset UI
@@ -213,7 +213,7 @@ function createAirplaneGame(words, callbacks) {
       this.deadRestart.setVisible(true);
     },
 
-    update: function (time) {
+    update: function (time, delta) {
       if (this.isPaused) return;
       var self = this;
       var g    = this.gfx;
@@ -221,9 +221,17 @@ function createAirplaneGame(words, callbacks) {
       g.clear();
       cg.clear();
 
+      // All [TUNE] constants below are defined as "per frame at 60fps" —
+      // dt normalizes every frame's motion to that baseline so gameplay
+      // speed stays consistent regardless of the browser's actual render
+      // rate (which otherwise varies with device load, display refresh
+      // rate, backgrounded-tab throttling, etc). Clamped so a big stall
+      // (e.g. tab regaining focus) can't teleport the bird through pipes.
+      var dt = Math.min(delta, 50) / (1000 / 60);
+
       // Clouds (all states)
       this.clouds.forEach(function (c) {
-        c.x -= c.spd;
+        c.x -= c.spd * dt;
         if (c.x < -c.rw - 40) c.x = W + c.rw;
         cg.fillStyle(0xffffff, 0.82);
         cg.fillEllipse(c.x,               c.y,     c.rw * 2,    46);
@@ -241,8 +249,8 @@ function createAirplaneGame(words, callbacks) {
 
       // ── DEAD ─────────────────────────────────────────────────────
       if (this.state === 'dead') {
-        this.birdVY += GRAVITY;
-        this.birdY  += this.birdVY;
+        this.birdVY += GRAVITY * dt;
+        this.birdY  += this.birdVY * dt;
         if (this.birdY + BIRD_R > GROUND_Y) { this.birdY = GROUND_Y - BIRD_R; this.birdVY = 0; }
         this.pipes.forEach(function (p) { self.drawPipe(g, p); });
         this.pipes.forEach(function (p) {
@@ -255,16 +263,22 @@ function createAirplaneGame(words, callbacks) {
 
       // ── PLAYING ──────────────────────────────────────────────────
 
-      // Spawn pipes on a regular interval
-      this.frameCount++;
-      var spawnEvery = Math.round(PIPE_DIST / SCROLL_SPD); // frames between pipes
-      if (this.frameCount % spawnEvery === 1) this.spawnPipe();
+      // Spawn pipes on a regular real-time interval (converted from the
+      // frame-based PIPE_DIST/SCROLL_SPD spacing at the 60fps baseline)
+      // rather than a raw frame count, so spacing stays consistent
+      // regardless of actual FPS.
+      this.pipeSpawnMs += delta;
+      var spawnEveryMs = (PIPE_DIST / SCROLL_SPD) * (1000 / 60);
+      if (this.pipeSpawnMs >= spawnEveryMs) {
+        this.pipeSpawnMs -= spawnEveryMs;
+        this.spawnPipe();
+      }
 
       // Physics
-      this.birdVY += GRAVITY;
-      this.birdY  += this.birdVY;
-      this.scrollOff    = (this.scrollOff + SCROLL_SPD) % 80;
-      if (this.immuneFrames > 0) this.immuneFrames--;
+      this.birdVY += GRAVITY * dt;
+      this.birdY  += this.birdVY * dt;
+      this.scrollOff    = (this.scrollOff + SCROLL_SPD * dt) % 80;
+      if (this.immuneFrames > 0) this.immuneFrames -= dt;
 
       // Ceiling: bounce off gently (don't die)
       if (this.birdY - BIRD_R < 0) { this.birdY = BIRD_R; this.birdVY = 0; }
@@ -281,7 +295,7 @@ function createAirplaneGame(words, callbacks) {
 
       // Move pipes + detect score
       this.pipes.forEach(function (p) {
-        p.x -= SCROLL_SPD;
+        p.x -= SCROLL_SPD * dt;
         if (p.wordLabel)  p.wordLabel.x  = p.x;
         if (p.emojiLabel) p.emojiLabel.x = p.x;
 

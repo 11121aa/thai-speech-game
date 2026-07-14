@@ -63,6 +63,13 @@ const PracticePanel = (function () {
     }
     el("ppWord").textContent = word.word;
     el("ppReading").textContent = word.level || "";
+    const repCounter = el("ppRepCounter");
+    if (cbs && cbs.repTotal > 1) {
+      repCounter.textContent = "ครั้งที่ " + cbs.repIndex + " จาก " + cbs.repTotal;
+      repCounter.style.display = "block";
+    } else {
+      repCounter.style.display = "none";
+    }
     // Animation box: animation > picture > hidden
     const animSvg = MOUTH_ANIMATIONS[word.letter_category];
     const animBox = el("ppMouthAnimation");

@@ -129,6 +129,7 @@
           <button class="btn btn-sm btn-outline-secondary" id="btnUserHwBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
           <h5 class="mb-0" id="userHwDetailTitle"></h5>
           <span id="userHwDetailStatus" class="badge"></span>
+          <button class="btn btn-sm btn-outline-primary ms-auto" id="btnUserHwPrint"><i class="bi bi-printer-fill me-1"></i>พิมพ์ / บันทึกเป็น PDF</button>
         </div>
         <div class="table-responsive" id="userHwDetailTableWrap"></div>
       </div>
@@ -221,6 +222,7 @@
                 <button class="btn btn-sm btn-outline-secondary" id="btnDetailHwBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
                 <h5 class="mb-0" id="detailHwDetailTitle"></h5>
                 <span id="detailHwDetailStatus" class="badge"></span>
+                <button class="btn btn-sm btn-outline-primary ms-auto" id="btnDetailHwPrint"><i class="bi bi-printer-fill me-1"></i>พิมพ์ / บันทึกเป็น PDF</button>
               </div>
               <div class="table-responsive" id="detailHwDetailTableWrap"></div>
             </div>
@@ -303,6 +305,7 @@
               <button class="btn btn-sm btn-outline-secondary" id="btnHwDetailBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
               <h5 class="mb-0" id="hwDetailTitle"></h5>
               <span id="hwDetailStatus" class="badge"></span>
+              <button class="btn btn-sm btn-outline-primary ms-auto" id="btnHwDetailPrint"><i class="bi bi-printer-fill me-1"></i>พิมพ์ / บันทึกเป็น PDF</button>
             </div>
             <div class="soft-card">
               <div class="table-responsive" id="hwDetailTableWrap">
@@ -418,6 +421,7 @@
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/illustrations.js"></script>
 <script>
 var currentSession, allWords = [], userEmailMap = {}, allSpecialistUsers = [];
 var hwRepeatCount = 5;
@@ -427,6 +431,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (!session) return;
   currentSession = session;
   await Auth.initNav();
+  Illustrations.load();
 
   var role = await Auth.getRole(session.user.id);
   document.getElementById('loadingState').style.display = 'none';
@@ -1238,6 +1243,10 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
   statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
 
   renderHwDetailTable('hwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
+
+  document.getElementById('btnHwDetailPrint').onclick = function () {
+    printHomeworkWorksheet(hw.name || 'การบ้าน #' + homeworkId, words, repeatCount, patient.email);
+  };
 }
 
 function renderHwDetailTable(containerId, words, practices, feedbacks, assignmentId, repeatCount, isSpecialist) {
@@ -1319,6 +1328,73 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, assignmen
       });
     });
   }
+}
+
+/* ── Printable homework worksheet ── */
+// Opens a new tab with a print-ready worksheet (word cards + blank tick
+// boxes per repetition) and triggers the browser's print dialog, where
+// "Save as PDF" produces a printable PDF without any extra dependencies.
+async function printHomeworkWorksheet(hwName, words, repeatCount, patientLabel) {
+  await Illustrations.load();
+
+  var items = words.map(function (hww) {
+    var w = hww.words;
+    if (!w) return null;
+    var illUrl = Illustrations.get(w.word);
+    return {
+      word: w.word,
+      emoji: w.emoji || '🔸',
+      img: illUrl ? new URL(illUrl, document.baseURI).href : null
+    };
+  }).filter(Boolean);
+
+  var ticks = '';
+  for (var i = 0; i < (repeatCount || 5); i++) ticks += '<span class="tick"></span>';
+
+  var cardsHtml = items.map(function (it) {
+    var pic = it.img
+      ? '<img src="' + it.img + '" alt="' + it.word + '">'
+      : '<div class="emoji">' + it.emoji + '</div>';
+    return '<div class="wcard">' + pic +
+      '<div class="wword">' + it.word + '</div>' +
+      '<div class="ticks">' + ticks + '</div>' +
+      '</div>';
+  }).join('');
+
+  var dateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  var html = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">' +
+    '<title>' + hwName + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">' +
+    '<style>' +
+    'body{font-family:"Prompt",sans-serif;margin:22px;color:#2b2438;}' +
+    'h1{font-size:1.4rem;margin:0 0 4px;}' +
+    '.meta{color:#666;font-size:0.85rem;margin-bottom:20px;}' +
+    '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}' +
+    '.wcard{border:2px solid #ddd;border-radius:14px;padding:12px;text-align:center;break-inside:avoid;}' +
+    '.wcard img{width:80px;height:80px;object-fit:contain;margin-bottom:6px;}' +
+    '.emoji{font-size:48px;margin-bottom:6px;}' +
+    '.wword{font-weight:700;font-size:1.1rem;margin-bottom:8px;}' +
+    '.ticks{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;}' +
+    '.tick{width:16px;height:16px;border:2px solid #999;border-radius:4px;display:inline-block;}' +
+    '@media print{ @page{ margin:14mm; } }' +
+    '</style></head><body>' +
+    '<h1>📝 ' + hwName + '</h1>' +
+    '<div class="meta">' + (patientLabel ? patientLabel + ' · ' : '') +
+    'วันที่พิมพ์: ' + dateStr + ' · ฝึกออกเสียงคำต่อไปนี้ แล้วทำเครื่องหมายในช่องทุกครั้งที่ฝึก</div>' +
+    '<div class="grid">' + cardsHtml + '</div>' +
+    '</body></html>';
+
+  var win = window.open('', '_blank');
+  if (!win) { alert('เบราว์เซอร์บล็อกหน้าต่างป็อปอัพ กรุณาอนุญาตป็อปอัพเพื่อพิมพ์การบ้าน'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+
+  var printed = false;
+  function doPrint() { if (printed) return; printed = true; win.focus(); win.print(); }
+  win.addEventListener('load', doPrint);
+  setTimeout(doPrint, 1500); // fallback in case the load event doesn't fire
 }
 
 /* ── Patient: my homework ── */
@@ -1464,6 +1540,10 @@ async function openDetailHwDetail(assignmentId, hw, patient) {
   statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
 
   renderHwDetailTable('detailHwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
+
+  document.getElementById('btnDetailHwPrint').onclick = function () {
+    printHomeworkWorksheet(hw.name || 'การบ้าน #' + hw.id, words, repeatCount, patient.email);
+  };
 }
 
 async function openUserHwDetail(assignment) {
@@ -1494,6 +1574,10 @@ async function openUserHwDetail(assignment) {
   statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
 
   renderHwDetailTable('userHwDetailTableWrap', words, practices, feedbacks, assignment.id, repeatCount, false);
+
+  document.getElementById('btnUserHwPrint').onclick = function () {
+    printHomeworkWorksheet(hw ? (hw.name || 'การบ้าน #' + hw.id) : 'การบ้าน', words, repeatCount);
+  };
 }
 </script>
 </body>

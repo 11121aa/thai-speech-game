@@ -24,11 +24,20 @@
 //      (SCROLL_SPD_BASE → SCROLL_SPD_MAX)
 // ============================================================
 
-function createPlatformerGame(words, callbacks) {
+// [DIFFICULTY] starting/cap scroll speed per tier — ง่าย (easy) < ธรรมดา (normal) < ยาก (hard)
+var PLATFORMER_DIFFICULTIES = {
+  'ง่าย':   { base: 1.8, max: 3.8 },
+  'ธรรมดา': { base: 2.7, max: 6   },
+  'ยาก':    { base: 3.6, max: 8   }
+};
+
+function createPlatformerGame(words, callbacks, difficulty) {
+
+  var diffCfg = PLATFORMER_DIFFICULTIES[difficulty] || PLATFORMER_DIFFICULTIES['ธรรมดา'];
 
   // ── [TUNE] ────────────────────────────────────────────────────
-  var SCROLL_SPD_BASE = 4.6;  // starting scroll speed
-  var SCROLL_SPD_MAX  = 9.5;  // speed cap so it never becomes unplayable
+  var SCROLL_SPD_BASE = diffCfg.base;  // starting scroll speed
+  var SCROLL_SPD_MAX  = diffCfg.max;  // speed cap so it never becomes unplayable
   var SPEED_RAMP      = 0.05; // +px/frame of scroll speed per second survived
   var GRAVITY       = 0.52;
   var JUMP_VY       = -13.5;
@@ -325,6 +334,14 @@ function createPlatformerGame(words, callbacks) {
       var p    = this.player;
       var self = this;
 
+      // All [TUNE] constants below are defined as "per frame at 60fps" —
+      // dt normalizes every frame's motion to that baseline so gameplay
+      // speed stays consistent regardless of the browser's actual render
+      // rate (which otherwise varies with device load, display refresh
+      // rate, backgrounded-tab throttling, etc). Clamped so a big stall
+      // (e.g. tab regaining focus) can't teleport the player through walls.
+      var dt = Math.min(delta, 50) / (1000 / 60);
+
       if (Phaser.Input.Keyboard.JustDown(this.keys.up) ||
           Phaser.Input.Keyboard.JustDown(this.keys.space)) this.doJump();
 
@@ -339,7 +356,7 @@ function createPlatformerGame(words, callbacks) {
       }
       var scrollSpd = Math.min(SCROLL_SPD_MAX, SCROLL_SPD_BASE + (this.surviveMs / 1000) * SPEED_RAMP);
 
-      this.scrollX += scrollSpd;
+      this.scrollX += scrollSpd * dt;
 
       // Slide held while airborne pulls the player toward the ground faster
       // (a fast-fall), on top of normal gravity — held on the ground it
@@ -347,11 +364,11 @@ function createPlatformerGame(words, callbacks) {
       var slideHeld = this.keys.down.isDown || this.slideHeld;
       var wasOnGround = p.onGround;
 
-      p.vy += GRAVITY;
-      if (slideHeld && !p.onGround) p.vy += FAST_FALL;
-      p.y  += p.vy;
+      p.vy += GRAVITY * dt;
+      if (slideHeld && !p.onGround) p.vy += FAST_FALL * dt;
+      p.y  += p.vy * dt;
 
-      if (p.invincible > 0) p.invincible--;
+      if (p.invincible > 0) p.invincible -= dt;
 
       // Ground collision — skipped while over an open pit, unless shielded
       // (invincible), in which case the pit is safely walked/jumped over.
@@ -390,10 +407,10 @@ function createPlatformerGame(words, callbacks) {
       // Fell through a pit and off the bottom of the screen
       if (p.y > H + 40 && p.invincible === 0) { this.gameOver('💀 ตกหลุม!'); return; }
 
-      if (p.onGround && !p.sliding) p.legPhase += 0.26;
+      if (p.onGround && !p.sliding) p.legPhase += 0.26 * dt;
 
       this.clouds.forEach(function (c) {
-        c.x -= 0.5;
+        c.x -= 0.5 * dt;
         if (c.x < -150) c.x = W + 100;
       });
 
@@ -625,9 +642,9 @@ function createPlatformerGame(words, callbacks) {
 
 var PlatformerGame = (function () {
   var game = null;
-  function start(words, cbs) {
+  function start(words, cbs, difficulty) {
     stop();
-    setTimeout(function () { game = createPlatformerGame(words, cbs); }, 60);
+    setTimeout(function () { game = createPlatformerGame(words, cbs, difficulty); }, 60);
   }
   function stop() {
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
