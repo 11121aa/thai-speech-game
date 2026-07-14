@@ -53,14 +53,26 @@ function createFlashcardGame(words, callbacks) {
       this.canInteract = true;  // false while the practice modal is open (blocks button presses)
     },
 
-    // create() — runs once when the scene starts; sets up the card and buttons
-    create: function () {
-      var self = this;
-
-      // ── Shuffle the word pool and cap at MAX_CARDS ───��───────────
+    // preload() — decide the pool here (not create()) so the exact same
+    // shuffled/capped order can be used to preload illustrations for it
+    preload: function () {
       this.pool = words.slice(); // copy the words array so we don't modify the original
       this.pool.sort(function () { return Math.random() - 0.5; }); // random shuffle
       if (this.pool.length > MAX_CARDS) this.pool = this.pool.slice(0, MAX_CARDS); // cap
+
+      // [ILLUSTRATIONS] Preload a real picture for any pool word that has
+      // one; words without one keep the emoji fallback (checked via
+      // texture-existence in showCard()).
+      this.pool.forEach(function (w) {
+        var url = Illustrations.get(w.word);
+        if (url) this.load.image('ill_' + w.word, url);
+      }, this);
+    },
+
+    // create() — runs once when the scene starts; sets up the card and buttons
+    create: function () {
+      var self = this;
+      // this.pool was already shuffled + capped in preload()
 
       // ── Pastel background ───────────────���──────────────────��──────
       var bg = this.add.graphics();
@@ -122,6 +134,7 @@ function createFlashcardGame(words, callbacks) {
       }).setOrigin(0.5, 0.5);
       cont.add(emojiTxt);
       cont.emojiTxt = emojiTxt; // save so showCard() can update its text
+      cont.emojiImg = null; // [ILLUSTRATIONS] set/destroyed per-card in showCard()
 
       // ── [TEXT] Pronunciation (reading) — shown in the lower half ──
       var readingTxt = this.add.text(0, 20, '', {
@@ -234,8 +247,21 @@ function createFlashcardGame(words, callbacks) {
       this.currentWord = this.pool[this.cardIdx]; // get the word for this card
       var cont = this.cardCont;
 
-      // Update the card's text content
-      cont.emojiTxt.setText(this.currentWord.emoji || '🔸');
+      // [ILLUSTRATIONS] Use the real picture if this word has one and it
+      // loaded successfully; otherwise fall back to the emoji text.
+      if (cont.emojiImg) { cont.emojiImg.destroy(); cont.emojiImg = null; }
+      var illKey = 'ill_' + this.currentWord.word;
+      if (this.textures.exists(illKey)) {
+        cont.emojiTxt.setVisible(false);
+        var img = this.add.image(0, -CARD_H / 2 + 56, illKey).setOrigin(0.5, 0.5);
+        var maxW = 150, maxH = 110;
+        img.setScale(Math.min(maxW / img.width, maxH / img.height));
+        cont.add(img);
+        cont.emojiImg = img;
+      } else {
+        cont.emojiTxt.setVisible(true);
+        cont.emojiTxt.setText(this.currentWord.emoji || '🔸');
+      }
       cont.readingTxt.setText(this.currentWord.reading || this.currentWord.word).setAlpha(0); // hidden until hint tapped
       cont.wordTxt.setText(this.currentWord.word).setAlpha(0); // hide Thai word initially
       // Reset hint button to full opacity for the new card

@@ -54,7 +54,13 @@ const PracticePanel = (function () {
     currentWord = word;
     callbacks = cbs || {};
 
-    el("ppEmoji").textContent = word.emoji || "🔸";
+    // Use the generated illustration when this word has one, else the emoji.
+    const illUrl = window.Illustrations && Illustrations.get(word.word);
+    if (illUrl) {
+      el("ppEmoji").innerHTML = '<img src="' + illUrl + '" alt="' + word.word + '" style="height:64px;max-width:100%;object-fit:contain;">';
+    } else {
+      el("ppEmoji").textContent = word.emoji || "🔸";
+    }
     el("ppWord").textContent = word.word;
     el("ppReading").textContent = word.level || "";
     // Animation box: animation > picture > hidden

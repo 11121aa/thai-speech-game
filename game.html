@@ -293,6 +293,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phaser 3 game engine -->
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<!-- Shared helper: maps a word to its generated illustration, if any -->
+<script src="js/illustrations.js"></script>
 <!-- One file per Phaser game — open the file to polish that game.
      ?v= is a cache-buster: bump it whenever a game-*.js file changes so
      Safari (which caches far more aggressively than Chrome) is forced to
@@ -300,8 +302,8 @@
 <script src="js/game-shooting.js?v=1"></script>
 <script src="js/game-airplane.js?v=1"></script>
 <script src="js/game-platformer.js?v=18"></script>
-<script src="js/game-matching.js?v=1"></script>
-<script src="js/game-flashcard.js?v=1"></script>
+<script src="js/game-matching.js?v=2"></script>
+<script src="js/game-flashcard.js?v=2"></script>
 <script src="js/game-crossy.js?v=1"></script>
 <script src="js/game-cooking.js?v=2"></script>
 <script src="js/game-dressup.js?v=1"></script>
@@ -311,7 +313,7 @@
 <script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/recorder.js"></script>
-<script src="js/practice-panel.js"></script>
+<script src="js/practice-panel.js?v=1"></script>
 <script src="js/main.js"></script>
 <script>
 /* ===== Global game-session state ===== */
@@ -702,6 +704,7 @@ function launchGame() {
 document.addEventListener('DOMContentLoaded', async function () {
   Auth.initNav();
   _allWords = await WordsApi.fetchAllWords();
+  await Illustrations.load();
   loadPracticeLeaderboard();
 
   document.getElementById('cardMatching').addEventListener('click', function () { openSetup('matching'); });

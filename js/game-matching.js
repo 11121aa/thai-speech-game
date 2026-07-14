@@ -59,6 +59,15 @@ function createMatchingGame(words, callbacks) {
       this.load.audio('FlipCard',  'soundeffect/FlipCard.mp3');
       this.load.audio('WrongSFX',  'soundeffect/WrongSFX.mp3');
       this.load.audio('CorrectSFX','soundeffect/CorrectSFX.mp3');
+
+      // [ILLUSTRATIONS] Preload a real picture for any word in this
+      // session's pool that has one; words without one keep the emoji
+      // fallback (checked via texture-existence in create()).
+      var n = Math.min(MAX_PAIRS, words.length);
+      words.slice(0, n).forEach(function (w) {
+        var url = Illustrations.get(w.word);
+        if (url) this.load.image('ill_' + w.word, url);
+      }, this);
     },
 
     // create() — runs once when the scene starts; builds the card grid
@@ -122,16 +131,28 @@ function createMatchingGame(words, callbacks) {
 
         // ── Word/emoji label (shown on the front face) ───────────────
         var isBig  = cardData.type === 'emoji'; // emoji cards show a large emoji
-        var label  = self.add.text(
-          0, isBig ? 8 : 2,
-          isBig ? (cardData.w.emoji || '🔸') : cardData.w.word,
-          {
-            fontFamily: 'Prompt, sans-serif',
-            fontSize:   isBig ? '34px' : '17px', // bigger font for emoji cards
-            fontStyle:  'bold',
-            color:      '#2b2438'
-          }
-        ).setOrigin(0.5, 0.5).setVisible(false); // hidden until the card is face-up
+        // [ILLUSTRATIONS] Use the real picture if this word has one and it
+        // loaded successfully; otherwise fall back to the emoji text, same
+        // as before.
+        var illKey = isBig ? 'ill_' + cardData.w.word : null;
+        var label;
+        if (illKey && self.textures.exists(illKey)) {
+          label = self.add.image(0, 8, illKey).setOrigin(0.5, 0.5);
+          var maxW = CARD_W - 30, maxH = CARD_H - 30;
+          label.setScale(Math.min(maxW / label.width, maxH / label.height));
+          label.setVisible(false);
+        } else {
+          label = self.add.text(
+            0, isBig ? 8 : 2,
+            isBig ? (cardData.w.emoji || '🔸') : cardData.w.word,
+            {
+              fontFamily: 'Prompt, sans-serif',
+              fontSize:   isBig ? '34px' : '17px', // bigger font for emoji cards
+              fontStyle:  'bold',
+              color:      '#2b2438'
+            }
+          ).setOrigin(0.5, 0.5).setVisible(false); // hidden until the card is face-up
+        }
         container.add(label);
 
         // ── Question mark (shown on the back face) ───────────────────
