@@ -235,7 +235,7 @@
               <input type="hidden" id="wordId">
               <div class="col-md-3"><label class="form-label fw-semibold">หมวดเสียง (ตัวอักษร)</label><input type="text" class="form-control" id="wordLetterCategory" required></div>
               <div class="col-md-3"><label class="form-label fw-semibold">คำ</label><input type="text" class="form-control" id="wordWord" required></div>
-              <div class="col-md-3"><label class="form-label fw-semibold">ระดับ</label><select class="form-select" id="wordLevel" required><option value="Sound">Sound</option><option value="1 syllable">1 syllable</option><option value="2 syllable">2 syllable</option><option value="3 syllable">3 syllable</option><option value="Sentences">Sentences</option></select></div>
+              <div class="col-md-3"><label class="form-label fw-semibold">ระดับ</label><select class="form-select" id="wordLevel" required><option value="เสียง">เสียง</option><option value="1 พยางค์ไม่มีตัวสะกด">1 พยางค์ไม่มีตัวสะกด</option><option value="1 พยางค์">1 พยางค์</option><option value="2 พยางค์">2 พยางค์</option><option value="3 พยางค์">3 พยางค์</option><option value="ประโยค">ประโยค</option></select></div>
               <div class="col-md-3"><label class="form-label fw-semibold">Emoji</label><input type="text" class="form-control" id="wordEmoji"></div>
               <div class="col-md-6 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-warning btn-bouncy" id="wordSubmitBtn">เพิ่มคำ</button>
@@ -995,7 +995,7 @@ function fillWordForm(w) {
   document.getElementById('wordId').value = w.id;
   document.getElementById('wordLetterCategory').value = w.letter_category;
   document.getElementById('wordWord').value = w.word;
-  document.getElementById('wordLevel').value = w.level || 'Sound';
+  document.getElementById('wordLevel').value = w.level || 'เสียง';
   document.getElementById('wordEmoji').value = w.emoji || '';
   document.getElementById('wordFormTitle').textContent = 'แก้ไขคำ';
   document.getElementById('wordSubmitBtn').textContent = 'บันทึก';

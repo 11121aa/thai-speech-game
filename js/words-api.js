@@ -1,5 +1,5 @@
 const WordsApi = (function () {
-  const LEVEL_ORDER = ['Sound', '1 syllable', '2 syllable', '3 syllable', 'Sentences'];
+  const LEVEL_ORDER = ['เสียง', '1 พยางค์ไม่มีตัวสะกด', '1 พยางค์', '2 พยางค์', '3 พยางค์', 'ประโยค'];
 
   async function fetchAllWords() {
     if (!sb) return [];
