@@ -15,14 +15,15 @@
 //    - Tap any face-down card to flip it over
 //    - Tap a second card — if they belong to the same word → correct match!
 //    - Correct match → pronunciation practice modal opens
-//    - Wrong match → both cards flip back face-down (no penalty other than -100 pts)
-//    - Score starts at 10,000; each flip costs 100 points
-//    - Match all pairs to finish
+//    - Wrong match → both cards flip back face-down
+//    - A live stopwatch (HUD "⏱" pill) counts up from the moment the
+//      round starts; match all pairs to finish — the goal is speed, not
+//      points, so the final elapsed time is shown/saved instead of a score
 // ============================================================
 
 // createMatchingGame is called with:
 //   words     = array of word objects { word, emoji, reading, id, ... }
-//   callbacks = { onPoints, onPractice, onFinish, onTime }
+//   callbacks = { onPractice, onFinish(elapsedMs), onElapsed(seconds) }
 function createMatchingGame(words, callbacks) {
 
   // ── [TUNE] Numbers you can change ────────────────────────────
@@ -52,7 +53,9 @@ function createMatchingGame(words, callbacks) {
       this.matchedPairs = 0;    // how many pairs have been matched so far
       this.totalPairs   = 0;    // total pairs to match (set in create)
       this.locked       = false; // true while a flip animation is in progress (blocks new taps)
-      this.flipCount    = 0;    // total number of individual cards opened (each costs 100 pts)
+      this.startTime    = 0;    // this.time.now at round start — drives the live stopwatch
+      this.lastSecShown  = -1;  // last whole-second value sent to the HUD (avoids redundant DOM writes)
+      this.finished      = false; // true once all pairs are matched (stops the stopwatch)
     },
 
     preload: function () {
@@ -181,13 +184,12 @@ function createMatchingGame(words, callbacks) {
         self.handleTap(ptr.x, ptr.y);
       });
 
-      // ��─ Seed the score at 100,000 ─────────────────────────────────
-      // Score starts high and decreases by 100 per flip
-      callbacks.onPoints(10000);
+      // Start the stopwatch — HUD "⏱" pill counts up live via update()
+      this.startTime = this.time.now;
 
       // ── Hint text at the bottom ───────────────────────────────────
       this.add.text(W / 2, H - 16,
-        'แตะไพ่เพื่อพลิก — จับคู่ภาพ 🖼️ กับ คำ 📝  |  ทุกการพลิก −100 แต้ม', {
+        'แตะไพ่เพื่อพลิก — จับคู่ภาพ 🖼️ กับ คำ 📝  |  จับคู่ให้ครบให้เร็วที่สุด!', {
           fontFamily: 'Prompt, sans-serif',
           fontSize: '13px', color: '#999'
         }).setOrigin(0.5, 1);
@@ -225,6 +227,13 @@ function createMatchingGame(words, callbacks) {
     // ── Hit test: find the card the player tapped ─────────────────
     // mx, my = pointer position in the scene
     handleTap: function (mx, my) {
+      // A pair is already flipped and waiting on checkMatch() — ignore
+      // further taps. Without this, spam-tapping a 3rd/4th card in the
+      // brief window before the 2nd card's flip animation finishes (this.locked
+      // isn't set until then) pushes extra cards into `flipped`, so the
+      // `flipped.length === 2` check in flipCard() never fires again and
+      // the round gets stuck with no match ever being checked.
+      if (this.flipped.length >= 2) return;
       for (var i = 0; i < this.cards.length; i++) {
         var card = this.cards[i];
         if (card.faceUp || card.matched) continue; // skip cards that are already face-up or matched
@@ -249,12 +258,10 @@ function createMatchingGame(words, callbacks) {
       if (this.sfxFlip) this.sfxFlip.play(); // play on every flip (face-up and face-down)
       if (toFront) {
         this.flipped.push(card); // add to the "waiting" list
-
-        // Each face-up flip costs 100 points
-        this.flipCount++;
-        callbacks.onPoints(-100);
-        // Show a small red "-100" floating up from the card
-        this.showPop(card.container.x, card.container.y - CARD_H / 2 - 8, '-100');
+        // Lock out further taps the instant a 2nd card is flipped, rather
+        // than waiting for its flip animation to finish — closes the spam-
+        // tap window described in handleTap() above.
+        if (this.flipped.length >= 2) this.locked = true;
       }
 
       // First half of the flip: scale down to 0 (card disappears edge-on)
@@ -315,8 +322,12 @@ function createMatchingGame(words, callbacks) {
         // Open the pronunciation practice modal for this word
         callbacks.onPractice(a.data.w, null, function () {
           self.locked = false; // allow tapping again after modal closes
-          // If all pairs are matched, end the game
-          if (self.matchedPairs >= self.totalPairs) callbacks.onFinish();
+          // If all pairs are matched, end the game — pass the total elapsed
+          // time (ms) so the finish screen/leaderboard show speed, not score.
+          if (self.matchedPairs >= self.totalPairs) {
+            self.finished = true;
+            callbacks.onFinish(self.time.now - self.startTime);
+          }
         });
 
       } else {
@@ -335,6 +346,18 @@ function createMatchingGame(words, callbacks) {
           // Unlock only after the flip animation (110+110 = 220ms) completes
           self.time.delayedCall(240, function () { self.locked = false; });
         });
+      }
+    },
+
+    // ── Stopwatch — pushes the live elapsed whole-seconds count to the
+    // shared HUD "⏱" pill via callbacks.onElapsed, throttled to once per
+    // second so it isn't writing to the DOM every single frame.
+    update: function () {
+      if (this.finished) return;
+      var elapsedSec = Math.floor((this.time.now - this.startTime) / 1000);
+      if (elapsedSec !== this.lastSecShown) {
+        this.lastSecShown = elapsedSec;
+        callbacks.onElapsed(elapsedSec);
       }
     },
 

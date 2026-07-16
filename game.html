@@ -170,8 +170,8 @@
         <div class="finish-card">
           <div class="finish-emoji">🎉</div>
           <h2 class="mt-2 mb-1">จบแล้ว!</h2>
-          <div class="finish-score">⭐ <span id="finalPoints">0</span> แต้ม</div>
-          <p class="finish-high text-secondary">สูงสุด: <strong id="highScore">0</strong></p>
+          <div class="finish-score" id="finishScoreLine">⭐ <span id="finalPoints">0</span> แต้ม</div>
+          <p class="finish-high text-secondary"><span id="finishHighLabel">สูงสุด</span>: <strong id="highScore">0</strong></p>
           <div class="finish-btns">
             <button class="btn btn-outline-primary btn-bouncy" id="btnReturnMode">กลับเมนูเกม</button>
             <button class="btn btn-warning btn-bouncy" id="btnPlayAgain">เล่นอีกครั้ง</button>
@@ -337,7 +337,7 @@
 <script src="js/game-shooting.js?v=1"></script>
 <script src="js/game-airplane.js?v=3"></script>
 <script src="js/game-platformer.js?v=22"></script>
-<script src="js/game-matching.js?v=2"></script>
+<script src="js/game-matching.js?v=3"></script>
 <script src="js/game-flashcard.js?v=2"></script>
 <script src="js/game-crossy.js?v=1"></script>
 <script src="js/game-cooking.js?v=2"></script>
@@ -454,21 +454,33 @@ function openPractice(word, onCorrect, onClosed) {
 var GAME_CBS = {
   onPoints:  addPts,
   onPractice: openPractice,
-  onFinish:  function () { finishGame(); },
+  onFinish:  function (extra) { finishGame(extra); },
   // Games that use timer-as-health call this to add/subtract seconds
   onTime: function (delta) {
     G.timeLeft = Math.max(0, G.timeLeft + delta);
     document.getElementById('hudTimer').textContent = Math.ceil(G.timeLeft);
     if (G.timeLeft <= 0) finishGame();
+  },
+  // Matching game's live stopwatch — counts up instead of down
+  onElapsed: function (seconds) {
+    var el = document.getElementById('hudTimer');
+    if (el) el.textContent = seconds;
   }
 };
+
+// M:SS formatter for the matching game's elapsed time (ms in, "1:23" out)
+function formatMatchTime(ms) {
+  var totalSec = Math.max(0, Math.round(ms / 1000));
+  var m = Math.floor(totalSec / 60), s = totalSec % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
 
 function restoreTimerPill() {
   var tp = document.getElementById('hudTimer') && document.getElementById('hudTimer').closest('.hud-pill');
   if (tp) tp.style.visibility = '';
 }
 
-function finishGame() {
+function finishGame(matchElapsedMs) {
   G.paused = true;
   clearInterval(G.timerHandle);
   restoreTimerPill();
@@ -480,13 +492,34 @@ function finishGame() {
   CrossyGame.stop();
   CookingGame.stop();
   DressupGame.stop();
-  var hs = G.highScores[G.mode] || 0;
-  if (G.pts > hs) {
-    G.highScores[G.mode] = G.pts;
-    localStorage.setItem('ghsv2', JSON.stringify(G.highScores));
+
+  // Matching game is timed, not scored — lower is better, so it's tracked
+  // and displayed separately from every other game's point-based scoring.
+  var isMatchTime = G.mode === 'matching' && matchElapsedMs != null;
+  var scoreToSave;
+  if (isMatchTime) {
+    var bestMs = G.highScores.matching_time;
+    if (bestMs == null || matchElapsedMs < bestMs) {
+      G.highScores.matching_time = matchElapsedMs;
+      localStorage.setItem('ghsv2', JSON.stringify(G.highScores));
+    }
+    document.getElementById('finishScoreLine').innerHTML = '⏱ ' + formatMatchTime(matchElapsedMs);
+    document.getElementById('finishHighLabel').textContent = 'เร็วที่สุด';
+    document.getElementById('highScore').textContent = formatMatchTime(G.highScores.matching_time);
+    // Stored negated so the shared leaderboard's "higher/DESC = better"
+    // comparison and sort still work unchanged for a lower-is-better metric.
+    scoreToSave = -matchElapsedMs;
+  } else {
+    var hs = G.highScores[G.mode] || 0;
+    if (G.pts > hs) {
+      G.highScores[G.mode] = G.pts;
+      localStorage.setItem('ghsv2', JSON.stringify(G.highScores));
+    }
+    document.getElementById('finishScoreLine').innerHTML = '⭐ <span id="finalPoints">' + G.pts + '</span> แต้ม';
+    document.getElementById('finishHighLabel').textContent = 'สูงสุด';
+    document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
+    scoreToSave = G.pts;
   }
-  document.getElementById('finalPoints').textContent = G.pts;
-  document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
 
   var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', dressup:'แต่งตัวตุ๊กตา 👗' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
@@ -495,7 +528,7 @@ function finishGame() {
   showScreen('screenFinish');
 
   // Save score then refresh leaderboard
-  saveGameScore(G.mode, G.pts).then(function () {
+  saveGameScore(G.mode, scoreToSave).then(function () {
     loadGameLeaderboard(G.mode, 'finishLeaderRows');
   });
 }
@@ -523,11 +556,16 @@ async function loadGameLeaderboard(gameKey, containerId) {
     var { data } = await sb.from('game_scores').select('display_name, best_score').eq('game_key', gameKey).order('best_score', { ascending: false }).limit(5);
     if (!data || !data.length) { container.innerHTML = '<div class="text-secondary text-center small py-1">ยังไม่มีข้อมูล</div>'; return; }
     var medals = ['🥇','🥈','🥉'];
+    // Matching stores a negated elapsed-ms as its "score" (see finishGame)
+    // so the shared higher-is-better sort/comparison works unchanged for
+    // this lower-is-better metric — flip it back to a time here for display.
+    var isMatch = gameKey === 'matching';
     container.innerHTML = data.map(function(r, i) {
+      var scoreLabel = isMatch ? ('⏱ ' + formatMatchTime(-r.best_score)) : ('⭐ ' + r.best_score);
       return '<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid #f0ebfc;">' +
         '<span style="font-size:1.1rem;width:26px;text-align:center;">' + (medals[i] || '<span style="color:#9b93b0;font-weight:700;font-size:0.8rem;">' + (i+1) + '</span>') + '</span>' +
         '<span style="flex:1;font-size:0.88rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.display_name || '—') + '</span>' +
-        '<span style="font-weight:700;color:var(--color-primary-dark);white-space:nowrap;">⭐ ' + r.best_score + '</span>' +
+        '<span style="font-weight:700;color:var(--color-primary-dark);white-space:nowrap;">' + scoreLabel + '</span>' +
         '</div>';
     }).join('');
   } catch(e) { container.innerHTML = '<div class="text-secondary text-center small py-1">ไม่สามารถโหลดได้</div>'; }
@@ -777,10 +815,19 @@ function launchGame() {
     return;
   }
 
-  var timerPill = document.getElementById('hudTimer') && document.getElementById('hudTimer').closest('.hud-pill');
-  if (G.mode === 'matching' || G.mode === 'platformer') {
-    // No countdown — matching scores by flips, platformer ends on death
-    // (survival scoring + speed ramp are handled inside the game itself)
+  var timerPill  = document.getElementById('hudTimer')  && document.getElementById('hudTimer').closest('.hud-pill');
+  var pointsPill = document.getElementById('hudPoints') && document.getElementById('hudPoints').closest('.hud-pill');
+  if (pointsPill) pointsPill.style.visibility = '';
+  if (G.mode === 'matching') {
+    // No score — a live stopwatch (counting up) replaces it, driven by the
+    // game itself via GAME_CBS.onElapsed.
+    if (pointsPill) pointsPill.style.visibility = 'hidden';
+    if (timerPill) timerPill.style.visibility = '';
+    clearInterval(G.timerHandle);
+    document.getElementById('hudTimer').textContent = '0';
+  } else if (G.mode === 'platformer') {
+    // No countdown — platformer ends on death (survival scoring + speed
+    // ramp are handled inside the game itself)
     if (timerPill) timerPill.style.visibility = 'hidden';
     clearInterval(G.timerHandle);
     G.timeLeft = 9999;
