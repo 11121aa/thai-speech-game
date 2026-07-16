@@ -360,26 +360,25 @@ var G = {
 };
 
 /* ===== Global click sfx =====
-   Plays a click sound for every button/link on the page EXCEPT ones
-   inside an active game itself (the Phaser canvases and their overlaid
-   controls like jump/slide/move buttons already have their own in-game
-   sound effects, so this deliberately skips anything inside those
-   containers to avoid doubling up) and game-mode cards, which get their
-   own GameSelect.mp3 sting below instead. */
+   Plays a click sound for every button/link/game-mode-card click on the
+   page EXCEPT ones inside an active game itself (the Phaser canvases and
+   their overlaid controls like jump/slide/move buttons already have
+   their own in-game sound effects, so this deliberately skips anything
+   inside those containers to avoid doubling up). */
 var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame';
 document.addEventListener('click', function (e) {
-  var target = e.target.closest('button, .nav-link');
-  if (!target || target.closest('.game-mode-card') || target.closest(GAME_CONTAINER_SELECTOR)) return;
+  var target = e.target.closest('button, .game-mode-card, .nav-link');
+  if (!target || target.closest(GAME_CONTAINER_SELECTOR)) return;
   new Audio('soundeffect/Click.mp3').play().catch(function () {});
 });
 
-// Selecting a game (clicking its mode card) plays a 2s snippet of
-// GameSelect.mp3 instead of the generic click sound.
-document.addEventListener('click', function (e) {
-  if (!e.target.closest('.game-mode-card')) return;
-  var audio = new Audio('soundeffect/GameSelect.mp3');
-  audio.play().catch(function () {});
-  setTimeout(function () { audio.pause(); }, 2000);
+// Hovering a game-mode card plays a 2s snippet of GameSelect.mp3.
+document.querySelectorAll('.game-mode-card').forEach(function (card) {
+  card.addEventListener('mouseenter', function () {
+    var audio = new Audio('soundeffect/GameSelect.mp3');
+    audio.play().catch(function () {});
+    setTimeout(function () { audio.pause(); }, 2000);
+  });
 });
 
 /* ===== Shared utilities ===== */
