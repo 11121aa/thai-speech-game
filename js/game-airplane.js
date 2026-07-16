@@ -1,33 +1,42 @@
 // ============================================================
 //  FLYING GAME — Phaser 3  (Subway-Surfers-style jetpack flight)
 // ============================================================
-//  [TUNE]    Follow speed, scroll speed, spawn rates   (~constants)
-//  [COINS]   Coin trail shape/points                   (~spawnCoinTrail)
-//  [WORDS]   Word bubble spawn + appearance             (~spawnWordItem, drawBubble)
-//  [PLANE]   Plane colours & shape                      (~drawPlane)
+//  [TUNE]      Follow speed, scroll speed, spawn rates   (~constants)
+//  [COINS]     Coin trail shape/points                   (~spawnCoinTrail)
+//  [WORDS]     Word bubble spawn + appearance             (~spawnWordItem, drawBubble)
+//  [OBSTACLE]  Hazard spawn/appearance/collision          (~spawnObstacle, drawObstacles, hitObstacle)
+//  [PLANE]     Plane colours & shape                      (~drawPlane)
 // ============================================================
 //  How the game works:
 //    - Hold a finger/mouse button down anywhere on the canvas and drag
 //      up/down — the plane eases toward the pointer's height, jetpack-style
-//    - No obstacles, no death — just fly fast and collect
 //    - Winding coin trails give +2 ⭐ each
 //    - A golden word bubble every so often → pronunciation practice
 //      modal → +5 ⭐ bonus (on top of the shared +20 for a correct
-//      recording)
-//    - The round ends when the shared HUD countdown timer runs out
+//      recording) — each one collected also ramps the scroll speed up
+//      a notch, so resuming after the modal feels like the start of a
+//      faster leg rather than a random mid-flight jolt
+//    - Hit a spiky hazard mine → game over immediately
+//    - Otherwise the round ends when the shared HUD countdown timer runs out
 // ============================================================
 
 function createAirplaneGame(words, callbacks) {
 
   // ── [TUNE] ──────────────────────────────────────────────────
   var FOLLOW_RATE = 0.32;  // how quickly the plane eases toward the held pointer (per 60fps frame)
-  var SCROLL_SPD  = 6.5;   // world scroll speed (px/frame at 60fps) — fast!
+  var SCROLL_SPD_BASE = 6.5;  // starting world scroll speed (px/frame at 60fps) — fast!
+  var SCROLL_SPD_MAX  = 15;   // speed cap so it never becomes unplayable
+  var SPEED_STEP = 1.3;       // scroll speed added per word collected — applied while paused
+                               // for the practice modal, so resuming feels like a fresh, faster
+                               // leg of the flight rather than a jolt mid-flight
   var COIN_INTERVAL = 750;                  // ms between coin-trail spawns
   var WORD_INTERVAL_MIN = 3500, WORD_INTERVAL_MAX = 6000; // ms range between word bubbles
+  var OBSTACLE_INTERVAL_MIN = 2200, OBSTACLE_INTERVAL_MAX = 3600; // ms range between hazards
   var COIN_PTS = 2, WORD_BONUS_PTS = 5;
   var PLANE_X = 140;   // fixed horizontal position of the plane
   var PLANE_R = 15;    // plane hitbox radius
   var COIN_R = 12;
+  var OBSTACLE_R = 15;
   var W = 800, H = 480;
   var GROUND_Y = H - 58;
   var TOP_MARGIN = 70; // keeps the plane clear of the big score text
@@ -43,17 +52,23 @@ function createAirplaneGame(words, callbacks) {
       this.isHolding      = false;
       this.coins          = [];
       this.wordItems      = [];
+      this.obstacles      = [];
       this.clouds        = [];
       this.score         = 0;
       this.scrollOff      = 0;
       this.coinTimer      = 0;
       this.wordTimer      = 0;
+      this.obstacleTimer  = 0;
       this.nextWordDelay  = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
+      this.nextObstacleDelay = OBSTACLE_INTERVAL_MIN + Math.random() * (OBSTACLE_INTERVAL_MAX - OBSTACLE_INTERVAL_MIN);
+      this.speedLevel     = 0;    // +1 per word collected — ramps curSpeed()
       this.isPaused       = false; // true while the practice modal is open
+      this.dead           = false; // true once an obstacle is hit — freezes play, then finishes
     },
 
     preload: function () {
       this.load.audio('CoinSFX', 'soundeffect/CoinSFX.mp3');
+      this.load.audio('ExplosionSFX', 'soundeffect/ExplosionSFX.mp3');
     },
 
     create: function () {
@@ -64,7 +79,8 @@ function createAirplaneGame(words, callbacks) {
       this.drawBg();
 
       var ca = this.cache.audio;
-      this.sfxCoin = ca.exists('CoinSFX') ? this.sound.add('CoinSFX', { volume: 0.6 }) : null;
+      this.sfxCoin = ca.exists('CoinSFX')      ? this.sound.add('CoinSFX',      { volume: 0.6  }) : null;
+      this.sfxHit  = ca.exists('ExplosionSFX') ? this.sound.add('ExplosionSFX', { volume: 0.65 }) : null;
 
       // Cloud layer
       this.cloudGfx = this.add.graphics().setDepth(1);
@@ -89,7 +105,7 @@ function createAirplaneGame(words, callbacks) {
 
       // Fading instructional hint
       this.hint = this.add.text(W / 2, H - 16,
-        '👆 กดค้างแล้วลากขึ้น-ลง เพื่อบิน — เก็บเหรียญ 🪙 และคำ 💬', {
+        '👆 กดค้างแล้วลากขึ้น-ลง เพื่อบิน — เก็บเหรียญ 🪙 และคำ 💬 หลบหนาม 💥', {
           fontFamily: 'Prompt, sans-serif', fontSize: '14px', color: '#2b2438',
           backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
         }).setOrigin(0.5, 1).setDepth(10);
@@ -154,6 +170,20 @@ function createAirplaneGame(words, callbacks) {
       });
     },
 
+    // ── [OBSTACLE] A single hazard mine — hitting it ends the round
+    spawnObstacle: function () {
+      this.obstacles.push({
+        x: W + 60,
+        y: TOP_MARGIN + 30 + Math.random() * (GROUND_Y - TOP_MARGIN - 60),
+        hit: false
+      });
+    },
+
+    // Current world scroll speed — ramps up by SPEED_STEP per word collected
+    curSpeed: function () {
+      return Math.min(SCROLL_SPD_MAX, SCROLL_SPD_BASE + this.speedLevel * SPEED_STEP);
+    },
+
     update: function (time, delta) {
       var self = this;
       var g    = this.gfx;
@@ -173,12 +203,23 @@ function createAirplaneGame(words, callbacks) {
         cg.fillEllipse(c.x + c.rw * 0.3,  c.y + 7, c.rw,       28);
       });
 
-      if (this.isPaused) {
+      if (this.dead) {
         this.drawGround(g);
         this.drawCoinsAndWords(g);
+      this.drawObstacles(g);
         this.drawPlane(g, time);
         return;
       }
+
+      if (this.isPaused) {
+        this.drawGround(g);
+        this.drawCoinsAndWords(g);
+      this.drawObstacles(g);
+        this.drawPlane(g, time);
+        return;
+      }
+
+      var speed = this.curSpeed();
 
       // ── Flight: ease the plane toward the held pointer's height ─────
       var prevY = this.planeY;
@@ -186,9 +227,9 @@ function createAirplaneGame(words, callbacks) {
       this.planeY  = Phaser.Math.Clamp(this.planeY, TOP_MARGIN, GROUND_Y - PLANE_R);
       this.planeVY = this.planeY - prevY; // cosmetic — drives the tilt/lean only
 
-      this.scrollOff = (this.scrollOff + SCROLL_SPD * dt) % 80;
+      this.scrollOff = (this.scrollOff + speed * dt) % 80;
 
-      // Spawn coin trails + word bubbles on real-time intervals
+      // Spawn coin trails + word bubbles + obstacles on real-time intervals
       this.coinTimer += delta;
       if (this.coinTimer >= COIN_INTERVAL) {
         this.coinTimer -= COIN_INTERVAL;
@@ -200,14 +241,24 @@ function createAirplaneGame(words, callbacks) {
         this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
         this.spawnWordItem();
       }
+      this.obstacleTimer += delta;
+      if (this.obstacleTimer >= this.nextObstacleDelay) {
+        this.obstacleTimer -= this.nextObstacleDelay;
+        this.nextObstacleDelay = OBSTACLE_INTERVAL_MIN + Math.random() * (OBSTACLE_INTERVAL_MAX - OBSTACLE_INTERVAL_MIN);
+        this.spawnObstacle();
+      }
 
       // Move + cull coins
-      this.coins.forEach(function (c) { c.x -= SCROLL_SPD * dt; });
+      this.coins.forEach(function (c) { c.x -= speed * dt; });
       this.coins = this.coins.filter(function (c) { return c.x > -30; });
 
       // Move + cull word bubbles
-      this.wordItems.forEach(function (w) { w.x -= SCROLL_SPD * dt; });
+      this.wordItems.forEach(function (w) { w.x -= speed * dt; });
       this.wordItems = this.wordItems.filter(function (w) { return w.x > -80; });
+
+      // Move + cull obstacles
+      this.obstacles.forEach(function (o) { o.x -= speed * dt; });
+      this.obstacles = this.obstacles.filter(function (o) { return o.x > -30; });
 
       // Coin collection
       this.coins.forEach(function (c) {
@@ -224,7 +275,9 @@ function createAirplaneGame(words, callbacks) {
       });
       this.coins = this.coins.filter(function (c) { return !c.collected; });
 
-      // Word bubble collection → pronunciation practice
+      // Word bubble collection → pronunciation practice. The speed ramp is
+      // applied only once paused/resumed here, not mid-flight, so it reads
+      // as "catch your breath, next leg is faster" rather than a sudden jolt.
       this.wordItems.forEach(function (w) {
         if (w.collected || self.isPaused) return;
         var dx = PLANE_X - w.x, dy = self.planeY - w.y;
@@ -233,18 +286,46 @@ function createAirplaneGame(words, callbacks) {
           self.isPaused = true;
           callbacks.onPractice(w.word, null, function () {
             self.isPaused = false;
+            self.speedLevel++;
             self.score += WORD_BONUS_PTS;
             self.scoreTxt.setText('' + self.score);
             callbacks.onPoints(WORD_BONUS_PTS);
-            self.showPop(PLANE_X, self.planeY - 30, '+' + WORD_BONUS_PTS + ' ⭐ ออกเสียงได้!');
+            self.showPop(PLANE_X, self.planeY - 30, '+' + WORD_BONUS_PTS + ' ⭐ เร็วขึ้น!');
           });
         }
       });
       this.wordItems = this.wordItems.filter(function (w) { return !w.collected; });
 
+      // Obstacle collision → game over. Skipped if a word bubble was just
+      // collected this same frame (isPaused flips true above) — otherwise
+      // an overlapping word+obstacle could trigger a game-over right as
+      // the practice modal is opening.
+      for (var i = 0; i < this.obstacles.length && !this.isPaused; i++) {
+        var o = this.obstacles[i];
+        if (o.hit) continue;
+        var odx = PLANE_X - o.x, ody = self.planeY - o.y;
+        if (odx * odx + ody * ody < (PLANE_R + OBSTACLE_R) * (PLANE_R + OBSTACLE_R)) {
+          o.hit = true;
+          this.hitObstacle();
+          break;
+        }
+      }
+
       this.drawGround(g);
       this.drawCoinsAndWords(g);
+      this.drawObstacles(g);
       this.drawPlane(g, time);
+    },
+
+    // ── Obstacle hit — freeze play, flash/pop, then end the round ───
+    hitObstacle: function () {
+      var self = this;
+      this.dead = true;
+      if (this.sfxHit) this.sfxHit.play();
+      this.showPop(PLANE_X, this.planeY - 30, '💥 ชนแล้ว!');
+      var flash = this.add.rectangle(W / 2, H / 2, W, H, 0xff0000, 0.35).setDepth(20);
+      this.tweens.add({ targets: flash, alpha: 0, duration: 500, onComplete: function () { flash.destroy(); } });
+      this.time.delayedCall(700, function () { callbacks.onFinish(); });
     },
 
     // Scrolling ground tile pattern drawn over the static base
@@ -283,6 +364,29 @@ function createAirplaneGame(words, callbacks) {
           { fontFamily: 'Prompt', fontSize: '12px', fontStyle: 'bold', color: '#2b2438' })
           .setOrigin(0.5, 0).setDepth(5);
         self.time.delayedCall(16, function () { et.destroy(); wt.destroy(); });
+      });
+    },
+
+    // ── [OBSTACLE] Spiky dark mine — clearly distinct from coins/words
+    drawObstacles: function (g) {
+      this.obstacles.forEach(function (o) {
+        if (o.hit || o.x < -30 || o.x > W + 30) return;
+        g.fillStyle(0xe74c3c, 0.25);
+        g.fillCircle(o.x, o.y, OBSTACLE_R + 6);
+        g.fillStyle(0x2b2438);
+        g.fillCircle(o.x, o.y, OBSTACLE_R);
+        g.lineStyle(3, 0xe74c3c);
+        for (var s = 0; s < 8; s++) {
+          var ang = (s / 8) * Math.PI * 2;
+          var ix = o.x + Math.cos(ang) * OBSTACLE_R;
+          var iy = o.y + Math.sin(ang) * OBSTACLE_R;
+          var ox = o.x + Math.cos(ang) * (OBSTACLE_R + 8);
+          var oy = o.y + Math.sin(ang) * (OBSTACLE_R + 8);
+          g.beginPath();
+          g.moveTo(ix, iy);
+          g.lineTo(ox, oy);
+          g.strokePath();
+        }
       });
     },
 
