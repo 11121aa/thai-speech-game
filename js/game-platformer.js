@@ -128,6 +128,7 @@ function createPlatformerGame(words, callbacks, difficulty) {
     preload: function () {
       this.load.audio('PixelJump',   'soundeffect/PixelJump.mp3');
       this.load.audio('PixelDamage', 'soundeffect/PixelDamage.mp3');
+      this.load.audio('Swoosh',      'soundeffect/swoosh.mp3');
       this.load.atlas('playerAnim', 'img/player/player-anim.png', 'img/player/player-anim.json');
     },
 
@@ -228,6 +229,7 @@ function createPlatformerGame(words, callbacks, difficulty) {
 
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
+      this.sfxSwoosh = this.sound.add('Swoosh',       { volume: 0.6 });
 
       this.hint = this.add.text(W / 2, 26,
         '🐒 กระโดด: ↑ / Space   สไลด์: ↓   ชนหนาม/ตกหลุม = จบเกม!', {
@@ -390,6 +392,7 @@ function createPlatformerGame(words, callbacks, difficulty) {
       if (slideHeld && p.onGround && !p.sliding) {
         p.sliding = true; p.h = PH_SLIDE;
         if (this.playerSprite) this.playerSprite.play('slidein', true);
+        if (this.sfxSwoosh) this.sfxSwoosh.play();
       } else if (!slideHeld && p.sliding) {
         p.sliding = false; p.h = PH;
         if (this.playerSprite) this.playerSprite.play('run', true);

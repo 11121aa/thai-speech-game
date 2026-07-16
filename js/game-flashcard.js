@@ -1,19 +1,20 @@
 // ============================================================
-//  FLASHCARD GAME — Phaser 3  (Slide-through vocabulary cards)
+//  FLASHCARD GAME — Phaser 3  (Picture → pick-the-word quiz)
 // ============================================================
 //  POLISH GUIDE (search for the label to find where to edit):
 //    [TUNE]    Max cards, points per card          (~line 15)
-//    [CARD]    Card colours and corner radius      (~drawCard)
-//    [TEXT]    Emoji / reading / word font sizes   (~buildCard)
-//    [BTN]     Button colours and labels           (~buildButtons)
+//    [CARD]    Card colours and corner radius      (~buildCard)
+//    [CHOICE]  Answer-button layout/colours        (~buildChoices)
 //    [ANIM]    Card slide distance                 (~advanceCard)
 // ============================================================
 //  How the game works:
 //    - Cards slide in from the right one by one
-//    - Each card shows a large EMOJI and the PRONUNCIATION (reading)
-//    - "🔊 ฟังตัวอย่าง" button → plays the word aloud using TTS
-//    - "🎤 พูดคำนี้!" button → opens the pronunciation practice modal
-//    - After practicing, the Thai word is briefly revealed, then the next card slides in
+//    - Each card shows a large picture/emoji and THREE word choices
+//      below it — only one matches the picture
+//    - Tap the correct word → pronunciation practice modal opens →
+//      points awarded → next card slides in
+//    - Tap a wrong word → it flashes red and locks out (try again)
+//    - No hints, no "listen" button — the word itself is the answer
 //    - A progress bar at the top fills as you complete cards
 //    - Game ends when all MAX_CARDS cards have been shown
 // ============================================================
@@ -28,14 +29,20 @@ function createFlashcardGame(words, callbacks) {
   var PTS_PER_CARD = 10;  // points awarded for completing one card
   var W = 800, H = 460;   // canvas size in pixels
 
-  // ── [CARD] Card visual dimensions ─────────��──────────────────
-  var CARD_W = 480;  // card width in pixels
-  var CARD_H = 240;  // card height in pixels
+  // ── [CARD] Card visual dimensions ──────────────────────────────
+  var CARD_W = 420;  // card width in pixels
+  var CARD_H = 190;  // card height in pixels
   var CARD_X = W / 2; // horizontal centre of the card when it's on screen
-  var CARD_Y = 195;   // vertical centre of the card
+  var CARD_Y = 140;   // vertical centre of the card
   var CARD_R = 20;    // corner rounding radius — POLISH: larger = rounder corners
 
-  // ── Scene class ─────────────────────���─────────────────────────
+  // ── [CHOICE] Answer-button layout ────────────────────────────
+  var CHOICE_Y  = 320; // Y position of the row of 3 answer buttons
+  var CHOICE_W  = 230; // each answer button's width
+  var CHOICE_H  = 64;  // each answer button's height
+  var CHOICE_GAP = 20; // horizontal gap between answer buttons
+
+  // ── Scene class ─────────────────────────────────────────────────
   var FcScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
@@ -50,12 +57,16 @@ function createFlashcardGame(words, callbacks) {
       this.cardCont    = null;  // Phaser Container holding the card graphics + text
       this.progFill    = null;  // Graphics object for the filled part of the progress bar
       this.progText    = null;  // Text object showing "done / total" counter
-      this.canInteract = true;  // false while the practice modal is open (blocks button presses)
+      this.canInteract = true;  // false while an answer/practice modal is being resolved
+      this.choiceBtns  = [];    // the 3 answer-button objects for the current card
     },
 
     // preload() — decide the pool here (not create()) so the exact same
     // shuffled/capped order can be used to preload illustrations for it
     preload: function () {
+      this.load.audio('CorrectSFX', 'soundeffect/CorrectSFX.mp3');
+      this.load.audio('WrongSFX',   'soundeffect/WrongSFX.mp3');
+
       this.pool = words.slice(); // copy the words array so we don't modify the original
       this.pool.sort(function () { return Math.random() - 0.5; }); // random shuffle
       if (this.pool.length > MAX_CARDS) this.pool = this.pool.slice(0, MAX_CARDS); // cap
@@ -71,10 +82,12 @@ function createFlashcardGame(words, callbacks) {
 
     // create() — runs once when the scene starts; sets up the card and buttons
     create: function () {
-      var self = this;
       // this.pool was already shuffled + capped in preload()
+      var ca = this.cache.audio;
+      this.sfxCorrect = ca.exists('CorrectSFX') ? this.sound.add('CorrectSFX', { volume: 0.75 }) : null;
+      this.sfxWrong   = ca.exists('WrongSFX')   ? this.sound.add('WrongSFX',   { volume: 0.7  }) : null;
 
-      // ── Pastel background ───────────────���──────────────────��──────
+      // ── Pastel background ──────────────────────────────────────────
       var bg = this.add.graphics();
       bg.fillStyle(0xf0fafa);
       bg.fillRect(0, 0, W, H);
@@ -99,60 +112,32 @@ function createFlashcardGame(words, callbacks) {
       this.cardCont = this.add.container(W + CARD_W, CARD_Y); // starts right off-screen
       this.buildCard(this.cardCont); // add graphics + text objects to the container
 
-      // ── Buttons below the card ────────────────��───────────────────
-      this.buildButtons();
+      // ── The 3 answer buttons below the card ────────────────────────
+      this.buildChoices();
 
-      // ── Show the first card ────────────────���──────────────────────
+      // ── Show the first card ─────────────────────────────────────────
       this.showCard();
     },
 
-    // ── Build all graphics and text objects inside the card container
+    // ── Build the picture card's graphics/text objects
     // All positions inside the container use (0,0) = container centre
     buildCard: function (cont) {
-      var self = this;
-
       // ── [CARD] Card background graphic ────────────────────────────
       var gfx = this.add.graphics();
-      // White card
       gfx.fillStyle(0xffffff);
       gfx.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
-      // Teal border
-      gfx.lineStyle(3, 0x2ec4b6);
-      gfx.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
-      // Subtle teal tint on the top half (makes it feel like a two-tone card)
-      gfx.fillStyle(0xf0fdfa);
-      gfx.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H / 2, CARD_R);
-      // Redraw border on top so it covers the tint's edges
       gfx.lineStyle(3, 0x2ec4b6);
       gfx.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
       cont.add(gfx);
       cont.cardGfx = gfx; // save reference in case we need to access it later
 
-      // ── [TEXT] Emoji — large, displayed in the upper half of the card
-      var emojiTxt = this.add.text(0, -CARD_H / 2 + 56, '', {
-        fontSize: '54px' // POLISH: increase for larger emoji
+      // ── [TEXT] Emoji — large, fills most of the card
+      var emojiTxt = this.add.text(0, 0, '', {
+        fontSize: '72px' // POLISH: increase for larger emoji
       }).setOrigin(0.5, 0.5);
       cont.add(emojiTxt);
       cont.emojiTxt = emojiTxt; // save so showCard() can update its text
       cont.emojiImg = null; // [ILLUSTRATIONS] set/destroyed per-card in showCard()
-
-      // ── [TEXT] Pronunciation (reading) — shown in the lower half ──
-      var readingTxt = this.add.text(0, 20, '', {
-        fontFamily: 'Prompt, sans-serif',
-        fontSize: '26px',   // POLISH: change reading size here
-        color: '#374151', fontStyle: 'bold'
-      }).setOrigin(0.5, 0.5);
-      cont.add(readingTxt);
-      cont.readingTxt = readingTxt;
-
-      // ��─ [TEXT] Thai word — revealed after practice, starts invisible
-      var wordTxt = this.add.text(0, 70, '', {
-        fontFamily: 'Prompt, sans-serif',
-        fontSize: '22px',
-        color: '#2ec4b6', fontStyle: 'bold'
-      }).setOrigin(0.5, 0.5).setAlpha(0); // alpha 0 = fully transparent (hidden)
-      cont.add(wordTxt);
-      cont.wordTxt = wordTxt;
 
       // ── Stack badge — shows "X ใบ" remaining in the top-right corner
       var badgeTxt = this.add.text(CARD_W / 2 - 12, -CARD_H / 2 + 12, '', {
@@ -165,78 +150,46 @@ function createFlashcardGame(words, callbacks) {
       cont.badgeTxt = badgeTxt;
     },
 
-    // ── [BTN] Build the three interactive buttons below the card ──
-    buildButtons: function () {
-      var self  = this;
-      var BTN_Y = CARD_Y + CARD_H / 2 + 40; // Y position for all buttons (below the card)
+    // ── [CHOICE] Build the 3 answer-button placeholders below the card.
+    // Their fill/text are rewritten per-card in layoutChoices(); this just
+    // creates the reusable Graphics + Text objects and click handling.
+    buildChoices: function () {
+      var self = this;
+      var totalW = 3 * CHOICE_W + 2 * CHOICE_GAP;
+      var startX = W / 2 - totalW / 2 + CHOICE_W / 2;
 
-      // ── Helper: create a rounded button with a label ──────────────
-      function makeBtn(x, w, h, fillColor, strokeColor, label, onClick) {
+      this.choiceBtns = [0, 1, 2].map(function (i) {
+        var x = startX + i * (CHOICE_W + CHOICE_GAP);
         var gfx = self.add.graphics();
-        gfx.fillStyle(fillColor);
-        gfx.fillRoundedRect(x - w / 2, BTN_Y - h / 2, w, h, 10);
-        gfx.lineStyle(2, strokeColor);
-        gfx.strokeRoundedRect(x - w / 2, BTN_Y - h / 2, w, h, 10);
-
-        var txt = self.add.text(x, BTN_Y, label, {
+        var txt = self.add.text(x, CHOICE_Y, '', {
           fontFamily: 'Prompt, sans-serif',
-          fontSize: '16px', fontStyle: 'bold', color: '#ffffff'
+          fontSize: '20px', fontStyle: 'bold', color: '#2b2438'
         }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true });
 
+        var btn = { x: x, gfx: gfx, txt: txt, word: null, disabled: false };
+        self.drawChoiceBtn(btn, 0xffffff, 0xd8d3e8); // default idle style
+
         txt.on('pointerdown', function () {
-          if (!self.canInteract) return;
-          onClick();
+          if (!self.canInteract || btn.disabled) return;
+          self.onChoicePicked(btn);
         });
-        txt.on('pointerover',  function () { gfx.setAlpha(0.85); });
-        txt.on('pointerout',   function () { gfx.setAlpha(1);    });
+        txt.on('pointerover', function () { if (!btn.disabled) self.drawChoiceBtn(btn, 0xf5f3ff, 0x8a5cf6); });
+        txt.on('pointerout',  function () { if (!btn.disabled) self.drawChoiceBtn(btn, 0xffffff, 0xd8d3e8); });
 
-        return { gfx: gfx, txt: txt };
-      }
-
-      // Three buttons spaced evenly: Listen | Hint | Practice
-      // Each 160px wide, 20px gaps → total 520px centred in W=800
-
-      // ── [BTN] Listen — plays the word via TTS ─────────────────────
-      this.listenBtn = makeBtn(
-        W / 2 - 180, 160, 50,
-        0x64748b, 0x475569,
-        '🔊  ฟังตัวอย่าง',
-        function () {
-          if (self.currentWord) SpeechTool.speak(self.currentWord.word);
-        }
-      );
-
-      // ── [BTN] Hint — reveals the pronunciation ────────────────────
-      this.hintBtn = makeBtn(
-        W / 2, 160, 50,
-        0x10b981, 0x059669,  // emerald green
-        '💡  คำใบ้',
-        function () {
-          if (!self.currentWord) return;
-          // Fade in the reading text and dim the hint button to show it's been used
-          self.tweens.add({ targets: self.cardCont.readingTxt, alpha: 1, duration: 200 });
-          self.hintBtn.gfx.setAlpha(0.4);
-          self.hintBtn.txt.setAlpha(0.5);
-        }
-      );
-
-      // ── [BTN] Practice — opens the pronunciation modal ────────────
-      this.practiceBtn = makeBtn(
-        W / 2 + 180, 160, 50,
-        0xf59e0b, 0xd97706,
-        '🎤  พูดคำนี้!',
-        function () {
-          if (!self.currentWord) return;
-          self.canInteract = false;
-          callbacks.onPractice(self.currentWord, null, function () {
-            self.canInteract = true;
-            self.onPracticeDone();
-          });
-        }
-      );
+        return btn;
+      });
     },
 
-    // ── Populate the card with the current word and slide it in ───
+    // Redraws one answer button's background in the given fill/stroke colour
+    drawChoiceBtn: function (btn, fill, stroke) {
+      btn.gfx.clear();
+      btn.gfx.fillStyle(fill);
+      btn.gfx.fillRoundedRect(btn.x - CHOICE_W / 2, CHOICE_Y - CHOICE_H / 2, CHOICE_W, CHOICE_H, 12);
+      btn.gfx.lineStyle(3, stroke);
+      btn.gfx.strokeRoundedRect(btn.x - CHOICE_W / 2, CHOICE_Y - CHOICE_H / 2, CHOICE_W, CHOICE_H, 12);
+    },
+
+    // ── Populate the card with the current word + 3 answer choices, slide it in
     showCard: function () {
       // If we've gone through all the words in the pool, the game is finished
       if (this.cardIdx >= this.pool.length) {
@@ -253,8 +206,8 @@ function createFlashcardGame(words, callbacks) {
       var illKey = 'ill_' + this.currentWord.word;
       if (this.textures.exists(illKey)) {
         cont.emojiTxt.setVisible(false);
-        var img = this.add.image(0, -CARD_H / 2 + 56, illKey).setOrigin(0.5, 0.5);
-        var maxW = 150, maxH = 110;
+        var img = this.add.image(0, 0, illKey).setOrigin(0.5, 0.5);
+        var maxW = 220, maxH = 150;
         img.setScale(Math.min(maxW / img.width, maxH / img.height));
         cont.add(img);
         cont.emojiImg = img;
@@ -262,14 +215,12 @@ function createFlashcardGame(words, callbacks) {
         cont.emojiTxt.setVisible(true);
         cont.emojiTxt.setText(this.currentWord.emoji || '🔸');
       }
-      cont.readingTxt.setText(this.currentWord.reading || this.currentWord.word).setAlpha(0); // hidden until hint tapped
-      cont.wordTxt.setText(this.currentWord.word).setAlpha(0); // hide Thai word initially
-      // Reset hint button to full opacity for the new card
-      if (this.hintBtn) { this.hintBtn.gfx.setAlpha(1); this.hintBtn.txt.setAlpha(1); }
 
       // Update the "remaining cards" badge
       var remaining = this.pool.length - this.cardIdx - 1;
       cont.badgeTxt.setText(remaining > 0 ? remaining + ' ใบ' : 'ใบสุดท้าย!');
+
+      this.layoutChoices(); // pick 3 words (1 correct + 2 distractors) and assign to buttons
 
       this.updateProgress(); // refresh the progress bar
       this.canInteract = true; // make sure buttons are enabled for this new card
@@ -284,8 +235,60 @@ function createFlashcardGame(words, callbacks) {
       });
     },
 
+    // ── [CHOICE] Picks 2 random distractor words (distinct from the
+    // correct word and from each other), shuffles all 3 into the answer
+    // buttons in a random order, and resets each button to its idle style.
+    layoutChoices: function () {
+      var self = this;
+      var correct = this.currentWord;
+
+      var others = words.filter(function (w) { return w.word !== correct.word; });
+      others.sort(function () { return Math.random() - 0.5; });
+      var distractors = others.slice(0, 2);
+
+      var choices = [correct].concat(distractors);
+      choices.sort(function () { return Math.random() - 0.5; }); // random button order
+
+      this.choiceBtns.forEach(function (btn, i) {
+        var w = choices[i];
+        btn.word     = w || null;
+        btn.disabled = !w; // fewer than 3 distinct words available — disable the spare slot
+        btn.txt.setText(w ? w.word : '');
+        btn.txt.setAlpha(w ? 1 : 0);
+        self.drawChoiceBtn(btn, 0xffffff, 0xd8d3e8);
+      });
+    },
+
+    // ── Called when the player taps one of the 3 answer buttons ───
+    onChoicePicked: function (btn) {
+      var self = this;
+      var isCorrect = btn.word && btn.word.word === this.currentWord.word;
+
+      if (!isCorrect) {
+        // Wrong pick: flash red, lock this button out, let them try again
+        if (this.sfxWrong) this.sfxWrong.play();
+        this.drawChoiceBtn(btn, 0xfee2e2, 0xef4444);
+        btn.disabled = true;
+        btn.txt.setAlpha(0.5);
+        this.tweens.add({
+          targets: btn.txt, x: btn.x - 8, duration: 60, yoyo: true, repeat: 2
+        });
+        return;
+      }
+
+      // Correct pick: lock all buttons, flash green, then open the
+      // pronunciation practice modal before awarding points and advancing.
+      this.canInteract = false;
+      if (this.sfxCorrect) this.sfxCorrect.play();
+      this.drawChoiceBtn(btn, 0xdcfce7, 0x22c55e);
+
+      callbacks.onPractice(this.currentWord, null, function () {
+        self.onPracticeDone();
+      });
+    },
+
     // ── Called after the practice modal closes ────────────────────
-    // Awards points, reveals the Thai word, then moves to the next card
+    // Awards points, then moves to the next card
     onPracticeDone: function () {
       var self = this;
       callbacks.onPoints(PTS_PER_CARD); // award points for completing this card
@@ -293,11 +296,8 @@ function createFlashcardGame(words, callbacks) {
       this.cardIdx++;                   // advance to the next card in the pool
       this.updateProgress();
 
-      // Briefly show the Thai word (alpha fades from 0 to 1)
-      this.cardCont.wordTxt.setAlpha(1);
-
-      // After 700ms, slide the card out and bring in the next one
-      this.time.delayedCall(700, function () {
+      // Brief pause so the green "correct" flash is visible before advancing
+      this.time.delayedCall(500, function () {
         self.advanceCard();
       });
     },
@@ -336,11 +336,11 @@ function createFlashcardGame(words, callbacks) {
     height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:  FcScene,
-    audio:  { noAudio: true }
+    audio:  { noAudio: false }
   });
 }
 
-// ── Public API ──────��─────────────────────────────────────────────
+// ── Public API ──────────────────────────────────────────────────────
 // Wraps the game so it can be controlled with FlashcardGame.start() / .stop()
 var FlashcardGame = (function () {
   var game = null; // holds the running Phaser.Game, or null if stopped
