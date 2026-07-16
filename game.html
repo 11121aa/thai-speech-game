@@ -364,34 +364,50 @@ var G = {
    page EXCEPT ones inside an active game itself (the Phaser canvases and
    their overlaid controls like jump/slide/move buttons already have
    their own in-game sound effects, so this deliberately skips anything
-   inside those containers to avoid doubling up). */
+   inside those containers to avoid doubling up). A single preloaded
+   Audio element is reused (instead of `new Audio()` per click) so
+   playback starts instantly instead of re-fetching/decoding every time. */
 var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame';
+var clickAudio = new Audio('soundeffect/Click.mp3');
+clickAudio.preload = 'auto';
 document.addEventListener('click', function (e) {
   var target = e.target.closest('button, .game-mode-card, .nav-link');
   if (!target || target.closest(GAME_CONTAINER_SELECTOR)) return;
-  new Audio('soundeffect/Click.mp3').play().catch(function () {});
+  clickAudio.currentTime = 0;
+  clickAudio.play().catch(function () {});
 });
 
 // Hovering a game-mode card plays a 2s snippet of GameSelect.mp3, starting
 // from a randomly-picked one of the several distinct blips recorded in that
-// file (measured offsets, in seconds, of each blip's start).
+// file (measured offsets, in seconds, of each blip's start). Preloaded once
+// up front (instead of `new Audio()` per hover) so the seek+play on hover
+// is instant rather than waiting on a fresh loadedmetadata each time.
 var GAME_SELECT_SFX_STARTS = [0.10, 3.30, 6.40, 9.60, 13.10, 15.60, 18.70, 21.55];
+var gameSelectAudio = new Audio('soundeffect/GameSelect.mp3');
+gameSelectAudio.preload = 'auto';
 var _lastGameSelectIdx = -1;
+var _gameSelectStopTimer = null;
+function playGameSelectBlip() {
+  var idx;
+  do {
+    idx = Math.floor(Math.random() * GAME_SELECT_SFX_STARTS.length);
+  } while (idx === _lastGameSelectIdx);
+  _lastGameSelectIdx = idx;
+  var offset = GAME_SELECT_SFX_STARTS[idx];
+  function seekAndPlay() {
+    gameSelectAudio.currentTime = offset;
+    gameSelectAudio.play().catch(function () {});
+  }
+  if (gameSelectAudio.readyState >= 1) {
+    seekAndPlay();
+  } else {
+    gameSelectAudio.addEventListener('loadedmetadata', seekAndPlay, { once: true });
+  }
+  clearTimeout(_gameSelectStopTimer);
+  _gameSelectStopTimer = setTimeout(function () { gameSelectAudio.pause(); }, 2000);
+}
 document.querySelectorAll('.game-mode-card').forEach(function (card) {
-  card.addEventListener('mouseenter', function () {
-    var audio = new Audio('soundeffect/GameSelect.mp3');
-    var idx;
-    do {
-      idx = Math.floor(Math.random() * GAME_SELECT_SFX_STARTS.length);
-    } while (idx === _lastGameSelectIdx);
-    _lastGameSelectIdx = idx;
-    var offset = GAME_SELECT_SFX_STARTS[idx];
-    audio.addEventListener('loadedmetadata', function () {
-      audio.currentTime = offset;
-      audio.play().catch(function () {});
-    });
-    setTimeout(function () { audio.pause(); }, 2000);
-  });
+  card.addEventListener('mouseenter', playGameSelectBlip);
 });
 
 /* ===== Shared utilities ===== */
