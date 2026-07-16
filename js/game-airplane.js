@@ -4,12 +4,12 @@
 //  [TUNE]    Follow speed, scroll speed, spawn rates   (~constants)
 //  [COINS]   Coin trail shape/points                   (~spawnCoinTrail)
 //  [WORDS]   Word bubble spawn + appearance             (~spawnWordItem, drawBubble)
-//  [BIRD]    Bird colours & shape                       (~drawBird)
+//  [PLANE]   Plane colours & shape                      (~drawPlane)
 // ============================================================
 //  How the game works:
 //    - Hold a finger/mouse button down anywhere on the canvas and drag
-//      up/down — the bird eases toward the pointer's height, jetpack-style
-//    - No obstacles, no death — just fly and collect
+//      up/down — the plane eases toward the pointer's height, jetpack-style
+//    - No obstacles, no death — just fly fast and collect
 //    - Winding coin trails give +2 ⭐ each
 //    - A golden word bubble every so often → pronunciation practice
 //      modal → +5 ⭐ bonus (on top of the shared +20 for a correct
@@ -20,26 +20,26 @@
 function createAirplaneGame(words, callbacks) {
 
   // ── [TUNE] ──────────────────────────────────────────────────
-  var FOLLOW_RATE = 0.22;  // how quickly the bird eases toward the held pointer (per 60fps frame)
-  var SCROLL_SPD  = 2.4;   // world scroll speed (px/frame at 60fps)
-  var COIN_INTERVAL = 1500;                 // ms between coin-trail spawns
-  var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 9000; // ms range between word bubbles
+  var FOLLOW_RATE = 0.32;  // how quickly the plane eases toward the held pointer (per 60fps frame)
+  var SCROLL_SPD  = 6.5;   // world scroll speed (px/frame at 60fps) — fast!
+  var COIN_INTERVAL = 750;                  // ms between coin-trail spawns
+  var WORD_INTERVAL_MIN = 3500, WORD_INTERVAL_MAX = 6000; // ms range between word bubbles
   var COIN_PTS = 2, WORD_BONUS_PTS = 5;
-  var BIRD_X = 140;    // fixed horizontal position of the bird
-  var BIRD_R = 13;     // bird hitbox radius
+  var PLANE_X = 140;   // fixed horizontal position of the plane
+  var PLANE_R = 15;    // plane hitbox radius
   var COIN_R = 12;
   var W = 800, H = 480;
   var GROUND_Y = H - 58;
-  var TOP_MARGIN = 70; // keeps the bird clear of the big score text
+  var TOP_MARGIN = 70; // keeps the plane clear of the big score text
 
   var FlapScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
     initialize: function () {
       Phaser.Scene.call(this, { key: 'flappy' });
-      this.birdY        = H / 2;
-      this.targetY       = H / 2;
-      this.birdVY        = 0; // purely cosmetic (drives the tilt/lean in drawBird)
+      this.planeY        = H / 2;
+      this.targetY        = H / 2;
+      this.planeVY        = 0; // purely cosmetic (drives the tilt/lean in drawPlane)
       this.isHolding      = false;
       this.coins          = [];
       this.wordItems      = [];
@@ -77,7 +77,7 @@ function createAirplaneGame(words, callbacks) {
         });
       }
 
-      // Main dynamic layer (coins, words, bird, ground)
+      // Main dynamic layer (coins, words, plane, ground)
       this.gfx = this.add.graphics().setDepth(2);
 
       // Score (top centre)
@@ -99,7 +99,7 @@ function createAirplaneGame(words, callbacks) {
         });
       });
 
-      // ── Input: hold + drag to set the bird's target height ─────────
+      // ── Input: hold + drag to set the plane's target height ─────────
       this.input.on('pointerdown', function (ptr) {
         self.isHolding = true;
         self.targetY = ptr.y;
@@ -176,15 +176,15 @@ function createAirplaneGame(words, callbacks) {
       if (this.isPaused) {
         this.drawGround(g);
         this.drawCoinsAndWords(g);
-        this.drawBird(g, time);
+        this.drawPlane(g, time);
         return;
       }
 
-      // ── Flight: ease the bird toward the held pointer's height ─────
-      var prevY = this.birdY;
-      this.birdY += (this.targetY - this.birdY) * Math.min(1, FOLLOW_RATE * dt);
-      this.birdY  = Phaser.Math.Clamp(this.birdY, TOP_MARGIN, GROUND_Y - BIRD_R);
-      this.birdVY = this.birdY - prevY; // cosmetic — drives the tilt/lean only
+      // ── Flight: ease the plane toward the held pointer's height ─────
+      var prevY = this.planeY;
+      this.planeY += (this.targetY - this.planeY) * Math.min(1, FOLLOW_RATE * dt);
+      this.planeY  = Phaser.Math.Clamp(this.planeY, TOP_MARGIN, GROUND_Y - PLANE_R);
+      this.planeVY = this.planeY - prevY; // cosmetic — drives the tilt/lean only
 
       this.scrollOff = (this.scrollOff + SCROLL_SPD * dt) % 80;
 
@@ -212,8 +212,8 @@ function createAirplaneGame(words, callbacks) {
       // Coin collection
       this.coins.forEach(function (c) {
         if (c.collected) return;
-        var dx = BIRD_X - c.x, dy = self.birdY - c.y;
-        if (dx * dx + dy * dy < (BIRD_R + COIN_R) * (BIRD_R + COIN_R)) {
+        var dx = PLANE_X - c.x, dy = self.planeY - c.y;
+        if (dx * dx + dy * dy < (PLANE_R + COIN_R) * (PLANE_R + COIN_R)) {
           c.collected = true;
           self.score += COIN_PTS;
           self.scoreTxt.setText('' + self.score);
@@ -227,7 +227,7 @@ function createAirplaneGame(words, callbacks) {
       // Word bubble collection → pronunciation practice
       this.wordItems.forEach(function (w) {
         if (w.collected || self.isPaused) return;
-        var dx = BIRD_X - w.x, dy = self.birdY - w.y;
+        var dx = PLANE_X - w.x, dy = self.planeY - w.y;
         if (dx * dx + dy * dy < 34 * 34) {
           w.collected = true;
           self.isPaused = true;
@@ -236,7 +236,7 @@ function createAirplaneGame(words, callbacks) {
             self.score += WORD_BONUS_PTS;
             self.scoreTxt.setText('' + self.score);
             callbacks.onPoints(WORD_BONUS_PTS);
-            self.showPop(BIRD_X, self.birdY - 30, '+' + WORD_BONUS_PTS + ' ⭐ ออกเสียงได้!');
+            self.showPop(PLANE_X, self.planeY - 30, '+' + WORD_BONUS_PTS + ' ⭐ ออกเสียงได้!');
           });
         }
       });
@@ -244,7 +244,7 @@ function createAirplaneGame(words, callbacks) {
 
       this.drawGround(g);
       this.drawCoinsAndWords(g);
-      this.drawBird(g, time);
+      this.drawPlane(g, time);
     },
 
     // Scrolling ground tile pattern drawn over the static base
@@ -298,17 +298,16 @@ function createAirplaneGame(words, callbacks) {
       g.fillCircle(x, y, 20);
     },
 
-    // ── [BIRD] Yellow cartoon bird ───────────────────────────────
-    drawBird: function (g, time) {
-      var x  = BIRD_X;
-      var y  = this.birdY;
-      var vy = this.birdVY;
+    // ── [PLANE] Red-and-white cartoon airplane, side view ─────────
+    drawPlane: function (g, time) {
+      var x  = PLANE_X;
+      var y  = this.planeY;
+      var vy = this.planeVY;
 
       // Tilt: leans in the direction it's currently easing toward
-      var tilt     = Phaser.Math.Clamp(vy * 0.12, -0.5, 0.5);
-      var cos      = Math.cos(tilt);
-      var sin      = Math.sin(tilt);
-      var wingFlap = Math.sin(time * 0.018) * 9;
+      var tilt = Phaser.Math.Clamp(vy * 0.1, -0.45, 0.45);
+      var cos  = Math.cos(tilt);
+      var sin  = Math.sin(tilt);
 
       function rPt(lx, ly) {
         return { x: x + lx * cos - ly * sin, y: y + lx * sin + ly * cos };
@@ -318,67 +317,92 @@ function createAirplaneGame(words, callbacks) {
       var shadowAlpha = Math.max(0, 1 - (GROUND_Y - y) / (H * 0.6));
       if (shadowAlpha > 0.05) {
         g.fillStyle(0x000000, shadowAlpha * 0.18);
-        g.fillEllipse(x, GROUND_Y - 4, 30, 8);
+        g.fillEllipse(x, GROUND_Y - 4, 34, 8);
       }
 
-      // Tail feathers
-      var tailPts = [
-        rPt(-16, -3),
-        rPt(-28, -11 + tilt * 6),
-        rPt(-26,  0),
-        rPt(-30,  7 - tilt * 6),
-        rPt(-16,  6)
-      ];
-      g.fillStyle(0xf9a825);
-      g.fillPoints(tailPts, true);
+      // Speed lines trailing behind — sells "way faster"
+      for (var s = 0; s < 3; s++) {
+        var sp = rPt(-30 - s * 10, -6 + s * 6);
+        g.lineStyle(2.5, 0xffffff, 0.5 - s * 0.13);
+        g.beginPath();
+        g.moveTo(sp.x, sp.y);
+        g.lineTo(sp.x - 16, sp.y);
+        g.strokePath();
+      }
 
-      // Wing (flaps up/down with time)
+      // Horizontal tail stabilizer (small flat fins at the back)
+      var hstabPts = [
+        rPt(-16, -2),
+        rPt(-27, -9),
+        rPt(-27,  9),
+        rPt(-16,  2)
+      ];
+      g.fillStyle(0xc0392b);
+      g.fillPoints(hstabPts, true);
+
+      // Vertical tail fin
+      var finPts = [
+        rPt(-14, -1),
+        rPt(-24, -14),
+        rPt(-17, -1)
+      ];
+      g.fillStyle(0xe74c3c);
+      g.fillPoints(finPts, true);
+
+      // Main wing (crosses the fuselage, swept slightly back)
       var wingPts = [
-        rPt(-5,  -5 - wingFlap),
-        rPt(-20, -18 - wingFlap),
-        rPt(-24, -9  - wingFlap * 0.5),
-        rPt(-7,   5)
+        rPt(6,  -3),
+        rPt(-8, -28),
+        rPt(-16, -26),
+        rPt(-4,  -2)
       ];
-      g.fillStyle(0xfbc02d);
+      var wingPtsLo = [
+        rPt(6,   3),
+        rPt(-8,  28),
+        rPt(-16, 26),
+        rPt(-4,   2)
+      ];
+      g.fillStyle(0xd32f2f);
       g.fillPoints(wingPts, true);
+      g.fillPoints(wingPtsLo, true);
 
-      // Body (14-point ellipse, rotated)
-      var bodyPts = [];
-      for (var a = 0; a < 14; a++) {
-        var ang = (a / 14) * Math.PI * 2;
-        bodyPts.push(rPt(Math.cos(ang) * 19, Math.sin(ang) * 14));
-      }
-      g.fillStyle(0xffd600);
+      // Fuselage (tapered capsule, nose pointing right)
+      var bodyPts = [
+        rPt(26,  0),
+        rPt(16, -7),
+        rPt(-16, -8),
+        rPt(-24, -3),
+        rPt(-24,  3),
+        rPt(-16,  8),
+        rPt(16,   7)
+      ];
+      g.fillStyle(0xe74c3c);
       g.fillPoints(bodyPts, true);
 
-      // White belly patch
-      var bellyPts = [];
-      for (var a2 = 0; a2 < 10; a2++) {
-        var ang2 = (a2 / 10) * Math.PI * 2;
-        bellyPts.push(rPt(5 + Math.cos(ang2) * 10, 2 + Math.sin(ang2) * 9));
-      }
-      g.fillStyle(0xfff9c4);
-      g.fillPoints(bellyPts, true);
-
-      // Beak (orange triangle)
-      var beakPts = [
-        rPt(15, -4),
-        rPt(28,  1),
-        rPt(15,  5)
+      // White stripe along the belly
+      var stripePts = [
+        rPt(14, 4),
+        rPt(-16, 5),
+        rPt(-16, 7.5),
+        rPt(14, 6.5)
       ];
-      g.fillStyle(0xff6d00);
-      g.fillPoints(beakPts, true);
+      g.fillStyle(0xffffff);
+      g.fillPoints(stripePts, true);
 
-      // Eye
-      var ep = rPt(10, -7);
-      g.fillStyle(0xffffff);
-      g.fillCircle(ep.x, ep.y, 6.5);
-      var pp = rPt(12, -6);
-      g.fillStyle(0x1a1a2e);
-      g.fillCircle(pp.x, pp.y, 3.8);
-      var hp = rPt(13.5, -7.5);
-      g.fillStyle(0xffffff);
-      g.fillCircle(hp.x, hp.y, 1.5);
+      // Cockpit window
+      var cp = rPt(9, -3);
+      g.fillStyle(0x81d4fa);
+      g.lineStyle(1.5, 0x0277bd);
+      g.fillCircle(cp.x, cp.y, 5);
+      g.strokeCircle(cp.x, cp.y, 5);
+
+      // Spinning propeller blur at the nose
+      var noseP = rPt(27, 0);
+      var blur = 6 + Math.sin(time * 0.09) * 2;
+      g.fillStyle(0x555555, 0.55);
+      g.fillEllipse(noseP.x, noseP.y, blur, 16);
+      g.fillStyle(0xffc107);
+      g.fillCircle(noseP.x, noseP.y, 2.5);
     },
 
     // ── [POP] Floating score popup ───────────────────────────────
