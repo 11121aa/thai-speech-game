@@ -278,7 +278,10 @@ function createAirplaneGame(words, callbacks) {
       this.birdVY += GRAVITY * dt;
       this.birdY  += this.birdVY * dt;
       this.scrollOff    = (this.scrollOff + SCROLL_SPD * dt) % 80;
-      if (this.immuneFrames > 0) this.immuneFrames -= dt;
+      // Clamp at 0 (not just >0) — dt is a float, so a plain -= would drift
+      // past 0 into small negative values and never land on it exactly,
+      // silently breaking the === 0 check below that gates pipe collision.
+      if (this.immuneFrames > 0) this.immuneFrames = Math.max(0, this.immuneFrames - dt);
 
       // Ceiling: bounce off gently (don't die)
       if (this.birdY - BIRD_R < 0) { this.birdY = BIRD_R; this.birdVY = 0; }

@@ -369,7 +369,10 @@ function createPlatformerGame(words, callbacks, difficulty) {
       if (slideHeld && !p.onGround) p.vy += FAST_FALL * dt;
       p.y  += p.vy * dt;
 
-      if (p.invincible > 0) p.invincible -= dt;
+      // Clamp at 0 (not just >0) — dt is a float, so a plain -= would drift
+      // past 0 into small negative values and never land on it exactly,
+      // silently breaking the === 0 checks below that gate death/damage.
+      if (p.invincible > 0) p.invincible = Math.max(0, p.invincible - dt);
 
       // Ground collision — skipped while over an open pit, unless shielded
       // (invincible), in which case the pit is safely walked/jumped over.
