@@ -1526,3 +1526,55 @@ section.bg-soft-yellow {
   .game-mode-hub { gap: 1rem; }
   .game-mode-card { width: 180px; min-height: 160px; }
 }
+
+/* ============ Kid-friendly playful background (game.html only) ============
+   Soft pastel sky + slowly drifting clouds/stars/balloons behind the page
+   content. Purely decorative (fixed, negative z-index, pointer-events:none)
+   so it sits behind every card/canvas and never interferes with input —
+   the opaque Phaser canvases naturally cover it during actual gameplay. */
+body.kid-page {
+  background: linear-gradient(180deg, #bfe7ff 0%, #d9f1ff 20%, #fdf3ff 55%, #fff6e2 100%);
+}
+
+.kid-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.kid-deco {
+  position: absolute;
+  display: inline-block;
+  font-size: 2.2rem;
+  opacity: 0.55;
+  filter: drop-shadow(0 4px 8px rgba(43, 36, 56, 0.1));
+}
+.kid-cloud   { font-size: 3.2rem; opacity: 0.75; animation: kidDrift 46s ease-in-out infinite; }
+.kid-star    { font-size: 1.5rem; animation: kidTwinkle 3.4s ease-in-out infinite; }
+.kid-balloon { font-size: 2.3rem; animation: kidBob 6.5s ease-in-out infinite; }
+.kid-rainbow { font-size: 2.8rem; opacity: 0.5; animation: kidBob 9s ease-in-out infinite; }
+
+@keyframes kidDrift {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  50%      { transform: translateX(26px) translateY(-10px); }
+}
+@keyframes kidBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-16px); }
+}
+@keyframes kidTwinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.9); }
+  50%      { opacity: 0.9;  transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kid-deco { animation: none !important; }
+}
+
+/* Thin out decorations on phones — fewer distractions, less paint cost */
+@media (max-width: 575.98px) {
+  .kid-deco { font-size: 1.5rem !important; opacity: 0.4; }
+  .kid-cloud { font-size: 2rem !important; }
+}
