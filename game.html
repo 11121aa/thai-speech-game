@@ -376,10 +376,16 @@ document.addEventListener('click', function (e) {
 // from a randomly-picked one of the several distinct blips recorded in that
 // file (measured offsets, in seconds, of each blip's start).
 var GAME_SELECT_SFX_STARTS = [0.10, 3.30, 6.40, 9.60, 13.10, 15.60, 18.70, 21.55];
+var _lastGameSelectIdx = -1;
 document.querySelectorAll('.game-mode-card').forEach(function (card) {
   card.addEventListener('mouseenter', function () {
     var audio = new Audio('soundeffect/GameSelect.mp3');
-    var offset = GAME_SELECT_SFX_STARTS[Math.floor(Math.random() * GAME_SELECT_SFX_STARTS.length)];
+    var idx;
+    do {
+      idx = Math.floor(Math.random() * GAME_SELECT_SFX_STARTS.length);
+    } while (idx === _lastGameSelectIdx);
+    _lastGameSelectIdx = idx;
+    var offset = GAME_SELECT_SFX_STARTS[idx];
     audio.addEventListener('loadedmetadata', function () {
       audio.currentTime = offset;
       audio.play().catch(function () {});
