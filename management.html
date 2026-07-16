@@ -268,6 +268,7 @@
               <div class="col-md-5">
                 <div class="soft-card h-100">
                   <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>รายชื่อผู้ป่วย</h6>
+                  <p class="text-secondary small mb-2">คลิกชื่อผู้ป่วยเพื่อดูการบ้าน</p>
                   <div id="hwPatientList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
                 </div>
               </div>
@@ -275,9 +276,6 @@
                 <div class="soft-card h-100 d-flex flex-column align-items-center justify-content-center gap-3 py-5">
                   <button class="btn btn-warning btn-bouncy px-4 py-3" id="btnCreateHw" style="min-width:220px;font-size:1.05rem;">
                     <i class="bi bi-plus-circle-fill me-2"></i>สร้างการบ้าน
-                  </button>
-                  <button class="btn btn-outline-primary btn-bouncy px-4 py-3" id="btnViewHw" style="min-width:220px;font-size:1.05rem;">
-                    <i class="bi bi-eye me-2"></i>ดูการบ้าน
                   </button>
                 </div>
               </div>
@@ -421,7 +419,6 @@
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
-<script src="js/illustrations.js"></script>
 <script>
 var currentSession, allWords = [], userEmailMap = {}, allSpecialistUsers = [];
 var hwRepeatCount = 5;
@@ -431,7 +428,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (!session) return;
   currentSession = session;
   await Auth.initNav();
-  Illustrations.load();
 
   var role = await Auth.getRole(session.user.id);
   document.getElementById('loadingState').style.display = 'none';
@@ -705,10 +701,6 @@ async function initSpecialist() {
   });
 
   document.getElementById('btnCreateHw').addEventListener('click', openCreateHw);
-  document.getElementById('btnViewHw').addEventListener('click', function () {
-    if (!hwSelectedPatient) { alert('กรุณาเลือกผู้ป่วยก่อน'); return; }
-    loadPatientHwList(hwSelectedPatient);
-  });
   document.getElementById('btnHwBack').addEventListener('click', function () { showHwView('hwListView'); });
   document.getElementById('btnHwPatientBack').addEventListener('click', function () { showHwView('hwListView'); });
   document.getElementById('btnHwDetailBack').addEventListener('click', function () { showHwView('hwPatientView'); });
@@ -1068,9 +1060,8 @@ function initHomeworkTab() {
       '<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:28px;font-size:0.75rem;font-weight:700;flex-shrink:0;margin-right:8px;">' + init + '</span>' +
       '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">' + u.email + '</span>';
     btn.addEventListener('click', function () {
-      document.querySelectorAll('.hw-patient-row').forEach(function (b) { b.classList.remove('btn-primary'); b.classList.add('btn-light'); });
-      btn.classList.remove('btn-light'); btn.classList.add('btn-primary');
       hwSelectedPatient = u;
+      loadPatientHwList(u);
     });
     list.appendChild(btn);
   });
@@ -1245,7 +1236,7 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
   renderHwDetailTable('hwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
 
   document.getElementById('btnHwDetailPrint').onclick = function () {
-    printHomeworkWorksheet(hw.name || 'การบ้าน #' + homeworkId, words, repeatCount, patient.email);
+    printHomeworkWorksheet(hw.name || 'การบ้าน #' + homeworkId, 'hwDetailTableWrap', patient.email);
   };
 }
 
@@ -1331,58 +1322,37 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, assignmen
 }
 
 /* ── Printable homework worksheet ── */
-// Opens a new tab with a print-ready worksheet (word cards + blank tick
-// boxes per repetition) and triggers the browser's print dialog, where
-// "Save as PDF" produces a printable PDF without any extra dependencies.
-async function printHomeworkWorksheet(hwName, words, repeatCount, patientLabel) {
-  await Illustrations.load();
-
-  var items = words.map(function (hww) {
-    var w = hww.words;
-    if (!w) return null;
-    var illUrl = Illustrations.get(w.word);
-    return {
-      word: w.word,
-      emoji: w.emoji || '🔸',
-      img: illUrl ? new URL(illUrl, document.baseURI).href : null
-    };
-  }).filter(Boolean);
-
-  var ticks = '';
-  for (var i = 0; i < (repeatCount || 5); i++) ticks += '<span class="tick"></span>';
-
-  var cardsHtml = items.map(function (it) {
-    var pic = it.img
-      ? '<img src="' + it.img + '" alt="' + it.word + '">'
-      : '<div class="emoji">' + it.emoji + '</div>';
-    return '<div class="wcard">' + pic +
-      '<div class="wword">' + it.word + '</div>' +
-      '<div class="ticks">' + ticks + '</div>' +
-      '</div>';
-  }).join('');
+// Opens a new tab with an exact copy of the on-screen homework progress
+// table (word × attempt × notes) and triggers the browser's print dialog,
+// where "Save as PDF" produces a printable PDF with no extra dependencies.
+function printHomeworkWorksheet(hwName, containerId, patientLabel) {
+  var original = document.getElementById(containerId);
+  var clone = original.cloneNode(true);
+  // cloneNode() copies each <input>'s live value, but serializing the
+  // clone back to an HTML string only reflects the `value` *attribute* —
+  // without this, a note typed after the table first rendered would
+  // silently be dropped from the printout.
+  var liveInputs  = original.querySelectorAll('input.hw-note-input');
+  var cloneInputs = clone.querySelectorAll('input.hw-note-input');
+  liveInputs.forEach(function (inp, i) { cloneInputs[i].setAttribute('value', inp.value); });
 
   var dateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
   var html = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">' +
     '<title>' + hwName + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">' +
+    '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">' +
+    '<link href="' + new URL('css/style.css', document.baseURI).href + '" rel="stylesheet">' +
     '<style>' +
-    'body{font-family:"Prompt",sans-serif;margin:22px;color:#2b2438;}' +
+    'body{background:#fff;margin:24px;}' +
     'h1{font-size:1.4rem;margin:0 0 4px;}' +
-    '.meta{color:#666;font-size:0.85rem;margin-bottom:20px;}' +
-    '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}' +
-    '.wcard{border:2px solid #ddd;border-radius:14px;padding:12px;text-align:center;break-inside:avoid;}' +
-    '.wcard img{width:80px;height:80px;object-fit:contain;margin-bottom:6px;}' +
-    '.emoji{font-size:48px;margin-bottom:6px;}' +
-    '.wword{font-weight:700;font-size:1.1rem;margin-bottom:8px;}' +
-    '.ticks{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;}' +
-    '.tick{width:16px;height:16px;border:2px solid #999;border-radius:4px;display:inline-block;}' +
+    '.meta{color:#666;font-size:0.85rem;margin-bottom:18px;}' +
+    'input.hw-note-input{border:1px solid #ccc;background:#fff;}' +
     '@media print{ @page{ margin:14mm; } }' +
     '</style></head><body>' +
     '<h1>📝 ' + hwName + '</h1>' +
-    '<div class="meta">' + (patientLabel ? patientLabel + ' · ' : '') +
-    'วันที่พิมพ์: ' + dateStr + ' · ฝึกออกเสียงคำต่อไปนี้ แล้วทำเครื่องหมายในช่องทุกครั้งที่ฝึก</div>' +
-    '<div class="grid">' + cardsHtml + '</div>' +
+    '<div class="meta">' + (patientLabel ? patientLabel + ' · ' : '') + 'วันที่พิมพ์: ' + dateStr + '</div>' +
+    clone.innerHTML +
     '</body></html>';
 
   var win = window.open('', '_blank');
@@ -1542,7 +1512,7 @@ async function openDetailHwDetail(assignmentId, hw, patient) {
   renderHwDetailTable('detailHwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
 
   document.getElementById('btnDetailHwPrint').onclick = function () {
-    printHomeworkWorksheet(hw.name || 'การบ้าน #' + hw.id, words, repeatCount, patient.email);
+    printHomeworkWorksheet(hw.name || 'การบ้าน #' + hw.id, 'detailHwDetailTableWrap', patient.email);
   };
 }
 
@@ -1576,7 +1546,7 @@ async function openUserHwDetail(assignment) {
   renderHwDetailTable('userHwDetailTableWrap', words, practices, feedbacks, assignment.id, repeatCount, false);
 
   document.getElementById('btnUserHwPrint').onclick = function () {
-    printHomeworkWorksheet(hw ? (hw.name || 'การบ้าน #' + hw.id) : 'การบ้าน', words, repeatCount);
+    printHomeworkWorksheet(hw ? (hw.name || 'การบ้าน #' + hw.id) : 'การบ้าน', 'userHwDetailTableWrap');
   };
 }
 </script>

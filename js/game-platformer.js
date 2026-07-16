@@ -24,11 +24,12 @@
 //      (SCROLL_SPD_BASE → SCROLL_SPD_MAX)
 // ============================================================
 
-// [DIFFICULTY] starting/cap scroll speed per tier — ง่าย (easy) < ธรรมดา (normal) < ยาก (hard)
+// [DIFFICULTY] starting/cap scroll speed per tier — ง่าย (easy) < ธรรมดา (normal) < ยาก (hard).
+// ง่าย is now what used to be ยาก; ธรรมดา/ยาก scale up harder from there.
 var PLATFORMER_DIFFICULTIES = {
-  'ง่าย':   { base: 1.8, max: 3.8 },
-  'ธรรมดา': { base: 2.7, max: 6   },
-  'ยาก':    { base: 3.6, max: 8   }
+  'ง่าย':   { base: 3.6, max: 8    },
+  'ธรรมดา': { base: 4.8, max: 10.5 },
+  'ยาก':    { base: 6.2, max: 13.5 }
 };
 
 function createPlatformerGame(words, callbacks, difficulty) {

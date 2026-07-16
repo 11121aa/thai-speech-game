@@ -25,6 +25,9 @@
     background:rgba(30,30,45,.55); color:#fff; font-size:1.3rem; font-weight:700;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     user-select:none; -webkit-user-select:none; touch-action:none; cursor:pointer;
+    /* Stops iOS Safari's long-press callout (selection loupe / copy bubble)
+       from popping up when a jump/slide button is held down. */
+    -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
   }
   .pf-btn:active { background:rgba(46,196,182,.6); }
   .pf-btn small { font-size:.6rem; font-weight:400; }
@@ -81,11 +84,12 @@
 //  [PLAYER]    Sprite atlas + animation state machine   (~create, doJump, update)
 // ============================================================
 
-// [DIFFICULTY] starting/cap scroll speed per tier — ง่าย (easy) < ธรรมดา (normal) < ยาก (hard)
+// [DIFFICULTY] starting/cap scroll speed per tier — ง่าย (easy) < ธรรมดา (normal) < ยาก (hard).
+// ง่าย is now what used to be ยาก; ธรรมดา/ยาก scale up harder from there.
 var PLATFORMER_DIFFICULTIES = {
-  'ง่าย':   { base: 1.8, max: 3.8 },
-  'ธรรมดา': { base: 2.7, max: 6   },
-  'ยาก':    { base: 3.6, max: 8   }
+  'ง่าย':   { base: 3.6, max: 8    },
+  'ธรรมดา': { base: 4.8, max: 10.5 },
+  'ยาก':    { base: 6.2, max: 13.5 }
 };
 
 function createPlatformerGame(difficulty) {
