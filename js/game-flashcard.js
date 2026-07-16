@@ -164,17 +164,26 @@ function createFlashcardGame(words, callbacks) {
         var txt = self.add.text(x, CHOICE_Y, '', {
           fontFamily: 'Prompt, sans-serif',
           fontSize: '20px', fontStyle: 'bold', color: '#2b2438'
-        }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true });
+        }).setOrigin(0.5, 0.5);
 
-        var btn = { x: x, gfx: gfx, txt: txt, word: null, disabled: false };
+        // The actual tap target is a separate invisible Zone sized to the
+        // full drawn button (CHOICE_W×CHOICE_H) rather than the text
+        // object itself — a Text's default hit area is only its tight
+        // glyph bounding box, which is much smaller than the visible
+        // button and easy to miss, especially for short words.
+        var zone = self.add.zone(x, CHOICE_Y, CHOICE_W, CHOICE_H)
+          .setOrigin(0.5, 0.5)
+          .setInteractive({ useHandCursor: true });
+
+        var btn = { x: x, gfx: gfx, txt: txt, zone: zone, word: null, disabled: false };
         self.drawChoiceBtn(btn, 0xffffff, 0xd8d3e8); // default idle style
 
-        txt.on('pointerdown', function () {
+        zone.on('pointerdown', function () {
           if (!self.canInteract || btn.disabled) return;
           self.onChoicePicked(btn);
         });
-        txt.on('pointerover', function () { if (!btn.disabled) self.drawChoiceBtn(btn, 0xf5f3ff, 0x8a5cf6); });
-        txt.on('pointerout',  function () { if (!btn.disabled) self.drawChoiceBtn(btn, 0xffffff, 0xd8d3e8); });
+        zone.on('pointerover', function () { if (!btn.disabled) self.drawChoiceBtn(btn, 0xf5f3ff, 0x8a5cf6); });
+        zone.on('pointerout',  function () { if (!btn.disabled) self.drawChoiceBtn(btn, 0xffffff, 0xd8d3e8); });
 
         return btn;
       });

@@ -1,62 +1,70 @@
 // ============================================================
-//  FLYING GAME — Phaser 3  (Flappy Bird style)
+//  FLYING GAME — Phaser 3  (Subway-Surfers-style jetpack flight)
 // ============================================================
-//  [TUNE]    Gravity, flap, pipe speed & gap       (~constants)
-//  [PIPES]   Pipe colours, cap size                (~drawPipe)
-//  [BIRD]    Bird colours & shape                  (~drawBird)
-//  [BUBBLE]  Word bubble appearance                (~drawBubble)
+//  [TUNE]    Follow speed, scroll speed, spawn rates   (~constants)
+//  [COINS]   Coin trail shape/points                   (~spawnCoinTrail)
+//  [WORDS]   Word bubble spawn + appearance             (~spawnWordItem, drawBubble)
+//  [BIRD]    Bird colours & shape                       (~drawBird)
 // ============================================================
 //  How the game works:
-//    - Tap / Space to flap upward; gravity pulls the bird down
-//    - Fly through the gap between pipe pairs to score +1 ⭐
-//    - Every 5th gap has a golden word bubble in the center
-//    - Fly INTO the bubble → practice modal → +5 ⭐ bonus
-//    - Hit a pipe, the ceiling, or the ground → die
-//    - Tap again after death to restart
+//    - Hold a finger/mouse button down anywhere on the canvas and drag
+//      up/down — the bird eases toward the pointer's height, jetpack-style
+//    - No obstacles, no death — just fly and collect
+//    - Winding coin trails give +2 ⭐ each
+//    - A golden word bubble every so often → pronunciation practice
+//      modal → +5 ⭐ bonus (on top of the shared +20 for a correct
+//      recording)
+//    - The round ends when the shared HUD countdown timer runs out
 // ============================================================
 
 function createAirplaneGame(words, callbacks) {
 
   // ── [TUNE] ──────────────────────────────────────────────────
-  var GRAVITY    = 0.32;   // downward pull per frame
-  var FLAP_VY    = -7.0;   // upward boost on tap
-  var SCROLL_SPD = 2.4;    // pipe scroll speed (px/frame)
-  var PIPE_GAP   = 150;    // vertical gap height (px)
-  var PIPE_DIST  = 240;    // horizontal distance between pipe pairs (px)
-  var PIPE_W     = 60;     // pipe width (px)
-  var BIRD_X     = 140;    // fixed horizontal position of the bird
-  var BIRD_R     = 13;     // bird hitbox radius
-  var WORD_EVERY = 5;      // every Nth pipe has a word bubble
+  var FOLLOW_RATE = 0.22;  // how quickly the bird eases toward the held pointer (per 60fps frame)
+  var SCROLL_SPD  = 2.4;   // world scroll speed (px/frame at 60fps)
+  var COIN_INTERVAL = 1500;                 // ms between coin-trail spawns
+  var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 9000; // ms range between word bubbles
+  var COIN_PTS = 2, WORD_BONUS_PTS = 5;
+  var BIRD_X = 140;    // fixed horizontal position of the bird
+  var BIRD_R = 13;     // bird hitbox radius
+  var COIN_R = 12;
   var W = 800, H = 480;
-  var GROUND_Y   = H - 58;
+  var GROUND_Y = H - 58;
+  var TOP_MARGIN = 70; // keeps the bird clear of the big score text
 
   var FlapScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
     initialize: function () {
       Phaser.Scene.call(this, { key: 'flappy' });
-      // Raw game state (no Phaser objects here — those live in create/doRestart)
-      this.state        = 'waiting'; // 'waiting' | 'playing' | 'dead'
       this.birdY        = H / 2;
-      this.birdVY       = 0;
-      this.pipes        = [];
-      this.clouds       = [];
-      this.score        = 0;
-      this.pipeCount    = 0;
-      this.wordIdx      = 0;
-      this.pipeSpawnMs  = 0;
-      this.scrollOff    = 0;
-      this.isPaused     = false;
-      this.immuneFrames = 0; // >0 = invincible (flashes, can't die from pipes/ground)
+      this.targetY       = H / 2;
+      this.birdVY        = 0; // purely cosmetic (drives the tilt/lean in drawBird)
+      this.isHolding      = false;
+      this.coins          = [];
+      this.wordItems      = [];
+      this.clouds        = [];
+      this.score         = 0;
+      this.scrollOff      = 0;
+      this.coinTimer      = 0;
+      this.wordTimer      = 0;
+      this.nextWordDelay  = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
+      this.isPaused       = false; // true while the practice modal is open
+    },
+
+    preload: function () {
+      this.load.audio('CoinSFX', 'soundeffect/CoinSFX.mp3');
     },
 
     create: function () {
       var self = this;
-      this.birdY = H / 2;
 
       // Static background drawn once
       this.bgGfx = this.add.graphics().setDepth(0);
       this.drawBg();
+
+      var ca = this.cache.audio;
+      this.sfxCoin = ca.exists('CoinSFX') ? this.sound.add('CoinSFX', { volume: 0.6 }) : null;
 
       // Cloud layer
       this.cloudGfx = this.add.graphics().setDepth(1);
@@ -69,7 +77,7 @@ function createAirplaneGame(words, callbacks) {
         });
       }
 
-      // Main dynamic layer (pipes, bird, ground, bubbles)
+      // Main dynamic layer (coins, words, bird, ground)
       this.gfx = this.add.graphics().setDepth(2);
 
       // Score (top centre)
@@ -79,72 +87,28 @@ function createAirplaneGame(words, callbacks) {
         color: '#ffffff', stroke: '#1a1a2e', strokeThickness: 6
       }).setOrigin(0.5, 0).setDepth(10);
 
-      // Wait screen
-      this.waitTxt = this.add.text(W / 2, H / 2 - 18,
-        '🐦  แตะเพื่อเริ่มเกม!', {
-          fontFamily: 'Prompt, sans-serif', fontSize: '28px', fontStyle: 'bold',
-          color: '#ffffff', stroke: '#2b2438', strokeThickness: 5,
-          backgroundColor: '#00000044', padding: { x: 18, y: 10 }
-        }).setOrigin(0.5).setDepth(10);
-
-      // Dead screen elements (hidden until death)
-      this.deadPanel   = this.add.graphics().setDepth(9);
-      this.deadTitle   = this.add.text(W / 2, H / 2 - 58, '💀  เกมจบแล้ว!', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '38px', fontStyle: 'bold',
-        color: '#e74c3c', stroke: '#ffffff', strokeThickness: 5
-      }).setOrigin(0.5).setDepth(10).setVisible(false);
-      this.deadScore   = this.add.text(W / 2, H / 2 + 2, '', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '26px', fontStyle: 'bold',
-        color: '#2b2438', stroke: '#ffffff', strokeThickness: 4
-      }).setOrigin(0.5).setDepth(10).setVisible(false);
-      this.deadRestart = this.add.text(W / 2, H / 2 + 56, '🔄  แตะเพื่อเล่นใหม่', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '20px', fontStyle: 'bold',
-        color: '#ffffff', stroke: '#2b2438', strokeThickness: 4,
-        backgroundColor: '#2b243899', padding: { x: 16, y: 8 }
-      }).setOrigin(0.5).setDepth(10).setVisible(false);
-
-      // Input — tap to flap or restart
-      this.input.on('pointerdown', function () { self.onTap(); });
-      this.input.keyboard.on('keydown-SPACE', function () { self.onTap(); });
-    },
-
-    onTap: function () {
-      if (this.isPaused) return;
-      if (this.state === 'waiting') {
-        this.state = 'playing';
-        this.birdVY = FLAP_VY;
-        this.waitTxt.setVisible(false);
-      } else if (this.state === 'playing') {
-        this.birdVY = FLAP_VY;
-      } else if (this.state === 'dead') {
-        this.doRestart();
-      }
-    },
-
-    doRestart: function () {
-      // Destroy any live pipe labels
-      this.pipes.forEach(function (p) {
-        if (p.wordLabel)  p.wordLabel.destroy();
-        if (p.emojiLabel) p.emojiLabel.destroy();
+      // Fading instructional hint
+      this.hint = this.add.text(W / 2, H - 16,
+        '👆 กดค้างแล้วลากขึ้น-ลง เพื่อบิน — เก็บเหรียญ 🪙 และคำ 💬', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '14px', color: '#2b2438',
+          backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
+        }).setOrigin(0.5, 1).setDepth(10);
+      this.time.delayedCall(4000, function () {
+        self.tweens.add({ targets: self.hint, alpha: 0, duration: 600,
+          onComplete: function () { self.hint.destroy(); self.hint = null; }
+        });
       });
-      // Reset all state
-      this.state        = 'waiting';
-      this.birdY        = H / 2;
-      this.birdVY       = 0;
-      this.pipes        = [];
-      this.score        = 0;
-      this.pipeCount    = 0;
-      this.wordIdx      = 0;
-      this.pipeSpawnMs  = 0;
-      this.scrollOff    = 0;
-      this.immuneFrames = 0;
-      // Reset UI
-      this.scoreTxt.setText('0');
-      this.waitTxt.setVisible(true);
-      this.deadPanel.clear();
-      this.deadTitle.setVisible(false);
-      this.deadScore.setVisible(false);
-      this.deadRestart.setVisible(false);
+
+      // ── Input: hold + drag to set the bird's target height ─────────
+      this.input.on('pointerdown', function (ptr) {
+        self.isHolding = true;
+        self.targetY = ptr.y;
+      });
+      this.input.on('pointermove', function (ptr) {
+        if (self.isHolding) self.targetY = ptr.y;
+      });
+      this.input.on('pointerup',        function () { self.isHolding = false; });
+      this.input.on('pointerupoutside', function () { self.isHolding = false; });
     },
 
     // ── [SKY] Static background ──────────────────────────────────
@@ -165,71 +129,41 @@ function createAirplaneGame(words, callbacks) {
       g.fillStyle(0x4aaa4a); g.fillRect(0, GROUND_Y + 2, W, 5);
     },
 
-    spawnPipe: function () {
-      this.pipeCount++;
-      var isWord = (this.pipeCount % WORD_EVERY === 0) && words.length > 0;
-
-      var minY = PIPE_GAP / 2 + 48;
-      var maxY = GROUND_Y - PIPE_GAP / 2 - 28;
-      var gapY = minY + Math.random() * (maxY - minY);
-
-      var wordObj = null, wordLabel = null, emojiLabel = null;
-      if (isWord) {
-        wordObj = words[this.wordIdx++ % words.length];
-        wordLabel = this.add.text(W + 90, gapY + 14, wordObj.word, {
-          fontFamily: 'Prompt, sans-serif', fontSize: '13px', fontStyle: 'bold',
-          color: '#2b2438'
-        }).setOrigin(0.5, 0).setDepth(5);
-        emojiLabel = this.add.text(W + 90, gapY - 12, wordObj.emoji || '🔸', {
-          fontSize: '20px'
-        }).setOrigin(0.5, 1).setDepth(5);
+    // ── [COINS] A winding S-curve trail of coins to follow by dragging
+    spawnCoinTrail: function () {
+      var centerY = TOP_MARGIN + 40 + Math.random() * (GROUND_Y - TOP_MARGIN - 80);
+      var amp = 50 + Math.random() * 50;
+      var n = 7;
+      for (var i = 0; i < n; i++) {
+        var x = W + 40 + i * 42;
+        var y = centerY + Math.sin((i / (n - 1)) * Math.PI * 2) * amp;
+        y = Phaser.Math.Clamp(y, TOP_MARGIN, GROUND_Y - 20);
+        this.coins.push({ x: x, y: y, collected: false });
       }
+    },
 
-      this.pipes.push({
-        x: W + 90,
-        gapY: gapY,
-        passed: false,
-        wordObj: wordObj,
-        wordLabel: wordLabel,
-        emojiLabel: emojiLabel,
-        wordHit: false
+    // ── [WORDS] A single golden word bubble
+    spawnWordItem: function () {
+      if (!words.length) return;
+      this.wordIdx = (this.wordIdx || 0);
+      var word = words[this.wordIdx++ % words.length];
+      this.wordItems.push({
+        x: W + 60,
+        y: TOP_MARGIN + 30 + Math.random() * (GROUND_Y - TOP_MARGIN - 60),
+        word: word, collected: false
       });
     },
 
-    killBird: function () {
-      if (this.state === 'dead') return;
-      this.state  = 'dead';
-      this.birdVY = -3; // small bounce before falling
-
-      // Show game-over panel
-      var px = W / 2 - 195, pw = 390, py = H / 2 - 80, ph = 158;
-      this.deadPanel.fillStyle(0x000000, 0.45);
-      this.deadPanel.fillRect(0, 0, W, H);
-      this.deadPanel.fillStyle(0xffffff, 0.94);
-      this.deadPanel.fillRoundedRect(px, py, pw, ph, 18);
-
-      this.deadTitle.setVisible(true);
-      this.deadScore.setText('คะแนน: ' + this.score + ' ⭐').setVisible(true);
-      this.deadRestart.setVisible(true);
-    },
-
     update: function (time, delta) {
-      if (this.isPaused) return;
       var self = this;
       var g    = this.gfx;
       var cg   = this.cloudGfx;
       g.clear();
       cg.clear();
 
-      // All [TUNE] constants below are defined as "per frame at 60fps" —
-      // dt normalizes every frame's motion to that baseline so gameplay
-      // speed stays consistent regardless of the browser's actual render
-      // rate (which otherwise varies with device load, display refresh
-      // rate, backgrounded-tab throttling, etc). Clamped so a big stall
-      // (e.g. tab regaining focus) can't teleport the bird through pipes.
       var dt = Math.min(delta, 50) / (1000 / 60);
 
-      // Clouds (all states)
+      // Clouds always drift, even while paused for the practice modal
       this.clouds.forEach(function (c) {
         c.x -= c.spd * dt;
         if (c.x < -c.rw - 40) c.x = W + c.rw;
@@ -239,134 +173,77 @@ function createAirplaneGame(words, callbacks) {
         cg.fillEllipse(c.x + c.rw * 0.3,  c.y + 7, c.rw,       28);
       });
 
-      // ── WAITING ──────────────────────────────────────────────────
-      if (this.state === 'waiting') {
-        this.birdY = H / 2 + Math.sin(time * 0.003) * 14;
-        this.drawBird(g, time);
+      if (this.isPaused) {
         this.drawGround(g);
-        return;
-      }
-
-      // ── DEAD ─────────────────────────────────────────────────────
-      if (this.state === 'dead') {
-        this.birdVY += GRAVITY * dt;
-        this.birdY  += this.birdVY * dt;
-        if (this.birdY + BIRD_R > GROUND_Y) { this.birdY = GROUND_Y - BIRD_R; this.birdVY = 0; }
-        this.pipes.forEach(function (p) { self.drawPipe(g, p); });
-        this.pipes.forEach(function (p) {
-          if (p.wordObj && !p.wordHit && p.wordLabel) self.drawBubble(g, p.x, p.gapY);
-        });
-        this.drawGround(g);
+        this.drawCoinsAndWords(g);
         this.drawBird(g, time);
         return;
       }
 
-      // ── PLAYING ──────────────────────────────────────────────────
+      // ── Flight: ease the bird toward the held pointer's height ─────
+      var prevY = this.birdY;
+      this.birdY += (this.targetY - this.birdY) * Math.min(1, FOLLOW_RATE * dt);
+      this.birdY  = Phaser.Math.Clamp(this.birdY, TOP_MARGIN, GROUND_Y - BIRD_R);
+      this.birdVY = this.birdY - prevY; // cosmetic — drives the tilt/lean only
 
-      // Spawn pipes on a regular real-time interval (converted from the
-      // frame-based PIPE_DIST/SCROLL_SPD spacing at the 60fps baseline)
-      // rather than a raw frame count, so spacing stays consistent
-      // regardless of actual FPS.
-      this.pipeSpawnMs += delta;
-      var spawnEveryMs = (PIPE_DIST / SCROLL_SPD) * (1000 / 60);
-      if (this.pipeSpawnMs >= spawnEveryMs) {
-        this.pipeSpawnMs -= spawnEveryMs;
-        this.spawnPipe();
+      this.scrollOff = (this.scrollOff + SCROLL_SPD * dt) % 80;
+
+      // Spawn coin trails + word bubbles on real-time intervals
+      this.coinTimer += delta;
+      if (this.coinTimer >= COIN_INTERVAL) {
+        this.coinTimer -= COIN_INTERVAL;
+        this.spawnCoinTrail();
+      }
+      this.wordTimer += delta;
+      if (this.wordTimer >= this.nextWordDelay) {
+        this.wordTimer -= this.nextWordDelay;
+        this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
+        this.spawnWordItem();
       }
 
-      // Physics
-      this.birdVY += GRAVITY * dt;
-      this.birdY  += this.birdVY * dt;
-      this.scrollOff    = (this.scrollOff + SCROLL_SPD * dt) % 80;
-      // Clamp at 0 (not just >0) — dt is a float, so a plain -= would drift
-      // past 0 into small negative values and never land on it exactly,
-      // silently breaking the === 0 check below that gates pipe collision.
-      if (this.immuneFrames > 0) this.immuneFrames = Math.max(0, this.immuneFrames - dt);
+      // Move + cull coins
+      this.coins.forEach(function (c) { c.x -= SCROLL_SPD * dt; });
+      this.coins = this.coins.filter(function (c) { return c.x > -30; });
 
-      // Ceiling: bounce off gently (don't die)
-      if (this.birdY - BIRD_R < 0) { this.birdY = BIRD_R; this.birdVY = 0; }
+      // Move + cull word bubbles
+      this.wordItems.forEach(function (w) { w.x -= SCROLL_SPD * dt; });
+      this.wordItems = this.wordItems.filter(function (w) { return w.x > -80; });
 
-      // Ground — immune: bounce back up; not immune: die
-      if (this.birdY + BIRD_R > GROUND_Y) {
-        if (this.immuneFrames > 0) {
-          this.birdY  = GROUND_Y - BIRD_R;
-          this.birdVY = FLAP_VY * 0.55; // auto-flap when immune
-        } else {
-          this.killBird(); return;
-        }
-      }
-
-      // Move pipes + detect score
-      this.pipes.forEach(function (p) {
-        p.x -= SCROLL_SPD * dt;
-        if (p.wordLabel)  p.wordLabel.x  = p.x;
-        if (p.emojiLabel) p.emojiLabel.x = p.x;
-
-        if (!p.passed && p.x + PIPE_W / 2 < BIRD_X) {
-          p.passed = true;
-          self.score++;
-          callbacks.onPoints(1);
+      // Coin collection
+      this.coins.forEach(function (c) {
+        if (c.collected) return;
+        var dx = BIRD_X - c.x, dy = self.birdY - c.y;
+        if (dx * dx + dy * dy < (BIRD_R + COIN_R) * (BIRD_R + COIN_R)) {
+          c.collected = true;
+          self.score += COIN_PTS;
           self.scoreTxt.setText('' + self.score);
-          self.showPop(BIRD_X, self.birdY - 34, '+1 ⭐');
+          callbacks.onPoints(COIN_PTS);
+          if (self.sfxCoin) self.sfxCoin.play();
+          self.showPop(c.x, c.y - 16, '+' + COIN_PTS);
         }
       });
+      this.coins = this.coins.filter(function (c) { return !c.collected; });
 
-      // Cull off-screen pipes
-      this.pipes = this.pipes.filter(function (p) {
-        if (p.x + PIPE_W < -10) {
-          if (p.wordLabel)  p.wordLabel.destroy();
-          if (p.emojiLabel) p.emojiLabel.destroy();
-          return false;
+      // Word bubble collection → pronunciation practice
+      this.wordItems.forEach(function (w) {
+        if (w.collected || self.isPaused) return;
+        var dx = BIRD_X - w.x, dy = self.birdY - w.y;
+        if (dx * dx + dy * dy < 34 * 34) {
+          w.collected = true;
+          self.isPaused = true;
+          callbacks.onPractice(w.word, null, function () {
+            self.isPaused = false;
+            self.score += WORD_BONUS_PTS;
+            self.scoreTxt.setText('' + self.score);
+            callbacks.onPoints(WORD_BONUS_PTS);
+            self.showPop(BIRD_X, self.birdY - 30, '+' + WORD_BONUS_PTS + ' ⭐ ออกเสียงได้!');
+          });
         }
-        return true;
       });
+      this.wordItems = this.wordItems.filter(function (w) { return !w.collected; });
 
-      // Collision
-      var dead = false;
-      for (var i = 0; i < this.pipes.length; i++) {
-        var p  = this.pipes[i];
-        var hW = PIPE_W / 2 + 2;      // horizontal half-width with small buffer
-        var hG = PIPE_GAP / 2 - 3;    // vertical half-gap (shrink hitbox slightly)
-
-        if (this.birdY + BIRD_R < p.x - hW) continue; // pipe not reached yet (wrong axis?)
-        // Check horizontal overlap
-        if (BIRD_X + BIRD_R > p.x - hW && BIRD_X - BIRD_R < p.x + hW) {
-          // Check vertical: hit top or bottom pipe? (skip when immune)
-          if (this.immuneFrames === 0 &&
-              (this.birdY - BIRD_R < p.gapY - hG ||
-               this.birdY + BIRD_R > p.gapY + hG)) {
-            this.killBird();
-            dead = true;
-            break;
-          }
-          // Check word bubble hit (only if word pipe and not yet collected)
-          if (p.wordObj && !p.wordHit) {
-            var dx = BIRD_X - p.x;
-            var dy = this.birdY - p.gapY;
-            if (dx * dx + dy * dy < 32 * 32) {
-              p.wordHit = true;
-              if (p.wordLabel)  { p.wordLabel.destroy();  p.wordLabel  = null; }
-              if (p.emojiLabel) { p.emojiLabel.destroy(); p.emojiLabel = null; }
-              this.isPaused = true;
-              callbacks.onPractice(p.wordObj, null, function () {
-                self.isPaused     = false;
-                self.immuneFrames = 120; // 2 s immunity after word practice
-                callbacks.onPoints(5);
-                self.showPop(BIRD_X, self.birdY - 50, '+5 ⭐ ออกเสียงได้!');
-                self.showPop(BIRD_X, self.birdY - 20, '🛡️ คุ้มกัน!');
-              });
-            }
-          }
-        }
-      }
-      if (dead) return;
-
-      // Draw
-      this.pipes.forEach(function (p) { self.drawPipe(g, p); });
-      this.pipes.forEach(function (p) {
-        if (p.wordObj && !p.wordHit && p.wordLabel) self.drawBubble(g, p.x, p.gapY);
-      });
       this.drawGround(g);
+      this.drawCoinsAndWords(g);
       this.drawBird(g, time);
     },
 
@@ -381,51 +258,42 @@ function createAirplaneGame(words, callbacks) {
       }
     },
 
-    // ── [PIPES] ──────────────────────────────────────────────────
-    drawPipe: function (g, p) {
-      var x      = p.x;
-      var gapY   = p.gapY;
-      var halfG  = PIPE_GAP / 2;
-      var halfW  = PIPE_W / 2;
-      var topH   = gapY - halfG;     // height of top pipe
-      var botY   = gapY + halfG;     // top of bottom pipe
-      var botH   = GROUND_Y - botY;  // height of bottom pipe
+    // ── [COINS]/[WORDS] Draw coins + word bubbles ──────────────────
+    drawCoinsAndWords: function (g) {
+      var self = this;
+      var now = this.time.now;
 
-      // Word pipes are golden, regular pipes are green
-      var pc  = p.wordObj ? 0xe67e22 : 0x27ae60;
-      var pcd = p.wordObj ? 0xc0392b : 0x1e8449;
+      this.coins.forEach(function (c) {
+        if (c.x < -30 || c.x > W + 30) return;
+        var bob = Math.sin(now * 0.004 + c.x * 0.02) * 3;
+        g.fillStyle(0xffd700);
+        g.lineStyle(2, 0xb8860b);
+        g.fillCircle(c.x, c.y + bob, COIN_R);
+        g.strokeCircle(c.x, c.y + bob, COIN_R);
+        g.fillStyle(0xfff2a8);
+        g.fillCircle(c.x - 3, c.y + bob - 3, COIN_R * 0.35);
+      });
 
-      // Top pipe body
-      if (topH > 0) {
-        g.fillStyle(pc);
-        g.fillRect(x - halfW, 0, PIPE_W, topH - 15);
-        g.fillStyle(pcd);
-        g.fillRect(x - halfW - 7, topH - 18, PIPE_W + 14, 20); // cap
-        g.fillStyle(0xffffff, 0.18);
-        g.fillRect(x - halfW + 4, 0, 11, topH - 15); // highlight
-      }
-      // Bottom pipe body
-      if (botH > 0) {
-        g.fillStyle(pc);
-        g.fillRect(x - halfW, botY + 15, PIPE_W, botH - 15);
-        g.fillStyle(pcd);
-        g.fillRect(x - halfW - 7, botY, PIPE_W + 14, 20); // cap
-        g.fillStyle(0xffffff, 0.18);
-        g.fillRect(x - halfW + 4, botY + 15, 11, botH - 15); // highlight
-      }
+      this.wordItems.forEach(function (w) {
+        if (w.collected || w.x < -80 || w.x > W + 80) return;
+        self.drawBubble(g, w.x, w.y);
+        var et = self.add.text(w.x, w.y - 6, w.word.emoji || '🔸',
+          { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(5);
+        var wt = self.add.text(w.x, w.y + 8, w.word.word,
+          { fontFamily: 'Prompt', fontSize: '12px', fontStyle: 'bold', color: '#2b2438' })
+          .setOrigin(0.5, 0).setDepth(5);
+        self.time.delayedCall(16, function () { et.destroy(); wt.destroy(); });
+      });
     },
 
-    // ── [BUBBLE] Word bubble in the gap center ───────────────────
+    // ── [WORDS] Word bubble in the gap center ───────────────────
     drawBubble: function (g, x, y) {
-      // Outer glow
       g.fillStyle(0xffd700, 0.28);
       g.fillCircle(x, y, 38);
-      // White fill with golden border
       g.fillStyle(0xfffde7, 0.95);
       g.lineStyle(3, 0xf39c12);
       g.fillCircle(x, y, 30);
       g.strokeCircle(x, y, 30);
-      // Inner shimmer
       g.fillStyle(0xffec6e, 0.45);
       g.fillCircle(x, y, 20);
     },
@@ -436,20 +304,8 @@ function createAirplaneGame(words, callbacks) {
       var y  = this.birdY;
       var vy = this.birdVY;
 
-      // Flash every 6 frames during immunity (same pattern as platformer)
-      if (this.immuneFrames > 0 && Math.floor(this.immuneFrames / 6) % 2 === 1) return;
-
-      // Golden shield glow when immune
-      if (this.immuneFrames > 0) {
-        var sa = 0.55 * (this.immuneFrames / 120);
-        g.fillStyle(0xffd700, sa);
-        g.fillCircle(x, y, BIRD_R + 14);
-        g.lineStyle(2.5, 0xffd700, Math.min(1, sa * 2));
-        g.strokeCircle(x, y, BIRD_R + 14);
-      }
-
-      // Tilt: nose down when falling, nose up briefly after flap
-      var tilt     = Phaser.Math.Clamp(vy * 0.065, -0.55, 0.7);
+      // Tilt: leans in the direction it's currently easing toward
+      var tilt     = Phaser.Math.Clamp(vy * 0.12, -0.5, 0.5);
       var cos      = Math.cos(tilt);
       var sin      = Math.sin(tilt);
       var wingFlap = Math.sin(time * 0.018) * 9;
@@ -545,7 +401,7 @@ function createAirplaneGame(words, callbacks) {
     height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:  FlapScene,
-    audio:  { noAudio: true }
+    audio:  { noAudio: false }
   });
 }
 
