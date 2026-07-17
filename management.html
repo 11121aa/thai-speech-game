@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- This page changes often during active development and has no
+     ?v= cache-bust the way linked JS/CSS files do (it IS the page), so
+     tell browsers not to cache it at all — otherwise a stale copy can
+     keep showing old/broken code indefinitely after a fix is deployed. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>ของฉัน | แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">

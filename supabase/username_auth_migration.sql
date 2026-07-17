@@ -108,27 +108,13 @@ $$;
 grant execute on function public.username_to_email(text) to anon, authenticated;
 
 -- ------------------------------------------------------------
--- Update list_users_for_specialist() to also return the username, so
--- management.html can show it instead of the (often synthetic) email.
--- left join: accounts created before this migration have no profile row.
--- Postgres won't let create-or-replace change a function's return row
--- shape (adding the username column counts as that), so drop it first.
+-- list_users_for_specialist() USED to be (re)created here, but it
+-- returned EVERY user to ANY specialist — exactly the access hole
+-- supabase/patient_linking_migration.sql closes by dropping it for good
+-- and replacing it with list_linked_patients_for_specialist(). It's
+-- deliberately NOT recreated here anymore, so re-running this (older)
+-- file after that (newer) one can never silently resurrect it.
 -- ------------------------------------------------------------
-
-drop function if exists public.list_users_for_specialist();
-
-create or replace function public.list_users_for_specialist()
-returns table (user_id uuid, email text, username text)
-language sql
-security definer
-set search_path = public
-as $$
-  select u.id, u.email, p.username
-  from auth.users u
-  left join public.profiles p on p.user_id = u.id
-  where public.is_specialist(auth.uid())
-  order by coalesce(p.username, u.email);
-$$;
 
 -- ------------------------------------------------------------
 -- get_practice_leaderboard() (below) reads from game_scores — create it
