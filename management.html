@@ -481,12 +481,23 @@ document.addEventListener('DOMContentLoaded', async function () {
   var role = await Auth.getRole(session.user.id);
   document.getElementById('loadingState').style.display = 'none';
 
-  if (role === 'specialist') {
-    document.getElementById('specialistView').style.display = 'block';
-    await initSpecialist();
-  } else {
-    document.getElementById('userView').style.display = 'block';
-    await initUserProfile(session);
+  try {
+    if (role === 'specialist') {
+      document.getElementById('specialistView').style.display = 'block';
+      await initSpecialist();
+    } else {
+      document.getElementById('userView').style.display = 'block';
+      await initUserProfile(session);
+    }
+  } catch (err) {
+    // Without this, a single failed query (e.g. a SQL migration that
+    // hasn't been run yet) throws silently and leaves the page looking
+    // permanently stuck loading, with nothing in the console pointing
+    // a non-technical user at what's wrong.
+    console.error(err);
+    document.getElementById('loadingState').innerHTML =
+      '<div class="alert alert-danger d-inline-block">โหลดข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : String(err)) + '</div>';
+    document.getElementById('loadingState').style.display = 'block';
   }
 });
 
