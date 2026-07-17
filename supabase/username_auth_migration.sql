@@ -95,6 +95,34 @@ as $$
 $$;
 
 -- ------------------------------------------------------------
+-- get_practice_leaderboard() (below) reads from game_scores — create it
+-- here too (idempotent) in case supabase/game_scores.sql was never run.
+-- ------------------------------------------------------------
+
+create table if not exists public.game_scores (
+  user_id      uuid    references auth.users not null,
+  game_key     text    not null,
+  best_score   integer not null default 0,
+  display_name text,
+  updated_at   timestamptz default now(),
+  primary key  (user_id, game_key)
+);
+
+alter table public.game_scores enable row level security;
+
+drop policy if exists "public read game_scores" on public.game_scores;
+create policy "public read game_scores"
+  on public.game_scores for select using (true);
+
+drop policy if exists "own insert game_scores" on public.game_scores;
+create policy "own insert game_scores"
+  on public.game_scores for insert with check (auth.uid() = user_id);
+
+drop policy if exists "own update game_scores" on public.game_scores;
+create policy "own update game_scores"
+  on public.game_scores for update using (auth.uid() = user_id);
+
+-- ------------------------------------------------------------
 -- Update the practice leaderboard's display-name fallback to use
 -- profiles.username instead of splitting the (now often synthetic) email.
 -- ------------------------------------------------------------
