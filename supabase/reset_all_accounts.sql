@@ -18,16 +18,23 @@
 -- actually want to wipe every account and start over.
 -- ============================================================
 
-delete from public.homework_word_feedback;
-delete from public.homework_assignments;
-delete from public.homework_words;
-delete from public.homework;
-delete from public.practice;
-delete from public.activity;
-delete from public.game_scores;
-delete from public.therapist_links;
-delete from public.role;
-delete from public.profiles;
+-- Each delete is guarded with to_regclass() so this script works no
+-- matter which of the optional migrations (homework, game_scores,
+-- patient_linking, ...) have or haven't been run yet — a table that
+-- doesn't exist is just skipped instead of erroring the whole script out.
+do $$
+begin
+  if to_regclass('public.homework_word_feedback') is not null then delete from public.homework_word_feedback; end if;
+  if to_regclass('public.homework_assignments')   is not null then delete from public.homework_assignments;   end if;
+  if to_regclass('public.homework_words')         is not null then delete from public.homework_words;         end if;
+  if to_regclass('public.homework')               is not null then delete from public.homework;               end if;
+  if to_regclass('public.practice')               is not null then delete from public.practice;               end if;
+  if to_regclass('public.activity')               is not null then delete from public.activity;               end if;
+  if to_regclass('public.game_scores')            is not null then delete from public.game_scores;            end if;
+  if to_regclass('public.therapist_links')        is not null then delete from public.therapist_links;        end if;
+  if to_regclass('public.role')                   is not null then delete from public.role;                   end if;
+  if to_regclass('public.profiles')               is not null then delete from public.profiles;               end if;
+end $$;
 
 -- Cascades (via Supabase's own auth schema) to auth.sessions,
 -- auth.refresh_tokens, auth.identities, etc. automatically.
