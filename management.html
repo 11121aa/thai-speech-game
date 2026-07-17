@@ -443,10 +443,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 
 /* ── User profile ── */
 async function initUserProfile(session) {
-  var email = session.user.email;
-  var initial = email ? email[0].toUpperCase() : '?';
+  var { data: profile } = await sb.from('profiles').select('username').eq('user_id', session.user.id).maybeSingle();
+  var displayName = (profile && profile.username) || session.user.email;
+  var initial = displayName ? displayName[0].toUpperCase() : '?';
   document.getElementById('profileAvatar').textContent = initial;
-  document.getElementById('profileEmail').textContent = email;
+  document.getElementById('profileEmail').textContent = displayName;
 
   document.getElementById('btnLogout').addEventListener('click', Auth.logout.bind(Auth));
 
@@ -739,7 +740,9 @@ async function loadPatientDashboard() {
   var { data: users } = await sb.rpc('list_users_for_specialist');
   users = users || [];
   allSpecialistUsers = users;
-  users.forEach(function (u) { userEmailMap[u.user_id] = u.email; });
+  // Prefer the chosen username; falls back to email for accounts created
+  // before the username migration (which have no profiles row yet).
+  users.forEach(function (u) { u.name = u.username || u.email; userEmailMap[u.user_id] = u.email; });
 
   // Load all practice records (id + user_id + word info only for counts)
   var { data: practices } = await sb.from('practice')
@@ -752,7 +755,7 @@ async function loadPatientDashboard() {
   allPracticeData.forEach(function (p) { counts[p.user_id] = (counts[p.user_id] || 0) + 1; });
 
   var ranked = users.map(function (u) {
-    return { userId: u.user_id, email: u.email, count: counts[u.user_id] || 0 };
+    return { userId: u.user_id, name: u.name, count: counts[u.user_id] || 0 };
   }).sort(function (a, b) { return b.count - a.count; });
 
   renderPatientList(ranked);
@@ -768,8 +771,8 @@ function renderPatientList(ranked) {
     btn.className = 'w-100 text-start btn btn-light mb-1 py-2 px-3';
     btn.style.cssText = 'border-radius:10px;border:1px solid #e8e3f5;font-size:0.9rem;';
     btn.innerHTML =
-      '<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:26px;font-size:0.75rem;font-weight:700;margin-right:8px;">' + u.email[0].toUpperCase() + '</span>' +
-      '<span style="font-weight:600;">' + u.email + '</span>';
+      '<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:26px;font-size:0.75rem;font-weight:700;margin-right:8px;">' + u.name[0].toUpperCase() + '</span>' +
+      '<span style="font-weight:600;">' + u.name + '</span>';
     btn.addEventListener('click', function () { openPatientDetail(u); });
     container.appendChild(btn);
   });
@@ -785,7 +788,7 @@ function renderLeaderboard(ranked) {
     var medal = i < 3 ? medals[i] : '<span style="display:inline-block;width:22px;text-align:center;font-weight:700;color:#9b93b0;font-size:0.8rem;">' + (i + 1) + '</span>';
     row.innerHTML =
       '<span style="font-size:1.2rem;">' + medal + '</span>' +
-      '<span style="flex:1;font-size:0.9rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.email + '</span>' +
+      '<span style="flex:1;font-size:0.9rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.name + '</span>' +
       '<span style="font-weight:700;color:var(--color-primary-dark);white-space:nowrap;">' + u.count + ' คำ</span>';
     container.appendChild(row);
   });
@@ -794,7 +797,7 @@ function renderLeaderboard(ranked) {
 
 async function openPatientDetail(u) {
   currentDetailPatient = u;
-  document.getElementById('detailPatientName').textContent = u.email;
+  document.getElementById('detailPatientName').textContent = u.name;
   document.getElementById('detailSearch').value = '';
   document.getElementById('detailHwDetailSection').style.display = 'none';
   document.getElementById('detailHwCards').parentElement.style.display = 'block';
@@ -1062,10 +1065,10 @@ function initHomeworkTab() {
     var btn = document.createElement('button');
     btn.className = 'w-100 text-start btn btn-light mb-1 py-2 px-3 hw-patient-row';
     btn.style.cssText = 'border-radius:10px;border:1px solid #e8e3f5;font-size:0.88rem;';
-    var init = u.email[0].toUpperCase();
+    var init = u.name[0].toUpperCase();
     btn.innerHTML =
       '<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:28px;font-size:0.75rem;font-weight:700;flex-shrink:0;margin-right:8px;">' + init + '</span>' +
-      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">' + u.email + '</span>';
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">' + u.name + '</span>';
     btn.addEventListener('click', function () {
       hwSelectedPatient = u;
       loadPatientHwList(u);
@@ -1105,11 +1108,11 @@ function populateHwAssign() {
   allSpecialistUsers.forEach(function (u) {
     var lbl = document.createElement('label');
     lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
-    var init = u.email[0].toUpperCase();
+    var init = u.name[0].toUpperCase();
     lbl.innerHTML =
       '<input type="checkbox" value="' + u.user_id + '" style="width:15px;height:15px;flex-shrink:0;">' +
       '<span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:24px;font-size:0.7rem;font-weight:700;flex-shrink:0;">' + init + '</span>' +
-      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.email + '</span>';
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + u.name + '</span>';
     list.appendChild(lbl);
   });
 }
@@ -1151,7 +1154,7 @@ async function createHomework() {
 /* ── Therapist: view patient homework ── */
 async function loadPatientHwList(patient) {
   hwCurrentPatient = patient;
-  document.getElementById('hwPatientViewName').textContent = patient.email;
+  document.getElementById('hwPatientViewName').textContent = patient.name;
   document.getElementById('hwCardGrid').innerHTML = '<p class="text-secondary text-center py-3 small">กำลังโหลด...</p>';
   document.getElementById('hwCardEmpty').style.display = 'none';
   showHwView('hwPatientView');
@@ -1218,7 +1221,7 @@ function renderHwCards(assignments, practiceData, filter) {
 }
 
 async function openHwDetail(assignmentId, homeworkId, hw, patient) {
-  document.getElementById('hwDetailTitle').textContent = (hw.name || 'การบ้าน #' + homeworkId) + ' — ' + patient.email;
+  document.getElementById('hwDetailTitle').textContent = (hw.name || 'การบ้าน #' + homeworkId) + ' — ' + patient.name;
   document.getElementById('hwDetailStatus').textContent = '';
   document.getElementById('hwDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
   showHwView('hwDetailView');
@@ -1243,7 +1246,7 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
   renderHwDetailTable('hwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
 
   document.getElementById('btnHwDetailPrint').onclick = function () {
-    printHomeworkWorksheet(hw.name || 'การบ้าน #' + homeworkId, 'hwDetailTableWrap', patient.email);
+    printHomeworkWorksheet(hw.name || 'การบ้าน #' + homeworkId, 'hwDetailTableWrap', patient.name);
   };
 }
 
@@ -1526,7 +1529,7 @@ async function openDetailHwDetail(assignmentId, hw, patient) {
   renderHwDetailTable('detailHwDetailTableWrap', words, practices, feedbacks, assignmentId, repeatCount, true);
 
   document.getElementById('btnDetailHwPrint').onclick = function () {
-    printHomeworkWorksheet(hw.name || 'การบ้าน #' + hw.id, 'detailHwDetailTableWrap', patient.email);
+    printHomeworkWorksheet(hw.name || 'การบ้าน #' + hw.id, 'detailHwDetailTableWrap', patient.name);
   };
 }
 

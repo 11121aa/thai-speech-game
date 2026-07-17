@@ -72,12 +72,12 @@
           <h2 class="h4 text-center mb-4">เข้าสู่ระบบ</h2>
           <form id="loginForm">
             <div class="mb-3">
-              <label class="form-label fw-semibold">อีเมล</label>
-              <input type="email" class="form-control" id="loginEmail" required>
+              <label class="form-label fw-semibold">ชื่อผู้ใช้</label>
+              <input type="text" class="form-control" id="loginUsername" autocomplete="username" required>
             </div>
             <div class="mb-3">
               <label class="form-label fw-semibold">รหัสผ่าน</label>
-              <input type="password" class="form-control" id="loginPassword" required>
+              <input type="password" class="form-control" id="loginPassword" autocomplete="current-password" required>
             </div>
             <div class="alert alert-danger" id="loginError" style="display:none;"></div>
             <button type="submit" class="btn btn-warning btn-lg w-100 btn-bouncy">เข้าสู่ระบบ</button>
@@ -87,11 +87,11 @@
           </form>
 
           <div id="forgotSection" style="display:none;" class="mt-3 border-top pt-3">
-            <p class="small text-muted mb-2">กรอกอีเมลที่ลงทะเบียนไว้ เราจะส่งลิงก์รีเซ็ตรหัสผ่านให้</p>
+            <p class="small text-muted mb-2">กรอกชื่อผู้ใช้ของคุณ — หากบัญชีมีอีเมลสำหรับกู้คืนรหัสผ่านผูกไว้ เราจะส่งลิงก์ไปให้</p>
             <form id="forgotForm">
               <div class="mb-3">
-                <label class="form-label fw-semibold">อีเมล</label>
-                <input type="email" class="form-control" id="forgotEmail" required>
+                <label class="form-label fw-semibold">ชื่อผู้ใช้</label>
+                <input type="text" class="form-control" id="forgotUsername" required>
               </div>
               <div class="alert alert-danger" id="forgotError" style="display:none;"></div>
               <div class="alert alert-success" id="forgotSuccess" style="display:none;"></div>
@@ -104,16 +104,20 @@
           <h2 class="h4 text-center mb-4">ลงทะเบียน</h2>
           <form id="registerForm">
             <div class="mb-3">
-              <label class="form-label fw-semibold">อีเมล</label>
-              <input type="email" class="form-control" id="registerEmail" required>
+              <label class="form-label fw-semibold">ชื่อผู้ใช้</label>
+              <input type="text" class="form-control" id="registerUsername" autocomplete="username" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">อีเมลสำหรับกู้คืนรหัสผ่าน <span class="text-secondary fw-normal">(ไม่บังคับ)</span></label>
+              <input type="email" class="form-control" id="registerRecoveryEmail" placeholder="กรอกไว้เผื่อลืมรหัสผ่าน">
             </div>
             <div class="mb-3">
               <label class="form-label fw-semibold">รหัสผ่าน</label>
-              <input type="password" class="form-control" id="registerPassword" required minlength="6">
+              <input type="password" class="form-control" id="registerPassword" autocomplete="new-password" required minlength="6">
             </div>
             <div class="mb-3">
               <label class="form-label fw-semibold">ยืนยันรหัสผ่าน</label>
-              <input type="password" class="form-control" id="registerPasswordConfirm" required minlength="6">
+              <input type="password" class="form-control" id="registerPasswordConfirm" autocomplete="new-password" required minlength="6">
             </div>
             <div class="mb-3">
               <label class="form-label fw-semibold">สมัครในฐานะ</label>
@@ -195,26 +199,28 @@
     const sec = document.getElementById("forgotSection");
     const visible = sec.style.display !== "none";
     sec.style.display = visible ? "none" : "block";
-    if (!visible) document.getElementById("forgotEmail").focus();
+    if (!visible) document.getElementById("forgotUsername").focus();
   });
 
-  // Send reset email
+  // Send reset email — resolves the username to its account's underlying
+  // Auth email first. Always shows the same neutral success message
+  // regardless of whether the username exists or has a recovery email on
+  // file, same anti-enumeration principle Supabase's own API follows.
   document.getElementById("forgotForm").addEventListener("submit", async function (e) {
     e.preventDefault();
     const errEl = document.getElementById("forgotError");
     const okEl = document.getElementById("forgotSuccess");
     errEl.style.display = "none";
     okEl.style.display = "none";
-    const email = document.getElementById("forgotEmail").value.trim();
-    const { error } = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: location.origin + location.pathname
-    });
-    if (error) {
-      errEl.textContent = "ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่";
-      errEl.style.display = "block";
-      return;
+    const username = document.getElementById("forgotUsername").value.trim();
+
+    const { data: email } = await sb.rpc("username_to_email", { uname: username });
+    if (email) {
+      await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: location.origin + location.pathname
+      });
     }
-    okEl.textContent = "ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ " + email + " แล้ว กรุณาตรวจสอบกล่องจดหมาย";
+    okEl.textContent = "หากบัญชี \"" + username + "\" มีอีเมลสำหรับกู้คืนรหัสผ่านผูกไว้ เราได้ส่งลิงก์ไปให้แล้ว กรุณาตรวจสอบกล่องจดหมาย";
     okEl.style.display = "block";
     document.getElementById("forgotForm").reset();
   });
@@ -248,12 +254,23 @@
     e.preventDefault();
     const errEl = document.getElementById("loginError");
     errEl.style.display = "none";
-    const email = document.getElementById("loginEmail").value.trim();
+    const username = document.getElementById("loginUsername").value.trim();
     const password = document.getElementById("loginPassword").value;
+
+    // signInWithPassword needs the account's actual Auth email, so resolve
+    // the typed username to it first (see username_to_email in the SQL
+    // migration — also matches an existing email directly, so accounts
+    // created before this migration can still log in with their old email).
+    const { data: email } = await sb.rpc("username_to_email", { uname: username });
+    if (!email) {
+      errEl.textContent = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
+      errEl.style.display = "block";
+      return;
+    }
 
     const { data, error } = await sb.auth.signInWithPassword({ email: email, password: password });
     if (error) {
-      errEl.textContent = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+      errEl.textContent = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
       errEl.style.display = "block";
       return;
     }
@@ -273,7 +290,8 @@
     errEl.style.display = "none";
     okEl.style.display = "none";
 
-    const email = document.getElementById("registerEmail").value.trim();
+    const username = document.getElementById("registerUsername").value.trim();
+    const recoveryEmail = document.getElementById("registerRecoveryEmail").value.trim();
     const password = document.getElementById("registerPassword").value;
     const confirmPassword = document.getElementById("registerPasswordConfirm").value;
     const role = document.querySelector('input[name="registerRole"]:checked').value;
@@ -284,9 +302,25 @@
       return;
     }
 
-    const { data, error } = await sb.auth.signUp({ email: email, password: password });
+    // Check the username isn't already taken before creating the account.
+    const { data: existing } = await sb.rpc("username_to_email", { uname: username });
+    if (existing) {
+      errEl.textContent = "ชื่อผู้ใช้นี้ถูกใช้แล้ว กรุณาเลือกชื่ออื่น";
+      errEl.style.display = "block";
+      return;
+    }
+
+    // Supabase Auth still requires an email under the hood. If a recovery
+    // email was given, use it as the real Auth email (so "forgot password"
+    // works); otherwise use a random placeholder that's never shown or
+    // emailed — either way, login always happens via username.
+    const authEmail = recoveryEmail || (crypto.randomUUID() + "@users.noreply.local");
+
+    const { data, error } = await sb.auth.signUp({ email: authEmail, password: password });
     if (error) {
-      errEl.textContent = error.message || "ลงทะเบียนไม่สำเร็จ กรุณาลองใหม่";
+      errEl.textContent = recoveryEmail
+        ? "อีเมลสำหรับกู้คืนรหัสผ่านนี้ถูกใช้แล้ว กรุณาใช้อีเมลอื่นหรือเว้นว่างไว้"
+        : (error.message || "ลงทะเบียนไม่สำเร็จ กรุณาลองใหม่");
       errEl.style.display = "block";
       return;
     }
@@ -297,6 +331,7 @@
       return;
     }
 
+    await sb.from("profiles").insert({ user_id: data.user.id, username: username, recovery_email: recoveryEmail || null });
     await sb.from("role").insert({ user_id: data.user.id, role: role });
     await Auth.logActivity("login", "login.html");
     location.href = redirectTarget;

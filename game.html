@@ -541,7 +541,8 @@ async function saveGameScore(gameKey, score) {
     var session = await Auth.getSession();
     if (!session) return;
     var userId = session.user.id;
-    var displayName = (session.user.email || '').split('@')[0];
+    var { data: profile } = await sb.from('profiles').select('username').eq('user_id', userId).maybeSingle();
+    var displayName = (profile && profile.username) || (session.user.email || '').split('@')[0];
     var { data: cur } = await sb.from('game_scores').select('best_score').eq('user_id', userId).eq('game_key', gameKey).maybeSingle();
     if (!cur || score > (cur.best_score || 0)) {
       await sb.from('game_scores').upsert({ user_id: userId, game_key: gameKey, best_score: score, display_name: displayName, updated_at: new Date().toISOString() });
