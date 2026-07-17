@@ -75,7 +75,11 @@ grant execute on function public.username_to_email(text) to anon, authenticated;
 -- Update list_users_for_specialist() to also return the username, so
 -- management.html can show it instead of the (often synthetic) email.
 -- left join: accounts created before this migration have no profile row.
+-- Postgres won't let create-or-replace change a function's return row
+-- shape (adding the username column counts as that), so drop it first.
 -- ------------------------------------------------------------
+
+drop function if exists public.list_users_for_specialist();
 
 create or replace function public.list_users_for_specialist()
 returns table (user_id uuid, email text, username text)
