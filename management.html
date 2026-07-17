@@ -81,8 +81,12 @@
             <button class="btn btn-sm btn-outline-secondary w-100 mb-2" id="btnEditProfile"><i class="bi bi-pencil-fill me-1"></i>แก้ไขข้อมูล</button>
           </div>
 
-          <!-- Edit form: gender/age only — role is set by a specialist, not self-editable -->
+          <!-- Edit form: username/gender/age — role is set by a specialist, not self-editable -->
           <div id="profileInfoEdit" style="display:none;text-align:left;">
+            <div class="mb-2">
+              <label class="form-label fw-semibold small mb-1">ชื่อผู้ใช้</label>
+              <input type="text" class="form-control form-control-sm" id="editUsername">
+            </div>
             <div class="mb-2">
               <label class="form-label fw-semibold small mb-1">เพศ</label>
               <select class="form-select form-select-sm" id="editGender">
@@ -507,15 +511,22 @@ async function initUserProfile(session) {
   }
   if (profile && profile.patient_code) {
     document.getElementById('profileCode').textContent = profile.patient_code;
-    document.getElementById('btnCopyCode').addEventListener('click', function () {
-      navigator.clipboard.writeText(profile.patient_code).then(function () {
-        var btn = document.getElementById('btnCopyCode');
-        var orig = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-check-lg"></i>';
-        setTimeout(function () { btn.innerHTML = orig; }, 1200);
-      });
-    });
   }
+  // Wired unconditionally (assignment, not addEventListener, so re-calling
+  // initUserProfile-adjacent code never double-binds it) and reads the
+  // code from the DOM at click time — works immediately even for accounts
+  // that only get a patient_code after saving the edit form for the
+  // first time (see wireProfileEdit), with no need to re-wire anything.
+  document.getElementById('btnCopyCode').onclick = function () {
+    var code = document.getElementById('profileCode').textContent;
+    if (!code || code.charAt(0) === '-') return; // still the "------" placeholder
+    navigator.clipboard.writeText(code).then(function () {
+      var btn = document.getElementById('btnCopyCode');
+      var orig = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+      setTimeout(function () { btn.innerHTML = orig; }, 1200);
+    });
+  };
 
   wireProfileAvatarUpload(session);
   wireProfileEdit(session, profile);
@@ -587,6 +598,7 @@ function wireProfileEdit(session, profile) {
   var editEl = document.getElementById('profileInfoEdit');
 
   document.getElementById('btnEditProfile').addEventListener('click', function () {
+    document.getElementById('editUsername').value = (profile && profile.username) || '';
     document.getElementById('editGender').value = (profile && profile.gender) || 'male';
     document.getElementById('editAge').value = (profile && profile.age) || '';
     displayEl.style.display = 'none';
@@ -599,25 +611,42 @@ function wireProfileEdit(session, profile) {
   });
 
   document.getElementById('btnSaveProfile').addEventListener('click', async function () {
+    var username = document.getElementById('editUsername').value.trim();
     var gender = document.getElementById('editGender').value;
     var ageVal = parseInt(document.getElementById('editAge').value, 10);
     var age = isNaN(ageVal) ? null : ageVal;
 
-    var { error } = await sb.from('profiles').update({ gender: gender, age: age }).eq('user_id', session.user.id);
-    if (error) { alert('บันทึกไม่สำเร็จ: ' + error.message); return; }
+    if (!username) { alert('กรุณากรอกชื่อผู้ใช้'); return; }
 
-    profile = profile || {};
-    profile.gender = gender;
-    profile.age = age;
+    // upsert, not update — accounts created before the username migration
+    // have no profiles row at all yet, so a plain update() would silently
+    // affect zero rows and look like it saved without persisting anything.
+    var { error } = await sb.from('profiles')
+      .upsert({ user_id: session.user.id, username: username, gender: gender, age: age }, { onConflict: 'user_id' });
+    if (error) {
+      alert(error.code === '23505'
+        ? 'ชื่อผู้ใช้นี้ถูกใช้แล้ว กรุณาเลือกชื่ออื่น'
+        : 'บันทึกไม่สำเร็จ: ' + error.message);
+      return;
+    }
 
+    // Re-fetch rather than trust local state — patient_code is DB-generated
+    // on first insert, so this also picks that up for legacy accounts that
+    // never had a profiles row until just now.
+    var { data: fresh } = await sb.from('profiles').select('username, gender, age, patient_code').eq('user_id', session.user.id).maybeSingle();
+    profile = fresh || { username: username, gender: gender, age: age };
+
+    document.getElementById('profileEmail').textContent = profile.username;
+    document.getElementById('profileAvatarInitial').textContent = profile.username[0].toUpperCase();
     document.getElementById('profileGenderRow').style.display = 'flex';
-    document.getElementById('profileGender').textContent = GENDER_LABELS[gender] || gender;
-    if (age) {
+    document.getElementById('profileGender').textContent = GENDER_LABELS[profile.gender] || profile.gender;
+    if (profile.age) {
       document.getElementById('profileAgeRow').style.display = 'flex';
-      document.getElementById('profileAge').textContent = age + ' ปี';
+      document.getElementById('profileAge').textContent = profile.age + ' ปี';
     } else {
       document.getElementById('profileAgeRow').style.display = 'none';
     }
+    if (profile.patient_code) document.getElementById('profileCode').textContent = profile.patient_code;
 
     editEl.style.display = 'none';
     displayEl.style.display = 'block';
