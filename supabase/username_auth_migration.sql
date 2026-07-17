@@ -25,6 +25,11 @@ create table if not exists public.profiles (
 -- Case-insensitive uniqueness, so "Alice" and "alice" can't both register.
 create unique index if not exists idx_profiles_username_lower on public.profiles (lower(username));
 
+-- Gender/age — collected at sign-up for patient (ผู้ฝึกออกเสียง) accounts
+-- only; left null for specialists.
+alter table public.profiles add column if not exists gender text check (gender in ('male', 'female', 'other'));
+alter table public.profiles add column if not exists age smallint check (age > 0 and age < 120);
+
 alter table public.profiles enable row level security;
 
 drop policy if exists "profiles_select_own_or_specialist" on public.profiles;

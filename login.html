@@ -132,6 +132,21 @@
                 </div>
               </div>
             </div>
+            <div id="patientExtraFields" class="row g-3 mb-3">
+              <div class="col-6">
+                <label class="form-label fw-semibold">เพศ</label>
+                <select class="form-select" id="registerGender" required>
+                  <option value="">เลือก...</option>
+                  <option value="male">ชาย</option>
+                  <option value="female">หญิง</option>
+                  <option value="other">อื่นๆ</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold">อายุ</label>
+                <input type="number" class="form-control" id="registerAge" min="1" max="120" required>
+              </div>
+            </div>
             <div class="alert alert-danger" id="registerError" style="display:none;"></div>
             <div class="alert alert-success" id="registerSuccess" style="display:none;"></div>
             <button type="submit" class="btn btn-warning btn-lg w-100 btn-bouncy">ลงทะเบียน</button>
@@ -193,6 +208,21 @@
     }
     Auth.initNav();
   });
+
+  // Gender/age are only collected for patient (ผู้ฝึกออกเสียง) sign-ups —
+  // hide them (and drop the `required` so the hidden fields can't block
+  // submission) when "specialist" is picked instead.
+  function updatePatientExtraFields() {
+    const isPatient = document.getElementById("roleUser").checked;
+    const wrap = document.getElementById("patientExtraFields");
+    wrap.style.display = isPatient ? "flex" : "none";
+    document.getElementById("registerGender").required = isPatient;
+    document.getElementById("registerAge").required = isPatient;
+  }
+  document.querySelectorAll('input[name="registerRole"]').forEach(function (r) {
+    r.addEventListener("change", updatePatientExtraFields);
+  });
+  updatePatientExtraFields();
 
   // Toggle forgot-password section
   document.getElementById("forgotToggle").addEventListener("click", function () {
@@ -295,6 +325,8 @@
     const password = document.getElementById("registerPassword").value;
     const confirmPassword = document.getElementById("registerPasswordConfirm").value;
     const role = document.querySelector('input[name="registerRole"]:checked').value;
+    const gender = role === "user" ? document.getElementById("registerGender").value : null;
+    const age = role === "user" ? parseInt(document.getElementById("registerAge").value, 10) : null;
 
     if (password !== confirmPassword) {
       errEl.textContent = "รหัสผ่านทั้งสองช่องไม่ตรงกัน";
@@ -331,7 +363,10 @@
       return;
     }
 
-    await sb.from("profiles").insert({ user_id: data.user.id, username: username, recovery_email: recoveryEmail || null });
+    await sb.from("profiles").insert({
+      user_id: data.user.id, username: username, recovery_email: recoveryEmail || null,
+      gender: gender || null, age: (age && !isNaN(age)) ? age : null
+    });
     await sb.from("role").insert({ user_id: data.user.id, role: role });
     await Auth.logActivity("login", "login.html");
     location.href = redirectTarget;
