@@ -71,6 +71,13 @@
               <span class="label">อายุ</span>
               <span class="value" id="profileAge">—</span>
             </div>
+            <div class="soft-card mb-2" style="background:var(--color-bg-soft);padding:0.75rem;text-align:left;">
+              <div class="small text-secondary mb-1">รหัสเชื่อมต่อกับผู้เชี่ยวชาญ — ส่งรหัสนี้ให้นักแก้ไขการพูดของคุณ</div>
+              <div class="d-flex align-items-center gap-2">
+                <code id="profileCode" style="font-size:1.1rem;font-weight:700;letter-spacing:1px;">------</code>
+                <button class="btn btn-sm btn-outline-primary" id="btnCopyCode" type="button" title="คัดลอกรหัส"><i class="bi bi-clipboard"></i></button>
+              </div>
+            </div>
             <button class="btn btn-sm btn-outline-secondary w-100 mb-2" id="btnEditProfile"><i class="bi bi-pencil-fill me-1"></i>แก้ไขข้อมูล</button>
           </div>
 
@@ -193,6 +200,11 @@
             <div class="col-md-6">
               <div class="soft-card h-100">
                 <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>ชื่อผู้ฝึก / Gmail</h6>
+                <div class="d-flex gap-2 mb-3">
+                  <input type="text" class="form-control form-control-sm" id="linkPatientCode" placeholder="กรอกรหัสเชื่อมต่อจากผู้ฝึก" maxlength="6" style="text-transform:uppercase;">
+                  <button class="btn btn-sm btn-warning flex-shrink-0" id="btnLinkPatient">เชื่อมต่อ</button>
+                </div>
+                <div id="linkPatientMsg" class="small mb-2" style="display:none;"></div>
                 <div id="patientList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
               </div>
             </div>
@@ -478,7 +490,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 var GENDER_LABELS = { male: 'ชาย', female: 'หญิง' };
 
 async function initUserProfile(session) {
-  var { data: profile } = await sb.from('profiles').select('username, gender, age, avatar_url').eq('user_id', session.user.id).maybeSingle();
+  var { data: profile } = await sb.from('profiles').select('username, gender, age, avatar_url, patient_code').eq('user_id', session.user.id).maybeSingle();
   var displayName = (profile && profile.username) || session.user.email;
   var initial = displayName ? displayName[0].toUpperCase() : '?';
   document.getElementById('profileAvatarInitial').textContent = initial;
@@ -492,6 +504,17 @@ async function initUserProfile(session) {
   if (profile && profile.age) {
     document.getElementById('profileAgeRow').style.display = 'flex';
     document.getElementById('profileAge').textContent = profile.age + ' ปี';
+  }
+  if (profile && profile.patient_code) {
+    document.getElementById('profileCode').textContent = profile.patient_code;
+    document.getElementById('btnCopyCode').addEventListener('click', function () {
+      navigator.clipboard.writeText(profile.patient_code).then(function () {
+        var btn = document.getElementById('btnCopyCode');
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+        setTimeout(function () { btn.innerHTML = orig; }, 1200);
+      });
+    });
   }
 
   wireProfileAvatarUpload(session);
@@ -808,6 +831,27 @@ async function initSpecialist() {
   await loadPatientDashboard();
   initHomeworkTab();
 
+  document.getElementById('btnLinkPatient').addEventListener('click', async function () {
+    var input = document.getElementById('linkPatientCode');
+    var msgEl = document.getElementById('linkPatientMsg');
+    var code = input.value.trim();
+    if (!code) return;
+    var btn = document.getElementById('btnLinkPatient');
+    btn.disabled = true;
+    var { data: ok, error } = await sb.rpc('link_patient_by_code', { code: code });
+    btn.disabled = false;
+    msgEl.style.display = 'block';
+    if (error || !ok) {
+      msgEl.className = 'small mb-2 text-danger';
+      msgEl.textContent = 'ไม่พบรหัสนี้ กรุณาตรวจสอบแล้วลองใหม่';
+      return;
+    }
+    msgEl.className = 'small mb-2 text-success';
+    msgEl.textContent = 'เชื่อมต่อสำเร็จ!';
+    input.value = '';
+    await loadPatientDashboard();
+  });
+
   document.getElementById('wordForm').addEventListener('submit', onWordSubmit);
   document.getElementById('wordCancelEditBtn').addEventListener('click', resetWordForm);
   document.getElementById('wordSearchInput').addEventListener('input', renderWordsTable);
@@ -871,8 +915,9 @@ var currentDetailData = [];
 var currentDetailPatient = null;
 
 async function loadPatientDashboard() {
-  // Load users
-  var { data: users } = await sb.rpc('list_users_for_specialist');
+  // Load only patients this specialist has linked via a shared code
+  // (see supabase/patient_linking_migration.sql) — never every user.
+  var { data: users } = await sb.rpc('list_linked_patients_for_specialist');
   users = users || [];
   allSpecialistUsers = users;
   // Prefer the chosen username; falls back to email for accounts created
