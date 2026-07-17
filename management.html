@@ -512,7 +512,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 var GENDER_LABELS = { male: 'ชาย', female: 'หญิง' };
 
 async function initUserProfile(session) {
-  var { data: profile } = await sb.from('profiles').select('username, gender, age, avatar_url, patient_code').eq('user_id', session.user.id).maybeSingle();
+  console.log('[profile load] logged-in user_id:', session.user.id, 'email:', session.user.email);
+  var { data: profile, error: profileErr } = await sb.from('profiles').select('username, gender, age, avatar_url, patient_code').eq('user_id', session.user.id).maybeSingle();
+  console.log('[profile load] query result — data:', profile, 'error:', profileErr);
   var displayName = (profile && profile.username) || session.user.email;
   var initial = displayName ? displayName[0].toUpperCase() : '?';
   document.getElementById('profileAvatarInitial').textContent = initial;
@@ -636,11 +638,22 @@ function wireProfileEdit(session, profile) {
 
     if (!username) { alert('กรุณากรอกชื่อผู้ใช้'); return; }
 
+    var payload = { user_id: session.user.id, username: username, gender: gender, age: age };
+    console.log('[profile save] logged-in user_id:', session.user.id);
+    console.log('[profile save] upsert payload:', payload);
+
     // upsert, not update — accounts created before the username migration
     // have no profiles row at all yet, so a plain update() would silently
     // affect zero rows and look like it saved without persisting anything.
-    var { error } = await sb.from('profiles')
-      .upsert({ user_id: session.user.id, username: username, gender: gender, age: age }, { onConflict: 'user_id' });
+    // .select().single() so the response echoes back the actual row
+    // Postgres now has, instead of just a blind "no error" — that row is
+    // what gets shown, not the values we sent, so a save that silently
+    // landed somewhere unexpected is visible here instead of hidden.
+    var { data: written, error } = await sb.from('profiles')
+      .upsert(payload, { onConflict: 'user_id' })
+      .select()
+      .single();
+    console.log('[profile save] upsert result — data:', written, 'error:', error);
     if (error) {
       alert(error.code === '23505'
         ? 'ชื่อผู้ใช้นี้ถูกใช้แล้ว กรุณาเลือกชื่ออื่น'
@@ -648,11 +661,7 @@ function wireProfileEdit(session, profile) {
       return;
     }
 
-    // Re-fetch rather than trust local state — patient_code is DB-generated
-    // on first insert, so this also picks that up for legacy accounts that
-    // never had a profiles row until just now.
-    var { data: fresh } = await sb.from('profiles').select('username, gender, age, patient_code').eq('user_id', session.user.id).maybeSingle();
-    profile = fresh || { username: username, gender: gender, age: age };
+    profile = written;
 
     document.getElementById('profileEmail').textContent = profile.username;
     document.getElementById('profileAvatarInitial').textContent = profile.username[0].toUpperCase();
