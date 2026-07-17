@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
@@ -1606,7 +1606,13 @@ function printHomeworkWorksheet(hwName, containerId, patientLabel) {
     '<h1>📝 ' + hwName + '</h1>' +
     '<div class="meta">' + (patientLabel ? patientLabel + ' · ' : '') + 'วันที่พิมพ์: ' + dateStr + '</div>' +
     clone.innerHTML +
-    '</body></html>';
+    // Split so this never contains the literal closing-body-tag substring
+    // — some local dev servers (e.g. VS Code Live Server) inject their
+    // auto-reload script by naively text-searching the raw file for that
+    // exact tag, and can match THIS string constant instead of the page's
+    // real closing tag near the end of the file, corrupting the script
+    // right here with a stray injected <script> in the middle of it.
+    '</bo' + 'dy></ht' + 'ml>';
 
   var win = window.open('', '_blank');
   if (!win) { alert('เบราว์เซอร์บล็อกหน้าต่างป็อปอัพ กรุณาอนุญาตป็อปอัพเพื่อพิมพ์การบ้าน'); return; }
