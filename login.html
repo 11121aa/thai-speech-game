@@ -363,10 +363,16 @@
       return;
     }
 
-    await sb.from("profiles").insert({
+    const { error: profileError } = await sb.from("profiles").insert({
       user_id: data.user.id, username: username, recovery_email: recoveryEmail || null,
       gender: gender || null, age: (age && !isNaN(age)) ? age : null
     });
+    if (profileError) {
+      errEl.textContent = "สร้างบัญชีสำเร็จ แต่บันทึกโปรไฟล์ไม่สำเร็จ: " + profileError.message +
+        " (อาจยังไม่ได้รัน supabase/username_auth_migration.sql — กรุณาแจ้งผู้ดูแลระบบ)";
+      errEl.style.display = "block";
+      return;
+    }
     await sb.from("role").insert({ user_id: data.user.id, role: role });
     await Auth.logActivity("login", "login.html");
     location.href = redirectTarget;

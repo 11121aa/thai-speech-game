@@ -60,6 +60,14 @@
             <span class="label">ชื่อเล่น</span>
             <span class="value" id="profileName">—</span>
           </div>
+          <div class="profile-info-row" id="profileGenderRow" style="display:none;">
+            <span class="label">เพศ</span>
+            <span class="value" id="profileGender">—</span>
+          </div>
+          <div class="profile-info-row" id="profileAgeRow" style="display:none;">
+            <span class="label">อายุ</span>
+            <span class="value" id="profileAge">—</span>
+          </div>
           <hr>
           <a href="game.html" class="btn btn-warning btn-bouncy w-100 mb-2"><i class="bi bi-controller me-1"></i>เริ่มเล่นเกม</a>
           <button class="btn btn-outline-secondary w-100" id="btnLogout"><i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ</button>
@@ -442,12 +450,23 @@ document.addEventListener('DOMContentLoaded', async function () {
 });
 
 /* ── User profile ── */
+var GENDER_LABELS = { male: 'ชาย', female: 'หญิง', other: 'อื่นๆ' };
+
 async function initUserProfile(session) {
-  var { data: profile } = await sb.from('profiles').select('username').eq('user_id', session.user.id).maybeSingle();
+  var { data: profile } = await sb.from('profiles').select('username, gender, age').eq('user_id', session.user.id).maybeSingle();
   var displayName = (profile && profile.username) || session.user.email;
   var initial = displayName ? displayName[0].toUpperCase() : '?';
   document.getElementById('profileAvatar').textContent = initial;
   document.getElementById('profileEmail').textContent = displayName;
+
+  if (profile && profile.gender) {
+    document.getElementById('profileGenderRow').style.display = 'flex';
+    document.getElementById('profileGender').textContent = GENDER_LABELS[profile.gender] || profile.gender;
+  }
+  if (profile && profile.age) {
+    document.getElementById('profileAgeRow').style.display = 'flex';
+    document.getElementById('profileAge').textContent = profile.age + ' ปี';
+  }
 
   document.getElementById('btnLogout').addEventListener('click', Auth.logout.bind(Auth));
 
