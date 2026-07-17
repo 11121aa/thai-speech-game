@@ -50,20 +50,49 @@
 
         <!-- Column 1: Profile info -->
         <div class="profile-column-card text-center">
-          <div class="profile-avatar" id="profileAvatar">?</div>
+          <div class="profile-avatar" id="profileAvatar" style="cursor:pointer;position:relative;overflow:hidden;" title="คลิกเพื่อเปลี่ยนรูปโปรไฟล์">
+            <span id="profileAvatarInitial">?</span>
+            <img id="profileAvatarImg" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="">
+            <span style="position:absolute;bottom:-2px;right:-2px;background:var(--color-primary-dark);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;border:2px solid #fff;"><i class="bi bi-camera-fill"></i></span>
+          </div>
+          <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
           <h5 class="mb-2" id="profileEmail" style="word-break:break-all;"></h5>
-          <div class="profile-info-row">
-            <span class="label">บทบาท</span>
-            <span class="value" id="profileRole">ผู้ฝึกออกเสียง</span>
+
+          <div id="profileInfoDisplay">
+            <div class="profile-info-row">
+              <span class="label">บทบาท</span>
+              <span class="value" id="profileRole">ผู้ฝึกออกเสียง</span>
+            </div>
+            <div class="profile-info-row" id="profileGenderRow" style="display:none;">
+              <span class="label">เพศ</span>
+              <span class="value" id="profileGender">—</span>
+            </div>
+            <div class="profile-info-row" id="profileAgeRow" style="display:none;">
+              <span class="label">อายุ</span>
+              <span class="value" id="profileAge">—</span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary w-100 mb-2" id="btnEditProfile"><i class="bi bi-pencil-fill me-1"></i>แก้ไขข้อมูล</button>
           </div>
-          <div class="profile-info-row" id="profileGenderRow" style="display:none;">
-            <span class="label">เพศ</span>
-            <span class="value" id="profileGender">—</span>
+
+          <!-- Edit form: gender/age only — role is set by a specialist, not self-editable -->
+          <div id="profileInfoEdit" style="display:none;text-align:left;">
+            <div class="mb-2">
+              <label class="form-label fw-semibold small mb-1">เพศ</label>
+              <select class="form-select form-select-sm" id="editGender">
+                <option value="male">ชาย</option>
+                <option value="female">หญิง</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label fw-semibold small mb-1">อายุ</label>
+              <input type="number" class="form-control form-control-sm" id="editAge" min="1" max="120">
+            </div>
+            <div class="d-flex gap-2 mb-2">
+              <button class="btn btn-sm btn-warning flex-fill" id="btnSaveProfile">บันทึก</button>
+              <button class="btn btn-sm btn-outline-secondary flex-fill" id="btnCancelEditProfile">ยกเลิก</button>
+            </div>
           </div>
-          <div class="profile-info-row" id="profileAgeRow" style="display:none;">
-            <span class="label">อายุ</span>
-            <span class="value" id="profileAge">—</span>
-          </div>
+
           <hr>
           <a href="game.html" class="btn btn-warning btn-bouncy w-100 mb-2"><i class="bi bi-controller me-1"></i>เริ่มเล่นเกม</a>
           <button class="btn btn-outline-secondary w-100" id="btnLogout"><i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ</button>
@@ -449,11 +478,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 var GENDER_LABELS = { male: 'ชาย', female: 'หญิง' };
 
 async function initUserProfile(session) {
-  var { data: profile } = await sb.from('profiles').select('username, gender, age').eq('user_id', session.user.id).maybeSingle();
+  var { data: profile } = await sb.from('profiles').select('username, gender, age, avatar_url').eq('user_id', session.user.id).maybeSingle();
   var displayName = (profile && profile.username) || session.user.email;
   var initial = displayName ? displayName[0].toUpperCase() : '?';
-  document.getElementById('profileAvatar').textContent = initial;
+  document.getElementById('profileAvatarInitial').textContent = initial;
   document.getElementById('profileEmail').textContent = displayName;
+  showAvatarImage(profile && profile.avatar_url);
 
   if (profile && profile.gender) {
     document.getElementById('profileGenderRow').style.display = 'flex';
@@ -463,6 +493,9 @@ async function initUserProfile(session) {
     document.getElementById('profileAgeRow').style.display = 'flex';
     document.getElementById('profileAge').textContent = profile.age + ' ปี';
   }
+
+  wireProfileAvatarUpload(session);
+  wireProfileEdit(session, profile);
 
   document.getElementById('btnLogout').addEventListener('click', Auth.logout.bind(Auth));
 
@@ -479,6 +512,93 @@ async function initUserProfile(session) {
   renderRecordings(data.slice(0, 15));
   renderStats(data);
   drawDailyChart(data);
+}
+
+function showAvatarImage(url) {
+  var img = document.getElementById('profileAvatarImg');
+  var initial = document.getElementById('profileAvatarInitial');
+  if (url) {
+    img.src = url;
+    img.style.display = 'block';
+    initial.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    initial.style.display = 'block';
+  }
+}
+
+// Clicking the avatar opens a file picker; the chosen image is uploaded
+// to the public "avatars" storage bucket (own-folder-only write, per the
+// RLS policies in the username migration) and saved on the profile row.
+function wireProfileAvatarUpload(session) {
+  var avatarEl = document.getElementById('profileAvatar');
+  var fileInput = document.getElementById('avatarFileInput');
+  avatarEl.addEventListener('click', function () { fileInput.click(); });
+
+  fileInput.addEventListener('change', async function () {
+    var file = fileInput.files[0];
+    if (!file) return;
+    var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    var path = session.user.id + '/avatar.' + ext;
+
+    var { error: uploadError } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+    if (uploadError) { alert('อัปโหลดรูปไม่สำเร็จ: ' + uploadError.message); return; }
+
+    var { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
+    // Cache-bust so the new image shows immediately even though the URL
+    // itself is otherwise identical to the previous upload's.
+    var url = pub.publicUrl + '?t=' + Date.now();
+
+    var { error: updateError } = await sb.from('profiles').update({ avatar_url: url }).eq('user_id', session.user.id);
+    if (updateError) { alert('บันทึกรูปโปรไฟล์ไม่สำเร็จ: ' + updateError.message); return; }
+
+    showAvatarImage(url);
+  });
+}
+
+// Toggles the gender/age rows into an editable form. Role is intentionally
+// not editable here — it's controlled by a specialist, not the account
+// owner (see the role table's RLS policies).
+function wireProfileEdit(session, profile) {
+  var displayEl = document.getElementById('profileInfoDisplay');
+  var editEl = document.getElementById('profileInfoEdit');
+
+  document.getElementById('btnEditProfile').addEventListener('click', function () {
+    document.getElementById('editGender').value = (profile && profile.gender) || 'male';
+    document.getElementById('editAge').value = (profile && profile.age) || '';
+    displayEl.style.display = 'none';
+    editEl.style.display = 'block';
+  });
+
+  document.getElementById('btnCancelEditProfile').addEventListener('click', function () {
+    editEl.style.display = 'none';
+    displayEl.style.display = 'block';
+  });
+
+  document.getElementById('btnSaveProfile').addEventListener('click', async function () {
+    var gender = document.getElementById('editGender').value;
+    var ageVal = parseInt(document.getElementById('editAge').value, 10);
+    var age = isNaN(ageVal) ? null : ageVal;
+
+    var { error } = await sb.from('profiles').update({ gender: gender, age: age }).eq('user_id', session.user.id);
+    if (error) { alert('บันทึกไม่สำเร็จ: ' + error.message); return; }
+
+    profile = profile || {};
+    profile.gender = gender;
+    profile.age = age;
+
+    document.getElementById('profileGenderRow').style.display = 'flex';
+    document.getElementById('profileGender').textContent = GENDER_LABELS[gender] || gender;
+    if (age) {
+      document.getElementById('profileAgeRow').style.display = 'flex';
+      document.getElementById('profileAge').textContent = age + ' ปี';
+    } else {
+      document.getElementById('profileAgeRow').style.display = 'none';
+    }
+
+    editEl.style.display = 'none';
+    displayEl.style.display = 'block';
+  });
 }
 
 var MGMT_GAMES = [
