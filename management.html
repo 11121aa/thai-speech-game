@@ -144,7 +144,7 @@
       </div>
 
       <ul class="nav nav-pills mb-4 gap-2">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabPatients" type="button"><i class="bi bi-people-fill me-1"></i>ผู้ป่วย</button></li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabPatients" type="button"><i class="bi bi-people-fill me-1"></i>ผู้ฝึก</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabHomework" type="button"><i class="bi bi-journal-check me-1"></i>การบ้าน</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabWords" type="button">จัดการคลังคำ</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabSounds" type="button">รูปปากตามเสียง</button></li>
@@ -159,7 +159,7 @@
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <div class="soft-card h-100">
-                <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>ชื่อผู้ป่วย / Gmail</h6>
+                <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>ชื่อผู้ฝึก / Gmail</h6>
                 <div id="patientList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
               </div>
             </div>
@@ -267,8 +267,8 @@
             <div class="row g-3">
               <div class="col-md-5">
                 <div class="soft-card h-100">
-                  <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>รายชื่อผู้ป่วย</h6>
-                  <p class="text-secondary small mb-2">คลิกชื่อผู้ป่วยเพื่อดูการบ้าน</p>
+                  <h6 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-1" style="color:var(--color-primary-dark);"></i>รายชื่อผู้ฝึก</h6>
+                  <p class="text-secondary small mb-2">คลิกชื่อผู้ฝึกเพื่อดูการบ้าน</p>
                   <div id="hwPatientList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
                 </div>
               </div>
@@ -345,7 +345,7 @@
               <!-- Patient assign -->
               <div class="col-md-4">
                 <div class="soft-card h-100">
-                  <h6 class="fw-bold mb-3">มอบหมายให้ผู้ป่วย</h6>
+                  <h6 class="fw-bold mb-3">มอบหมายให้ผู้ฝึก</h6>
                   <div id="hwAssignList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
                 </div>
               </div>
@@ -362,7 +362,7 @@
             <div style="background:#fff;border-radius:20px;padding:2.5rem 2rem;text-align:center;max-width:320px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
               <div style="font-size:3rem;">🎉</div>
               <h4 class="mt-2 mb-1">สร้างการบ้านสำเร็จ!</h4>
-              <p class="text-secondary mb-3">มอบหมายการบ้านให้ผู้ป่วยแล้ว</p>
+              <p class="text-secondary mb-3">มอบหมายการบ้านให้ผู้ฝึกแล้ว</p>
               <button class="btn btn-warning btn-bouncy w-100" id="btnHwReturn">กลับไปหน้าการบ้าน</button>
             </div>
           </div>
@@ -1054,7 +1054,7 @@ function showHwView(viewId) {
 function initHomeworkTab() {
   var list = document.getElementById('hwPatientList');
   if (!allSpecialistUsers.length) {
-    list.innerHTML = '<p class="text-secondary text-center py-3 small">ยังไม่มีผู้ป่วย</p>';
+    list.innerHTML = '<p class="text-secondary text-center py-3 small">ยังไม่มีผู้ฝึก</p>';
     return;
   }
   list.innerHTML = '';
@@ -1101,7 +1101,7 @@ function populateHwWords() {
 function populateHwAssign() {
   var list = document.getElementById('hwAssignList');
   list.innerHTML = '';
-  if (!allSpecialistUsers.length) { list.innerHTML = '<p class="text-secondary small">ยังไม่มีผู้ป่วย</p>'; return; }
+  if (!allSpecialistUsers.length) { list.innerHTML = '<p class="text-secondary small">ยังไม่มีผู้ฝึก</p>'; return; }
   allSpecialistUsers.forEach(function (u) {
     var lbl = document.createElement('label');
     lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
@@ -1124,7 +1124,7 @@ async function createHomework() {
     patientIds.push(cb.value);
   });
   if (!wordIds.length) { alert('กรุณาเลือกคำอย่างน้อย 1 คำ'); return; }
-  if (!patientIds.length) { alert('กรุณาเลือกผู้ป่วยอย่างน้อย 1 คน'); return; }
+  if (!patientIds.length) { alert('กรุณาเลือกผู้ฝึกอย่างน้อย 1 คน'); return; }
 
   var btn = document.getElementById('btnHwCreate');
   btn.disabled = true; btn.textContent = 'กำลังสร้าง...';
