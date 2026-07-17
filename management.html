@@ -942,8 +942,15 @@ function renderDetailPracticeList(rows, filter) {
         this.disabled = true; this.textContent = '…';
         var me = this;
         var { data: signed } = await sb.storage.from('practice-audio').createSignedUrl(row.file_path, 3600);
-        if (signed) { new Audio(signed.signedUrl).play(); }
-        me.disabled = false; me.textContent = '▶ เล่น';
+        if (!signed) { me.disabled = false; me.textContent = '▶ เล่น'; return; }
+
+        var reset = function () { me.disabled = false; me.textContent = '▶ เล่น'; };
+        var audio = new Audio(signed.signedUrl);
+        audio.addEventListener('ended', reset);
+        audio.addEventListener('error', reset);
+        audio.play().then(function () {
+          me.textContent = '⏸ กำลังเล่น';
+        }).catch(reset);
       });
     }
     var rowId = row.id;
@@ -1289,8 +1296,15 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, assignmen
     btn.addEventListener('click', async function () {
       btn.disabled = true; btn.textContent = '…';
       var { data: signed } = await sb.storage.from('practice-audio').createSignedUrl(btn.getAttribute('data-path'), 3600);
-      if (signed) new Audio(signed.signedUrl).play();
-      btn.disabled = false; btn.textContent = '▶';
+      if (!signed) { btn.disabled = false; btn.textContent = '▶'; return; }
+
+      var reset = function () { btn.disabled = false; btn.textContent = '▶'; };
+      var audio = new Audio(signed.signedUrl);
+      audio.addEventListener('ended', reset);
+      audio.addEventListener('error', reset);
+      audio.play().then(function () {
+        btn.textContent = '⏸'; // swap to a "playing" icon for the clip's duration
+      }).catch(reset);
     });
   });
 
