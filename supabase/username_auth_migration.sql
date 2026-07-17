@@ -26,9 +26,16 @@ create table if not exists public.profiles (
 create unique index if not exists idx_profiles_username_lower on public.profiles (lower(username));
 
 -- Gender/age — collected at sign-up for patient (ผู้ฝึกออกเสียง) accounts
--- only; left null for specialists.
-alter table public.profiles add column if not exists gender text check (gender in ('male', 'female', 'other'));
-alter table public.profiles add column if not exists age smallint check (age > 0 and age < 120);
+-- only; left null for specialists. Only male/female — the app is aimed at
+-- young children, so this stays a simple two-option field.
+alter table public.profiles add column if not exists gender text;
+alter table public.profiles add column if not exists age smallint;
+
+alter table public.profiles drop constraint if exists profiles_gender_check;
+alter table public.profiles add constraint profiles_gender_check check (gender in ('male', 'female'));
+
+alter table public.profiles drop constraint if exists profiles_age_check;
+alter table public.profiles add constraint profiles_age_check check (age > 0 and age < 120);
 
 alter table public.profiles enable row level security;
 

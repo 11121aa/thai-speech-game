@@ -56,10 +56,6 @@
             <span class="label">บทบาท</span>
             <span class="value" id="profileRole">ผู้ฝึกออกเสียง</span>
           </div>
-          <div class="profile-info-row">
-            <span class="label">ชื่อเล่น</span>
-            <span class="value" id="profileName">—</span>
-          </div>
           <div class="profile-info-row" id="profileGenderRow" style="display:none;">
             <span class="label">เพศ</span>
             <span class="value" id="profileGender">—</span>
@@ -450,7 +446,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 });
 
 /* ── User profile ── */
-var GENDER_LABELS = { male: 'ชาย', female: 'หญิง', other: 'อื่นๆ' };
+var GENDER_LABELS = { male: 'ชาย', female: 'หญิง' };
 
 async function initUserProfile(session) {
   var { data: profile } = await sb.from('profiles').select('username, gender, age').eq('user_id', session.user.id).maybeSingle();
