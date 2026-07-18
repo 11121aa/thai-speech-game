@@ -691,6 +691,17 @@ function wireProfileEdit(session, profile) {
   });
 }
 
+// M:SS formatter for the matching game's elapsed time (ms in, "1:23" out)
+// — matching is timed, not scored: game.html stores its game_scores.best_score
+// as NEGATED elapsed-ms (so the shared higher-is-better sort still works for
+// this lower-is-better metric), so displays need to flip the sign back and
+// format it as a time instead of showing the raw number.
+function formatMatchTime(ms) {
+  var totalSec = Math.max(0, Math.round(ms / 1000));
+  var m = Math.floor(totalSec / 60), s = totalSec % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
 var MGMT_GAMES = [
   { key: 'matching',  name: 'จับคู่ภาพ',     icon: '🃏', color: 'var(--color-accent-purple)' },
   { key: 'shooting',  name: 'ยิงเป้า',         icon: '🎯', color: 'var(--color-danger)' },
@@ -710,6 +721,10 @@ async function loadUserGameLeaderboards() {
   var myBest = JSON.parse(localStorage.getItem('ghsv2') || '{}');
 
   MGMT_GAMES.forEach(function (g) {
+    var isMatch = g.key === 'matching';
+    var myBestLabel = isMatch
+      ? (myBest.matching_time != null ? formatMatchTime(myBest.matching_time) : '—')
+      : (myBest[g.key] || 0) + ' ⭐';
     var col = document.createElement('div');
     col.className = 'col-sm-6 col-lg-4';
     col.innerHTML =
@@ -718,7 +733,7 @@ async function loadUserGameLeaderboards() {
           '<span style="font-size:1.6rem;">' + g.icon + '</span>' +
           '<div>' +
             '<div style="font-weight:700;font-size:0.95rem;">' + g.name + '</div>' +
-            '<div style="font-size:0.75rem;color:var(--color-text-soft);">คะแนนของฉัน: <strong style="color:' + g.color + ';">' + (myBest[g.key] || 0) + '</strong> ⭐</div>' +
+            '<div style="font-size:0.75rem;color:var(--color-text-soft);">' + (isMatch ? 'เวลาที่เร็วที่สุด' : 'คะแนนของฉัน') + ': <strong style="color:' + g.color + ';">' + myBestLabel + '</strong></div>' +
           '</div>' +
         '</div>' +
         '<div id="lb_' + g.key + '"><div class="text-secondary text-center small py-1">กำลังโหลด...</div></div>' +
@@ -738,10 +753,14 @@ async function loadUserGameLeaderboards() {
         if (!data.length) { el.innerHTML = '<div class="text-secondary text-center small py-1">ยังไม่มีข้อมูล</div>'; return; }
         var medals = ['🥇','🥈','🥉'];
         el.innerHTML = data.map(function(r, i) {
+          // Matching stores a negated elapsed-ms as its "score" so the
+          // shared higher-is-better sort still works for this
+          // lower-is-better metric — flip it back to a time for display.
+          var scoreLabel = isMatch ? ('⏱ ' + formatMatchTime(-r.best_score)) : ('⭐ ' + r.best_score);
           return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f0ebfc;font-size:0.82rem;">' +
             '<span style="width:22px;text-align:center;">' + (medals[i] || (i+1)) + '</span>' +
             '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;">' + (r.display_name || '—') + '</span>' +
-            '<span style="font-weight:700;color:' + g.color + ';white-space:nowrap;">⭐ ' + r.best_score + '</span>' +
+            '<span style="font-weight:700;color:' + g.color + ';white-space:nowrap;">' + scoreLabel + '</span>' +
             '</div>';
         }).join('');
       })
