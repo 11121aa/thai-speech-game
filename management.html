@@ -1579,7 +1579,12 @@ async function createHomework() {
     if (error) throw error;
 
     await sb.from('homework_words').insert(wordIds.map(function (wid) { return { homework_id: hw.id, word_id: wid }; }));
-    await sb.from('homework_assignments').insert(patientIds.map(function (uid) { return { homework_id: hw.id, patient_user_id: uid }; }));
+    console.log('[hw create] assigning to patientIds:', patientIds);
+    var { data: assignRows, error: assignError } = await sb.from('homework_assignments')
+      .insert(patientIds.map(function (uid) { return { homework_id: hw.id, patient_user_id: uid }; }))
+      .select();
+    console.log('[hw create] assignment insert result — data:', assignRows, 'error:', assignError);
+    if (assignError) throw assignError;
 
     document.getElementById('hwSuccessMsg').style.display = 'flex';
   } catch (err) {
@@ -1835,10 +1840,12 @@ var _userHwAssignments = [];
 var _userHwPracticeData = [];
 
 async function loadUserHw(session) {
-  var { data } = await sb.from('homework_assignments')
+  console.log('[hw load] logged-in user_id:', session.user.id);
+  var { data, error } = await sb.from('homework_assignments')
     .select('id, assigned_at, homework(id, name, repeat_count, homework_words(word_id))')
     .eq('patient_user_id', session.user.id)
     .order('assigned_at', { ascending: false });
+  console.log('[hw load] query result — data:', data, 'error:', error);
   _userHwAssignments = data || [];
 
   if (!_userHwAssignments.length) {
