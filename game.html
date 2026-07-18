@@ -202,12 +202,18 @@
         <button class="diff-btn active" data-diff="easy">ง่าย <small class="text-secondary">มีตัวอย่างเสียง</small></button>
         <button class="diff-btn" data-diff="hard">ยาก <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
         <button class="diff-btn" data-diff="hw" style="background:#e74c3c;color:#fff;border-color:#e74c3c;">การบ้าน</button>
+        <button class="diff-btn" data-diff="worksheet" style="background:#8a5cf6;color:#fff;border-color:#8a5cf6;">แบบฝึกหัด</button>
       </div>
     </div>
 
     <div id="hwSelectorRow" class="setup-row" style="display:none;">
       <label>เลือกการบ้าน</label>
       <div id="hwSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto;"></div>
+    </div>
+
+    <div id="worksheetSelectorRow" class="setup-row" style="display:none;">
+      <label>เลือกแบบฝึกหัด</label>
+      <div id="worksheetSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto;"></div>
     </div>
 
     <div id="pfDiffRow" class="setup-row" style="display:none;">
@@ -355,7 +361,7 @@
 var G = {
   mode: null, words: [], pts: 0, timeLeft: 60,
   paused: false, timerHandle: null, hardMode: false,
-  hwMode: false, hwAssignmentId: null, pronounceCount: 1,
+  hwMode: false, hwAssignmentId: null, worksheetMode: false, worksheetProgressId: null, pronounceCount: 1,
   highScores: JSON.parse(localStorage.getItem('ghsv2') || '{}')
 };
 
@@ -430,6 +436,7 @@ function openPractice(word, onCorrect, onClosed) {
     PracticePanel.open(word, {
       showListen: !G.hardMode,
       hwAssignmentId: G.hwAssignmentId,
+      worksheetProgressId: G.worksheetProgressId,
       repIndex: repIndex,
       repTotal: total,
       onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
@@ -613,6 +620,7 @@ function startTimer(limit) {
 var _allWords = [], _setupMode = null, _setupCam = null;
 var LEVELS_ALL = ['เสียง', '1 พยางค์ไม่มีตัวสะกด', '1 พยางค์', '2 พยางค์', '3 พยางค์', 'ประโยค'];
 var _hwAssignments = [], _selectedHwAssignmentId = null, _hwPool = [];
+var _worksheets = [], _selectedWorksheetId = null, _worksheetPool = [];
 var _pronounceCount = 1;
 var PRONOUNCE_COUNT_MIN = 1, PRONOUNCE_COUNT_MAX = 10;
 
@@ -624,8 +632,10 @@ function openSetup(mode) {
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
   document.querySelector('#hwDiffBtns .diff-btn[data-diff="easy"]').classList.add('active');
   document.getElementById('hwSelectorRow').style.display = 'none';
+  document.getElementById('worksheetSelectorRow').style.display = 'none';
   document.getElementById('soundLevelRows').style.display = 'block';
   _selectedHwAssignmentId = null; _hwPool = [];
+  _selectedWorksheetId = null; _worksheetPool = [];
   // Platformer speed selector — only shown for the platformer mode, reset to ธรรมดา (normal)
   document.getElementById('pfDiffRow').style.display = (mode === 'platformer') ? 'block' : 'none';
   document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.remove('active'); });
@@ -674,6 +684,11 @@ function isHwMode() {
   return btn && btn.getAttribute('data-diff') === 'hw';
 }
 
+function isWorksheetMode() {
+  var btn = document.querySelector('#hwDiffBtns .diff-btn.active');
+  return btn && btn.getAttribute('data-diff') === 'worksheet';
+}
+
 function getPfDifficulty() {
   var btn = document.querySelector('.pf-diff-btn.active');
   return btn ? btn.getAttribute('data-pfdiff') : 'ธรรมดา';
@@ -684,6 +699,11 @@ function getSetupPool() {
     var pool = _hwPool.slice().sort(function () { return Math.random() - 0.5; });
     if (_setupMode === 'matching') pool = pool.slice(0, 10);
     return pool;
+  }
+  if (isWorksheetMode()) {
+    var wsPool = _worksheetPool.slice().sort(function () { return Math.random() - 0.5; });
+    if (_setupMode === 'matching') wsPool = wsPool.slice(0, 10);
+    return wsPool;
   }
   var soundEl = document.querySelector('#setupSoundList input[name="setupSound"]:checked');
   var selectedSound = soundEl ? soundEl.value : null;
@@ -699,7 +719,7 @@ function getSetupPool() {
 
 function updateWordCount() {
   var pool = getSetupPool();
-  var count = isHwMode() ? pool.length : (_setupMode === 'matching' ? Math.min(pool.length, 10) : pool.length);
+  var count = (isHwMode() || isWorksheetMode()) ? pool.length : (_setupMode === 'matching' ? Math.min(pool.length, 10) : pool.length);
   document.getElementById('setupWordCount').textContent = count + ' คำ';
 }
 
@@ -765,6 +785,45 @@ async function loadHwSelectorList() {
   });
 }
 
+// Worksheets are shared curriculum content, not per-patient assignments —
+// unlike loadHwSelectorList() this lists EVERY worksheet, unfiltered
+// (no hiding ones already fully completed; see launchGame() for the
+// auto-new-round-on-completion behavior instead).
+async function loadWorksheetSelectorList() {
+  var list = document.getElementById('worksheetSelectorList');
+  list.innerHTML = '<div class="text-secondary small text-center py-2">กำลังโหลด...</div>';
+  var session = await Auth.getSession();
+  if (!session) {
+    list.innerHTML = '<div class="text-secondary small text-center">กรุณา<a href="login.html">เข้าสู่ระบบ</a>ก่อน</div>';
+    return;
+  }
+  var { data } = await sb.from('worksheets')
+    .select('id, name, repeat_count, worksheet_words(word_id, words(id, word, emoji, level, letter_category))')
+    .order('created_at', { ascending: false });
+  _worksheets = data || [];
+
+  list.innerHTML = '';
+  if (!_worksheets.length) {
+    list.innerHTML = '<div class="text-secondary small text-center py-2">ยังไม่มีแบบฝึกหัด</div>';
+    return;
+  }
+  _worksheets.forEach(function (ws) {
+    var wordObjs = (ws.worksheet_words || []).map(function (w) { return w.words; }).filter(Boolean);
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-outline-secondary text-start w-100 py-2 worksheet-selector-btn';
+    btn.style.cssText = 'border-radius:10px;font-size:0.9rem;';
+    btn.innerHTML = '<strong>' + (ws.name || 'แบบฝึกหัด #' + ws.id) + '</strong><span class="text-secondary small ms-2">' + wordObjs.length + ' คำ</span>';
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.worksheet-selector-btn').forEach(function (b) { b.classList.remove('btn-warning'); b.classList.add('btn-outline-secondary'); });
+      btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-warning');
+      _selectedWorksheetId = ws.id;
+      _worksheetPool = wordObjs;
+      updateWordCount();
+    });
+    list.appendChild(btn);
+  });
+}
+
 function startSetupCam() {
   var vid = document.getElementById('setupCameraVideo'), wrap = document.getElementById('setupCameraWrap');
   navigator.mediaDevices && navigator.mediaDevices.getUserMedia({ video: true })
@@ -776,14 +835,69 @@ function stopSetupCam() {
   if (_setupCam) { _setupCam.getTracks().forEach(function (t) { t.stop(); }); _setupCam = null; }
 }
 
-function launchGame() {
+// Finds (or starts) the round of worksheet_progress this patient should
+// practice against: reuses the latest round for this worksheet unless it's
+// already fully done (every word practiced repeat_count times), in which
+// case a fresh round is inserted — this is what makes picking the same
+// worksheet again after finishing it "start a new one automatically"
+// instead of silently piling up hidden extra practice past the visible
+// columns in the checking table.
+async function getOrStartWorksheetRound(worksheetId, wordPool, repeatCount, userId) {
+  var { data: rows } = await sb.from('worksheet_progress')
+    .select('id')
+    .eq('worksheet_id', worksheetId)
+    .eq('patient_user_id', userId)
+    .order('started_at', { ascending: false })
+    .limit(1);
+  var latest = rows && rows[0];
+
+  if (latest) {
+    var { data: practices } = await sb.from('practice').select('word_id').eq('worksheet_progress_id', latest.id);
+    var counts = {};
+    (practices || []).forEach(function (p) { counts[p.word_id] = (counts[p.word_id] || 0) + 1; });
+    var allDone = wordPool.every(function (w) { return (counts[w.id] || 0) >= repeatCount; });
+    if (!allDone) return latest.id;
+  }
+
+  var { data: created, error } = await sb.from('worksheet_progress')
+    .insert({ worksheet_id: worksheetId, patient_user_id: userId })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return created.id;
+}
+
+async function launchGame() {
   var diffBtn = document.querySelector('#hwDiffBtns .diff-btn.active');
   var diff = diffBtn ? diffBtn.getAttribute('data-diff') : 'easy';
   G.hwMode = diff === 'hw';
   G.hwAssignmentId = G.hwMode ? _selectedHwAssignmentId : null;
+  G.worksheetMode = diff === 'worksheet';
   G.hardMode = diff === 'hard';
   if (G.hwMode && !_selectedHwAssignmentId) { alert('กรุณาเลือกการบ้านก่อน'); return; }
+  if (G.worksheetMode && !_selectedWorksheetId) { alert('กรุณาเลือกแบบฝึกหัดก่อน'); return; }
   var pool = getSetupPool();
+
+  if (G.worksheetMode) {
+    var startBtn = document.getElementById('btnSetupStart');
+    var startBtnOrigText = startBtn.innerHTML;
+    startBtn.disabled = true; startBtn.textContent = 'กำลังเตรียม...';
+    try {
+      var session = await Auth.getSession();
+      var ws = _worksheets.find(function (w) { return w.id === _selectedWorksheetId; });
+      // Use the full worksheet word list (not `pool`, which the matching
+      // game slices to 10) so "is this round done?" reflects every word in
+      // the worksheet, regardless of which game mode is being played.
+      G.worksheetProgressId = await getOrStartWorksheetRound(_selectedWorksheetId, _worksheetPool, (ws && ws.repeat_count) || 5, session.user.id);
+    } catch (err) {
+      alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+      startBtn.disabled = false; startBtn.innerHTML = startBtnOrigText;
+      return;
+    }
+    startBtn.disabled = false; startBtn.innerHTML = startBtnOrigText;
+  } else {
+    G.worksheetProgressId = null;
+  }
   if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
@@ -885,10 +999,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     btn.addEventListener('click', function () {
       document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
-      var hw = btn.getAttribute('data-diff') === 'hw';
+      var diffVal = btn.getAttribute('data-diff');
+      var hw = diffVal === 'hw';
+      var worksheet = diffVal === 'worksheet';
       document.getElementById('hwSelectorRow').style.display = hw ? 'block' : 'none';
-      document.getElementById('soundLevelRows').style.display = hw ? 'none' : 'block';
+      document.getElementById('worksheetSelectorRow').style.display = worksheet ? 'block' : 'none';
+      document.getElementById('soundLevelRows').style.display = (hw || worksheet) ? 'none' : 'block';
       if (hw) { _selectedHwAssignmentId = null; _hwPool = []; loadHwSelectorList(); }
+      if (worksheet) { _selectedWorksheetId = null; _worksheetPool = []; loadWorksheetSelectorList(); }
       updateWordCount();
     });
   });

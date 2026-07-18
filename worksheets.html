@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Same no-cache policy as management.html — this page changes often
+     during active development and has no ?v= cache-bust. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>แบบฝึกหัด | แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar navbar-expand-lg app-nav">
+    <div class="container">
+      <a class="navbar-brand app-brand" href="index.html">
+        <span class="brand-emoji">🗣️</span>
+        <span>แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMain">
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
+          <li class="nav-item"><a class="nav-link" data-page="game.html" href="game.html">เกม</a></li>
+          <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
+          <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
+          <li class="nav-item" id="navSelf" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">ของฉัน</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main class="py-4">
+  <div class="container">
+
+    <div id="loadingState" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="text-secondary mt-3">กำลังโหลดข้อมูล...</p>
+    </div>
+
+    <div id="wsPage" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h1 class="h3 mb-0">📋 แบบฝึกหัด</h1>
+        <div class="d-flex gap-2">
+          <a href="management.html" class="btn btn-outline-secondary btn-bouncy"><i class="bi bi-arrow-left me-1"></i>กลับไปแดชบอร์ด</a>
+        </div>
+      </div>
+
+      <!-- ── List view: all worksheets + create button ── -->
+      <div id="wsListView">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <h5 class="mb-0">แบบฝึกหัดทั้งหมด</h5>
+          <button class="btn btn-warning btn-bouncy" id="btnCreateWs"><i class="bi bi-plus-circle-fill me-2"></i>สร้างแบบฝึกหัด</button>
+        </div>
+        <div class="soft-card">
+          <div id="wsList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
+        </div>
+      </div>
+
+      <!-- ── Round grid view: who has done this worksheet ── -->
+      <div id="wsPatientView" style="display:none;">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" id="btnWsPatientBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+          <h5 class="mb-0"><span id="wsPatientViewName"></span></h5>
+        </div>
+        <div id="wsRoundGrid" class="d-flex flex-wrap gap-3"></div>
+        <p id="wsRoundEmpty" class="text-secondary text-center py-4" style="display:none;">ยังไม่มีผู้ฝึกทำแบบฝึกหัดนี้</p>
+      </div>
+
+      <!-- ── Detail view (word × recording table) ── -->
+      <div id="wsDetailView" style="display:none;">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" id="btnWsDetailBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+          <h5 class="mb-0" id="wsDetailTitle"></h5>
+          <span id="wsDetailStatus" class="badge"></span>
+          <button class="btn btn-sm btn-outline-primary ms-auto" id="btnWsDetailPrint"><i class="bi bi-printer-fill me-1"></i>พิมพ์ / บันทึกเป็น PDF</button>
+        </div>
+        <div class="soft-card">
+          <div class="table-responsive" id="wsDetailTableWrap">
+            <p class="text-secondary text-center py-3">กำลังโหลด...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Create view ── -->
+      <div id="wsCreateView" style="display:none;">
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <button class="btn btn-sm btn-outline-secondary" id="btnWsBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+          <h5 class="mb-0">สร้างแบบฝึกหัด</h5>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">ชื่อแบบฝึกหัด</label>
+          <input type="text" class="form-control" id="wsName" placeholder="เช่น ป สัปดาห์ที่ 1">
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="soft-card h-100">
+              <h6 class="fw-bold mb-3">เลือกคำ</h6>
+              <div id="wsWordList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="soft-card h-100 d-flex flex-column align-items-center justify-content-center gap-2 py-4">
+              <h6 class="fw-bold">จำนวนครั้งที่ต้องพูด</h6>
+              <div class="d-flex align-items-center gap-3 mt-2">
+                <button class="btn btn-outline-secondary" id="btnWsMinus" style="width:42px;height:42px;padding:0;font-size:1.5rem;line-height:1;">−</button>
+                <span id="wsRepeatDisplay" style="font-size:3rem;font-weight:700;min-width:56px;text-align:center;">5</span>
+                <button class="btn btn-outline-secondary" id="btnWsPlus" style="width:42px;height:42px;padding:0;font-size:1.5rem;line-height:1;">+</button>
+              </div>
+              <p class="text-secondary small text-center mt-2">ครั้งต่อคำ</p>
+            </div>
+          </div>
+        </div>
+        <div class="text-end mt-4">
+          <button class="btn btn-warning btn-bouncy px-5" id="btnWsCreate">
+            <i class="bi bi-check-circle-fill me-2"></i>สร้างแบบฝึกหัด
+          </button>
+        </div>
+      </div>
+
+      <!-- Success popup (fixed overlay) -->
+      <div id="wsSuccessMsg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:20px;padding:2.5rem 2rem;text-align:center;max-width:320px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+          <div style="font-size:3rem;">🎉</div>
+          <h4 class="mt-2 mb-1">สร้างแบบฝึกหัดสำเร็จ!</h4>
+          <p class="text-secondary mb-3">เพิ่มแบบฝึกหัดใหม่เรียบร้อยแล้ว</p>
+          <button class="btn btn-warning btn-bouncy w-100" id="btnWsReturn">กลับไปหน้าแบบฝึกหัด</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="row gy-4">
+      <div class="col-lg-4">
+        <h5>🗣️ แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</h5>
+        <p>เกมฝึกออกเสียงภาษาไทยสำหรับเด็ก ช่วยให้เด็กกล้าพูด ออกเสียงชัด มั่นใจมากขึ้นทุกวัน</p>
+      </div>
+      <div class="col-lg-4">
+        <h5>เมนู</h5>
+        <ul class="list-unstyled">
+          <li><a href="game.html">เกม</a></li>
+          <li><a href="contact.html">ติดต่อเรา</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-4">
+        <h5>ติดต่อเรา</h5>
+        <p>มีคำแนะนำหรือข้อเสนอแนะ ติดต่อได้ที่หน้า "ติดต่อเรา"</p>
+      </div>
+    </div>
+    <div class="footer-disclaimer text-center">
+      เว็บไซต์นี้จัดทำขึ้นเพื่อการศึกษาและฝึกฝนเบื้องต้นเท่านั้น ไม่ใช่เครื่องมือวินิจฉัยหรือทดแทนการรักษาทางการแพทย์
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+var allWords = [], allSpecialistUsers = [], allWorksheets = [];
+var wsRepeatCount = 5;
+var wsCurrentWorksheet = null;
+
+// "emoji + word" label — duplicated from management.html (see wordLabel there
+// for why the emoji-equals-word guard exists).
+function wordLabel(w) {
+  if (!w) return '?';
+  var emoji = (w.emoji && w.emoji !== w.word) ? w.emoji : '';
+  return emoji ? emoji + ' ' + w.word : w.word;
+}
+
+// Small circular avatar (photo > preset emoji > initial letter) — duplicated
+// from management.html's avatarHTML.
+function avatarHTML(person, size) {
+  size = size || 28;
+  var style = 'display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;' +
+    'width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;' +
+    'color:#fff;font-weight:700;font-size:' + Math.round(size * 0.4) + 'px;';
+  if (person && person.avatar_url) {
+    return '<span style="' + style + '"><img src="' + person.avatar_url + '" style="width:100%;height:100%;object-fit:cover;" alt=""></span>';
+  }
+  if (person && person.avatar_emoji) {
+    return '<span style="' + style + 'background:linear-gradient(135deg, ' + person.avatar_color + ' 0%, ' + (person.avatar_color2 || person.avatar_color) + ' 100%);font-size:' + Math.round(size * 0.55) + 'px;">' + person.avatar_emoji + '</span>';
+  }
+  var initial = person && person.name ? person.name[0].toUpperCase() : '?';
+  return '<span style="' + style + 'background:var(--color-primary-dark);">' + initial + '</span>';
+}
+
+document.addEventListener('DOMContentLoaded', async function () {
+  var session = await Auth.requireLogin('worksheets.html');
+  if (!session) return;
+  await Auth.initNav();
+
+  var role = await Auth.getRole(session.user.id);
+  document.getElementById('loadingState').style.display = 'none';
+
+  if (role !== 'specialist') {
+    location.href = 'management.html';
+    return;
+  }
+
+  try {
+    document.getElementById('wsPage').style.display = 'block';
+    await initWorksheetsPage();
+  } catch (err) {
+    console.error(err);
+    document.getElementById('loadingState').innerHTML =
+      '<div class="alert alert-danger d-inline-block">โหลดข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : String(err)) + '</div>';
+    document.getElementById('loadingState').style.display = 'block';
+  }
+});
+
+async function initWorksheetsPage() {
+  var { data: words } = await sb.from('words').select('*').order('letter_category', { ascending: true }).order('level', { ascending: true });
+  allWords = words || [];
+
+  var { data: users } = await sb.rpc('list_linked_patients_for_specialist');
+  allSpecialistUsers = users || [];
+  allSpecialistUsers.forEach(function (u) { u.name = u.username || u.email; });
+
+  document.getElementById('btnCreateWs').addEventListener('click', openCreateWs);
+  document.getElementById('btnWsBack').addEventListener('click', function () { showWsView('wsListView'); });
+  document.getElementById('btnWsPatientBack').addEventListener('click', function () { showWsView('wsListView'); });
+  document.getElementById('btnWsDetailBack').addEventListener('click', function () { showWsView('wsPatientView'); });
+  document.getElementById('btnWsMinus').addEventListener('click', function () {
+    if (wsRepeatCount > 1) { wsRepeatCount--; document.getElementById('wsRepeatDisplay').textContent = wsRepeatCount; }
+  });
+  document.getElementById('btnWsPlus').addEventListener('click', function () {
+    wsRepeatCount++; document.getElementById('wsRepeatDisplay').textContent = wsRepeatCount;
+  });
+  document.getElementById('btnWsCreate').addEventListener('click', createWorksheet);
+  document.getElementById('btnWsReturn').addEventListener('click', function () {
+    document.getElementById('wsSuccessMsg').style.display = 'none';
+    showWsView('wsListView');
+  });
+
+  await loadWorksheetList();
+}
+
+function showWsView(viewId) {
+  ['wsListView', 'wsPatientView', 'wsDetailView', 'wsCreateView'].forEach(function (id) {
+    document.getElementById(id).style.display = id === viewId ? 'block' : 'none';
+  });
+}
+
+/* ── List all worksheets ── */
+async function loadWorksheetList() {
+  var container = document.getElementById('wsList');
+  container.innerHTML = '<p class="text-secondary text-center py-3 small">กำลังโหลด...</p>';
+
+  var { data } = await sb.from('worksheets')
+    .select('id, name, repeat_count, created_at, worksheet_words(word_id)')
+    .order('created_at', { ascending: false });
+  allWorksheets = data || [];
+
+  if (!allWorksheets.length) {
+    container.innerHTML = '<p class="text-secondary text-center py-3 small">ยังไม่มีแบบฝึกหัด</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  allWorksheets.forEach(function (ws) {
+    var wordCount = (ws.worksheet_words || []).length;
+    var row = document.createElement('button');
+    row.className = 'w-100 text-start btn btn-light mb-2 py-2 px-3 d-flex align-items-center gap-2';
+    row.style.cssText = 'border-radius:10px;border:1px solid #e8e3f5;';
+    row.innerHTML =
+      '<span style="flex:1;">' +
+        '<span style="font-weight:700;">' + (ws.name || 'แบบฝึกหัด #' + ws.id) + '</span>' +
+        '<span class="text-secondary small ms-2">' + wordCount + ' คำ · พูดคำละ ' + (ws.repeat_count || 5) + ' ครั้ง</span>' +
+      '</span>' +
+      '<i class="bi bi-chevron-right text-secondary"></i>';
+    row.addEventListener('click', function () { loadWsRounds(ws); });
+    container.appendChild(row);
+  });
+}
+
+/* ── Create worksheet ── */
+function openCreateWs() {
+  wsRepeatCount = 5;
+  document.getElementById('wsRepeatDisplay').textContent = '5';
+  document.getElementById('wsName').value = '';
+  populateWsWords();
+  showWsView('wsCreateView');
+}
+
+function populateWsWords() {
+  var list = document.getElementById('wsWordList');
+  list.innerHTML = '';
+  if (!allWords.length) { list.innerHTML = '<p class="text-secondary small">ยังไม่มีคำในระบบ</p>'; return; }
+  allWords.forEach(function (w) {
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
+    lbl.innerHTML =
+      '<input type="checkbox" value="' + w.id + '" style="width:15px;height:15px;flex-shrink:0;">' +
+      '<span style="flex:1;">' + wordLabel(w) + '</span>' +
+      '<span style="font-size:0.7rem;color:#9b93b0;white-space:nowrap;">' + (w.level || '') + '</span>';
+    list.appendChild(lbl);
+  });
+}
+
+async function createWorksheet() {
+  var wordIds = [];
+  document.querySelectorAll('#wsWordList input[type="checkbox"]:checked').forEach(function (cb) {
+    wordIds.push(parseInt(cb.value, 10));
+  });
+  if (!wordIds.length) { alert('กรุณาเลือกคำอย่างน้อย 1 คำ'); return; }
+
+  var btn = document.getElementById('btnWsCreate');
+  btn.disabled = true; btn.textContent = 'กำลังสร้าง...';
+
+  try {
+    var wsName = (document.getElementById('wsName').value || '').trim() || ('แบบฝึกหัด ' + new Date().toLocaleDateString('th-TH'));
+    var session = await Auth.getSession();
+    var { data: ws, error } = await sb.from('worksheets')
+      .insert({ created_by: session.user.id, repeat_count: wsRepeatCount, name: wsName })
+      .select('id').single();
+    if (error) throw error;
+
+    await sb.from('worksheet_words').insert(wordIds.map(function (wid) { return { worksheet_id: ws.id, word_id: wid }; }));
+
+    await loadWorksheetList();
+    document.getElementById('wsSuccessMsg').style.display = 'flex';
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>สร้างแบบฝึกหัด';
+  }
+}
+
+/* ── Rounds: every (patient, round) a worksheet has been played through ── */
+async function loadWsRounds(ws) {
+  wsCurrentWorksheet = ws;
+  document.getElementById('wsPatientViewName').textContent = ws.name || 'แบบฝึกหัด #' + ws.id;
+  document.getElementById('wsRoundGrid').innerHTML = '<p class="text-secondary text-center py-3 small">กำลังโหลด...</p>';
+  document.getElementById('wsRoundEmpty').style.display = 'none';
+  showWsView('wsPatientView');
+
+  // RLS already scopes this to rounds belonging to this specialist's linked
+  // patients (see worksheet_progress_specialist_select_linked policy).
+  var { data } = await sb.from('worksheet_progress')
+    .select('id, patient_user_id, started_at')
+    .eq('worksheet_id', ws.id)
+    .order('started_at', { ascending: true });
+  var rounds = data || [];
+
+  if (!rounds.length) {
+    document.getElementById('wsRoundGrid').innerHTML = '';
+    document.getElementById('wsRoundEmpty').style.display = 'block';
+    return;
+  }
+
+  // Round number = position within that patient's own rounds for this worksheet.
+  var seenByPatient = {};
+  rounds.forEach(function (r) {
+    seenByPatient[r.patient_user_id] = (seenByPatient[r.patient_user_id] || 0) + 1;
+    r.roundNum = seenByPatient[r.patient_user_id];
+  });
+
+  var progressIds = rounds.map(function (r) { return r.id; });
+  var { data: pData } = await sb.from('practice').select('word_id, worksheet_progress_id').in('worksheet_progress_id', progressIds);
+  var practiceData = pData || [];
+
+  var totalWords = (ws.worksheet_words || []).length;
+  var repeatCount = ws.repeat_count || 5;
+
+  var grid = document.getElementById('wsRoundGrid');
+  grid.innerHTML = '';
+  // Most recent round first.
+  rounds.slice().reverse().forEach(function (r) {
+    var patient = allSpecialistUsers.find(function (u) { return u.user_id === r.patient_user_id; }) || { name: 'ไม่ทราบชื่อ' };
+    var rP = practiceData.filter(function (p) { return p.worksheet_progress_id === r.id; });
+    var counts = {};
+    rP.forEach(function (p) { counts[p.word_id] = (counts[p.word_id] || 0) + 1; });
+    var wordIds = (ws.worksheet_words || []).map(function (w) { return w.word_id; });
+    var doneCount = wordIds.filter(function (wid) { return (counts[wid] || 0) >= repeatCount; }).length;
+    var allDone = totalWords > 0 && doneCount === totalWords;
+
+    var card = document.createElement('div');
+    card.style.cssText = 'background:' + (allDone ? '#e8f8f5' : '#fff') + ';border:1.5px solid ' + (allDone ? '#2ec4b6' : '#e8e3f5') + ';border-radius:14px;padding:1rem 1.2rem;cursor:pointer;min-width:180px;max-width:240px;position:relative;';
+    card.innerHTML =
+      (allDone ? '<div style="position:absolute;top:8px;right:10px;font-size:1.1rem;">✅</div>' : '') +
+      '<div class="d-flex align-items-center gap-2 mb-1">' + avatarHTML(patient, 26) + '<span style="font-weight:700;font-size:0.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + patient.name + '</span></div>' +
+      '<div style="font-size:0.8rem;color:#9b93b0;">รอบที่ ' + r.roundNum + ' · ' + doneCount + '/' + totalWords + ' เสร็จ</div>' +
+      '<div style="font-size:0.75rem;color:#c0bbd0;margin-top:4px;">' + new Date(r.started_at).toLocaleDateString('th-TH') + '</div>';
+    card.addEventListener('click', function () { openWsRoundDetail(r, ws, patient); });
+    grid.appendChild(card);
+  });
+}
+
+async function openWsRoundDetail(progressRow, ws, patient) {
+  document.getElementById('wsDetailTitle').textContent = (ws.name || 'แบบฝึกหัด #' + ws.id) + ' — ' + patient.name + ' (รอบที่ ' + progressRow.roundNum + ')';
+  document.getElementById('wsDetailStatus').textContent = '';
+  document.getElementById('wsDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
+  showWsView('wsDetailView');
+
+  var results = await Promise.all([
+    sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
+    sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
+  ]);
+  var words = results[0].data || [];
+  var practices = results[1].data || [];
+  var feedbacks = results[2].data || [];
+  var repeatCount = ws.repeat_count || 5;
+
+  var allDone = words.length > 0 && words.every(function (w) {
+    return practices.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+  });
+  var statusEl = document.getElementById('wsDetailStatus');
+  statusEl.className = 'badge ' + (allDone ? 'bg-success' : 'bg-warning text-dark');
+  statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
+
+  renderWorksheetDetailTable('wsDetailTableWrap', words, practices, feedbacks, progressRow.id, repeatCount);
+
+  document.getElementById('btnWsDetailPrint').onclick = function () {
+    printWorksheet((ws.name || 'แบบฝึกหัด #' + ws.id) + ' — รอบที่ ' + progressRow.roundNum, 'wsDetailTableWrap', patient.name);
+  };
+}
+
+/* ── Word × attempt table (own copy of management.html's renderHwDetailTable,
+   hardcoded to worksheet_word_feedback/worksheet_progress_id — this page has
+   no access to management.html's script, and this repo's convention is to
+   duplicate small page-local UI logic across files rather than share a
+   module for it) ── */
+function renderWorksheetDetailTable(containerId, words, practices, feedbacks, progressId, repeatCount) {
+  var byWord = {};
+  practices.forEach(function (p) {
+    if (!byWord[p.word_id]) byWord[p.word_id] = [];
+    byWord[p.word_id].push(p);
+  });
+  var maxCols = repeatCount;
+
+  var html = '<table class="table table-bordered align-middle" style="font-size:0.88rem;"><thead><tr><th>คำ</th>';
+  for (var c = 1; c <= maxCols; c++) html += '<th style="white-space:nowrap;text-align:center;">ครั้งที่ ' + c + '</th>';
+  html += '<th>หมายเหตุ</th></tr></thead><tbody>';
+
+  words.forEach(function (hww) {
+    var w = hww.words;
+    if (!w) return;
+    var recs = byWord[hww.word_id] || [];
+    var fb = feedbacks.find(function (f) { return f.word_id === hww.word_id; });
+    var noteVal = fb ? (fb.note || '') : '';
+    var isDoneWord = recs.length >= repeatCount;
+    html += '<tr style="' + (isDoneWord ? 'background:rgba(46,196,182,0.07);' : '') + '">';
+    html += '<td style="font-weight:600;white-space:nowrap;">' + wordLabel(w) + '</td>';
+    for (var i = 0; i < maxCols; i++) {
+      var rec = recs[i];
+      if (rec) {
+        var icon = rec.parent_marked_correct === true ? '✅' : rec.parent_marked_correct === false ? '❌' : '⏳';
+        html += '<td style="text-align:center;white-space:nowrap;">' +
+          (rec.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 px-1 btn-ws-play" data-path="' + rec.file_path + '" style="font-size:0.7rem;margin-right:3px;">▶</button>' : '') +
+          '<span class="ws-result-toggle" data-prac-id="' + rec.id + '" data-correct="' + rec.parent_marked_correct + '" style="cursor:pointer;font-size:1rem;" title="คลิกเพื่อเปลี่ยน">' + icon + '</span>' +
+          '</td>';
+      } else {
+        html += '<td style="color:#d0cce0;text-align:center;">—</td>';
+      }
+    }
+    html += '<td><input type="text" class="form-control form-control-sm ws-note-input" data-word-id="' + hww.word_id + '" data-progress-id="' + progressId + '" value="' + noteVal.replace(/"/g, '&quot;') + '" placeholder="หมายเหตุ" style="min-width:120px;"></td></tr>';
+  });
+  html += '</tbody></table>';
+
+  var wrap = document.getElementById(containerId);
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.btn-ws-play').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      btn.disabled = true; btn.textContent = '…';
+      var { data: signed } = await sb.storage.from('practice-audio').createSignedUrl(btn.getAttribute('data-path'), 3600);
+      if (!signed) { btn.disabled = false; btn.textContent = '▶'; return; }
+
+      var reset = function () { btn.disabled = false; btn.textContent = '▶'; };
+      var audio = new Audio(signed.signedUrl);
+      audio.addEventListener('ended', reset);
+      audio.addEventListener('error', reset);
+      audio.play().then(function () {
+        btn.textContent = '⏸';
+      }).catch(reset);
+    });
+  });
+
+  wrap.querySelectorAll('.ws-result-toggle').forEach(function (span) {
+    span.addEventListener('click', async function () {
+      var cur = span.getAttribute('data-correct');
+      var next = cur === 'true' ? false : cur === 'false' ? null : true;
+      await sb.from('practice').update({ parent_marked_correct: next }).eq('id', parseInt(span.getAttribute('data-prac-id')));
+      span.setAttribute('data-correct', String(next));
+      span.textContent = next === true ? '✅' : next === false ? '❌' : '⏳';
+    });
+  });
+
+  var noteTimers = {};
+  wrap.querySelectorAll('.ws-note-input').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      var wid = parseInt(inp.getAttribute('data-word-id'));
+      var pid = parseInt(inp.getAttribute('data-progress-id'));
+      clearTimeout(noteTimers[wid]);
+      noteTimers[wid] = setTimeout(async function () {
+        await sb.from('worksheet_word_feedback').upsert(
+          { worksheet_progress_id: pid, word_id: wid, note: inp.value, updated_at: new Date().toISOString() },
+          { onConflict: 'worksheet_progress_id,word_id' }
+        );
+      }, 700);
+    });
+  });
+}
+
+/* ── Printable worksheet (own copy of management.html's printHomeworkWorksheet) ── */
+function printWorksheet(wsName, containerId, patientLabel) {
+  var original = document.getElementById(containerId);
+  var clone = original.cloneNode(true);
+  var liveInputs  = original.querySelectorAll('input.ws-note-input');
+  var cloneInputs = clone.querySelectorAll('input.ws-note-input');
+  liveInputs.forEach(function (inp, i) { cloneInputs[i].setAttribute('value', inp.value); });
+
+  var dateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  var html = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">' +
+    '<title>' + wsName + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">' +
+    '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">' +
+    '<link href="' + new URL('css/style.css', document.baseURI).href + '" rel="stylesheet">' +
+    '<style>' +
+    'body{background:#fff;margin:24px;}' +
+    'h1{font-size:1.4rem;margin:0 0 4px;}' +
+    '.meta{color:#666;font-size:0.85rem;margin-bottom:18px;}' +
+    'input.ws-note-input{border:1px solid #ccc;background:#fff;}' +
+    '@media print{ @page{ margin:14mm; } }' +
+    '</style></head><body>' +
+    '<h1>📝 ' + wsName + '</h1>' +
+    '<div class="meta">' + (patientLabel ? patientLabel + ' · ' : '') + 'วันที่พิมพ์: ' + dateStr + '</div>' +
+    clone.innerHTML +
+    // Same split-string workaround as printHomeworkWorksheet in
+    // management.html — dodges a local Live-Server dev-only bug where its
+    // auto-reload script naively text-searches for a literal closing
+    // </body> tag and can match this string constant instead of the real
+    // one near the end of the file.
+    '</bo' + 'dy></ht' + 'ml>';
+
+  var win = window.open('', '_blank');
+  if (!win) { alert('เบราว์เซอร์บล็อกหน้าต่างป็อปอัพ กรุณาอนุญาตป็อปอัพเพื่อพิมพ์'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+
+  var printed = false;
+  function doPrint() { if (printed) return; printed = true; win.focus(); win.print(); }
+  win.addEventListener('load', doPrint);
+  setTimeout(doPrint, 1500);
+}
+</script>
+</body>
+</html>

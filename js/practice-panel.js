@@ -196,8 +196,11 @@ const PracticePanel = (function () {
           }, 1000);
           try {
             const session = await Auth.getSession();
+            const extra = {};
+            if (callbacks.hwAssignmentId) extra.homework_assignment_id = callbacks.hwAssignmentId;
+            if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
             const result = await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id, mimeType,
-              callbacks.hwAssignmentId ? { homework_assignment_id: callbacks.hwAssignmentId } : undefined);
+              Object.keys(extra).length ? extra : undefined);
             lastPracticeId = result.id;
             showPlayback(blob);
           } catch (err) {

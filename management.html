@@ -201,13 +201,31 @@
         <div class="table-responsive" id="userHwDetailTableWrap"></div>
       </div>
 
+      <!-- User worksheet section -->
+      <div class="soft-card mt-4" id="userWorksheetSection">
+        <h6 class="mb-3 fw-bold"><i class="bi bi-journal-richtext me-1" style="color:var(--color-accent-purple);"></i>แบบฝึกหัด</h6>
+        <div id="userWorksheetCards" class="d-flex flex-wrap gap-3"><p class="text-secondary small py-2">กำลังโหลด...</p></div>
+      </div>
+      <div id="userWorksheetDetailSection" style="display:none;" class="soft-card mt-4">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" id="btnUserWorksheetBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+          <h5 class="mb-0" id="userWorksheetDetailTitle"></h5>
+          <span id="userWorksheetDetailStatus" class="badge"></span>
+          <button class="btn btn-sm btn-outline-primary ms-auto" id="btnUserWorksheetPrint"><i class="bi bi-printer-fill me-1"></i>พิมพ์ / บันทึกเป็น PDF</button>
+        </div>
+        <div class="table-responsive" id="userWorksheetDetailTableWrap"></div>
+      </div>
+
     </div>
 
     <!-- ── Specialist View ── -->
     <div id="specialistView" style="display:none;">
       <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h1 class="h3 mb-0">🩺 แดชบอร์ดผู้เชี่ยวชาญ</h1>
-        <button class="btn btn-outline-secondary btn-bouncy" id="btnLogoutSpec"><i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ</button>
+        <div class="d-flex gap-2">
+          <a href="worksheets.html" class="btn btn-outline-primary btn-bouncy"><i class="bi bi-journal-richtext me-1"></i>แบบฝึกหัด</a>
+          <button class="btn btn-outline-secondary btn-bouncy" id="btnLogoutSpec"><i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ</button>
+        </div>
       </div>
 
       <ul class="nav nav-pills mb-4 gap-2">
@@ -614,6 +632,7 @@ async function initUserProfile(session) {
 
   loadUserGameLeaderboards();
   loadUserHw(session);
+  loadUserWorksheets(session);
 
   if (!data || !data.length) return;
 
@@ -1646,7 +1665,9 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
   };
 }
 
-function renderHwDetailTable(containerId, words, practices, feedbacks, assignmentId, repeatCount, isSpecialist) {
+function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, repeatCount, isSpecialist, feedbackTable, fkColumn) {
+  feedbackTable = feedbackTable || 'homework_word_feedback';
+  fkColumn = fkColumn || 'homework_assignment_id';
   var byWord = {};
   practices.forEach(function (p) {
     if (!byWord[p.word_id]) byWord[p.word_id] = [];
@@ -1682,7 +1703,7 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, assignmen
       }
     }
     var noteCell = isSpecialist
-      ? '<input type="text" class="form-control form-control-sm hw-note-input" data-word-id="' + hww.word_id + '" data-assign-id="' + assignmentId + '" value="' + noteVal.replace(/"/g, '&quot;') + '" placeholder="หมายเหตุ" style="min-width:120px;">'
+      ? '<input type="text" class="form-control form-control-sm hw-note-input" data-word-id="' + hww.word_id + '" data-group-id="' + groupId + '" value="' + noteVal.replace(/"/g, '&quot;') + '" placeholder="หมายเหตุ" style="min-width:120px;">'
       : (noteVal ? '<span>' + noteVal + '</span>' : '<span style="color:#d0cce0;">—</span>');
     html += '<td>' + noteCell + '</td></tr>';
   });
@@ -1721,13 +1742,12 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, assignmen
     wrap.querySelectorAll('.hw-note-input').forEach(function (inp) {
       inp.addEventListener('input', function () {
         var wid = parseInt(inp.getAttribute('data-word-id'));
-        var aid = parseInt(inp.getAttribute('data-assign-id'));
+        var gid = parseInt(inp.getAttribute('data-group-id'));
         clearTimeout(noteTimers[wid]);
         noteTimers[wid] = setTimeout(async function () {
-          await sb.from('homework_word_feedback').upsert(
-            { homework_assignment_id: aid, word_id: wid, note: inp.value, updated_at: new Date().toISOString() },
-            { onConflict: 'homework_assignment_id,word_id' }
-          );
+          var row = { word_id: wid, note: inp.value, updated_at: new Date().toISOString() };
+          row[fkColumn] = gid;
+          await sb.from(feedbackTable).upsert(row, { onConflict: fkColumn + ',word_id' });
         }, 700);
       });
     });
@@ -1966,6 +1986,109 @@ async function openUserHwDetail(assignment) {
 
   document.getElementById('btnUserHwPrint').onclick = function () {
     printHomeworkWorksheet(hw ? (hw.name || 'การบ้าน #' + hw.id) : 'การบ้าน', 'userHwDetailTableWrap');
+  };
+}
+
+/* ── Patient: worksheets (แบบฝึกหัด) ──
+   Unlike homework, worksheets are shared curriculum content — ALL of them
+   show here (not just ones the patient has started), and a worksheet can
+   have several completed "rounds" (see supabase/worksheet_migration.sql).
+   The card only ever reflects the most recent round. */
+var _userWorksheets = [], _userWorksheetProgress = [], _userWorksheetPracticeData = [];
+
+async function loadUserWorksheets(session) {
+  var { data } = await sb.from('worksheets')
+    .select('id, name, repeat_count, worksheet_words(word_id)')
+    .order('created_at', { ascending: false });
+  _userWorksheets = data || [];
+
+  var container = document.getElementById('userWorksheetCards');
+  if (!_userWorksheets.length) {
+    container.innerHTML = '<p class="text-secondary small py-2">ยังไม่มีแบบฝึกหัด</p>';
+    return;
+  }
+
+  var { data: progress } = await sb.from('worksheet_progress')
+    .select('id, worksheet_id, started_at')
+    .eq('patient_user_id', session.user.id)
+    .order('started_at', { ascending: true });
+  _userWorksheetProgress = progress || [];
+
+  var progressIds = _userWorksheetProgress.map(function (p) { return p.id; });
+  if (progressIds.length) {
+    var { data: pData } = await sb.from('practice').select('word_id, worksheet_progress_id').in('worksheet_progress_id', progressIds);
+    _userWorksheetPracticeData = pData || [];
+  } else {
+    _userWorksheetPracticeData = [];
+  }
+
+  document.getElementById('btnUserWorksheetBack').addEventListener('click', function () {
+    document.getElementById('userWorksheetDetailSection').style.display = 'none';
+    document.getElementById('userWorksheetSection').style.display = 'block';
+  });
+
+  renderUserWorksheetCards();
+}
+
+function renderUserWorksheetCards() {
+  var container = document.getElementById('userWorksheetCards');
+  container.innerHTML = '';
+  _userWorksheets.forEach(function (ws) {
+    var rounds = _userWorksheetProgress.filter(function (p) { return p.worksheet_id === ws.id; });
+    var latest = rounds.length ? rounds[rounds.length - 1] : null;
+    var totalWords = (ws.worksheet_words || []).length;
+    var repeatCount = ws.repeat_count || 5;
+    var doneCount = 0, allDone = false;
+    if (latest) {
+      var wordIds = (ws.worksheet_words || []).map(function (w) { return w.word_id; });
+      var wsP = _userWorksheetPracticeData.filter(function (p) { return p.worksheet_progress_id === latest.id; });
+      var counts = {};
+      wsP.forEach(function (p) { counts[p.word_id] = (counts[p.word_id] || 0) + 1; });
+      doneCount = wordIds.filter(function (wid) { return (counts[wid] || 0) >= repeatCount; }).length;
+      allDone = totalWords > 0 && doneCount === totalWords;
+    }
+    var card = document.createElement('div');
+    card.style.cssText = 'background:' + (allDone ? '#e8f8f5' : '#fff') + ';border:1.5px solid ' + (allDone ? '#2ec4b6' : '#e8e3f5') + ';border-radius:14px;padding:1rem 1.2rem;cursor:pointer;min-width:160px;max-width:220px;position:relative;';
+    card.innerHTML =
+      (allDone ? '<div style="position:absolute;top:8px;right:10px;font-size:1.1rem;">✅</div>' : '') +
+      '<div style="font-weight:700;font-size:0.95rem;margin-bottom:4px;">' + (ws.name || 'แบบฝึกหัด #' + ws.id) + '</div>' +
+      '<div style="font-size:0.8rem;color:#9b93b0;">' + totalWords + ' คำ · ' + (latest ? (doneCount + '/' + totalWords + ' เสร็จ (รอบที่ ' + rounds.length + ')') : 'ยังไม่เริ่ม') + '</div>';
+    card.addEventListener('click', function () { openUserWorksheetDetail(ws, latest, rounds.length); });
+    container.appendChild(card);
+  });
+}
+
+async function openUserWorksheetDetail(ws, latestProgress, roundNum) {
+  document.getElementById('userWorksheetDetailTitle').textContent = (ws.name || 'แบบฝึกหัด #' + ws.id) + (latestProgress ? ' — รอบที่ ' + roundNum : '');
+  document.getElementById('userWorksheetDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
+  document.getElementById('userWorksheetSection').style.display = 'none';
+  document.getElementById('userWorksheetDetailSection').style.display = 'block';
+
+  var results = await Promise.all([
+    sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
+    latestProgress
+      ? sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('worksheet_progress_id', latestProgress.id).order('practiced_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    latestProgress
+      ? sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', latestProgress.id)
+      : Promise.resolve({ data: [] })
+  ]);
+  var words = results[0].data || [];
+  var practices = results[1].data || [];
+  var feedbacks = results[2].data || [];
+  var repeatCount = ws.repeat_count || 5;
+
+  var allDone = latestProgress && words.length > 0 && words.every(function (w) {
+    return practices.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
+  });
+  var statusEl = document.getElementById('userWorksheetDetailStatus');
+  statusEl.className = 'badge ' + (allDone ? 'bg-success' : 'bg-warning text-dark');
+  statusEl.textContent = latestProgress ? (allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ') : 'ยังไม่เริ่ม';
+
+  renderHwDetailTable('userWorksheetDetailTableWrap', words, practices, feedbacks, latestProgress ? latestProgress.id : null, repeatCount, false, 'worksheet_word_feedback', 'worksheet_progress_id');
+
+  document.getElementById('btnUserWorksheetPrint').onclick = function () {
+    printHomeworkWorksheet(ws.name || 'แบบฝึกหัด #' + ws.id, 'userWorksheetDetailTableWrap');
   };
 }
 </script>

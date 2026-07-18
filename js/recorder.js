@@ -188,6 +188,7 @@ const Recorder = (function () {
     if (uploadError) throw uploadError;
     var row = { word_id: wordId, user_id: userId, file_path: path };
     if (extra && extra.homework_assignment_id) row.homework_assignment_id = extra.homework_assignment_id;
+    if (extra && extra.worksheet_progress_id) row.worksheet_progress_id = extra.worksheet_progress_id;
     const { data: inserted, error: insertError } = await sb
       .from("practice")
       .insert(row)
