@@ -68,24 +68,17 @@
         </div>
       </div>
 
-      <!-- ── Round grid view: who has done this worksheet ── -->
-      <div id="wsPatientView" style="display:none;">
-        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-          <button class="btn btn-sm btn-outline-secondary" id="btnWsPatientBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
-          <h5 class="mb-0"><span id="wsPatientViewName"></span></h5>
-        </div>
-        <div id="wsRoundGrid" class="d-flex flex-wrap gap-3"></div>
-        <p id="wsRoundEmpty" class="text-secondary text-center py-4" style="display:none;">ยังไม่มีผู้ฝึกทำแบบฝึกหัดนี้</p>
-      </div>
-
-      <!-- ── Detail view (word × recording table) ── -->
+      <!-- ── Preview view: what words are in this worksheet, and how many
+           times each needs to be spoken — a blank template, not tied to any
+           patient. To check a specific patient's actual attempts, open
+           their profile in the "ผู้ฝึก" tab instead. ── -->
       <div id="wsDetailView" style="display:none;">
         <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
           <button class="btn btn-sm btn-outline-secondary" id="btnWsDetailBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
           <h5 class="mb-0" id="wsDetailTitle"></h5>
-          <span id="wsDetailStatus" class="badge"></span>
           <button class="btn btn-sm btn-outline-primary ms-auto" id="btnWsDetailPrint"><i class="bi bi-printer-fill me-1"></i>พิมพ์ / บันทึกเป็น PDF</button>
         </div>
+        <p class="text-secondary small mb-2">ตัวอย่างแบบฝึกหัด — คำที่มีและจำนวนครั้งที่ต้องพูด (ยังไม่มีข้อมูลการฝึกของผู้ฝึกคนใด ดูข้อมูลการฝึกจริงได้ที่หน้าโปรไฟล์ของผู้ฝึกแต่ละคน)</p>
         <div class="soft-card">
           <div class="table-responsive" id="wsDetailTableWrap">
             <p class="text-secondary text-center py-3">กำลังโหลด...</p>
@@ -176,7 +169,7 @@
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
 <script>
-var allWords = [], allSpecialistUsers = [], allWorksheets = [];
+var allWords = [], allWorksheets = [];
 var wsRepeatCount = 5;
 var wsCurrentWorksheet = null;
 
@@ -186,23 +179,6 @@ function wordLabel(w) {
   if (!w) return '?';
   var emoji = (w.emoji && w.emoji !== w.word) ? w.emoji : '';
   return emoji ? emoji + ' ' + w.word : w.word;
-}
-
-// Small circular avatar (photo > preset emoji > initial letter) — duplicated
-// from management.html's avatarHTML.
-function avatarHTML(person, size) {
-  size = size || 28;
-  var style = 'display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;' +
-    'width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;' +
-    'color:#fff;font-weight:700;font-size:' + Math.round(size * 0.4) + 'px;';
-  if (person && person.avatar_url) {
-    return '<span style="' + style + '"><img src="' + person.avatar_url + '" style="width:100%;height:100%;object-fit:cover;" alt=""></span>';
-  }
-  if (person && person.avatar_emoji) {
-    return '<span style="' + style + 'background:linear-gradient(135deg, ' + person.avatar_color + ' 0%, ' + (person.avatar_color2 || person.avatar_color) + ' 100%);font-size:' + Math.round(size * 0.55) + 'px;">' + person.avatar_emoji + '</span>';
-  }
-  var initial = person && person.name ? person.name[0].toUpperCase() : '?';
-  return '<span style="' + style + 'background:var(--color-primary-dark);">' + initial + '</span>';
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -233,14 +209,9 @@ async function initWorksheetsPage() {
   var { data: words } = await sb.from('words').select('*').order('letter_category', { ascending: true }).order('level', { ascending: true });
   allWords = words || [];
 
-  var { data: users } = await sb.rpc('list_linked_patients_for_specialist');
-  allSpecialistUsers = users || [];
-  allSpecialistUsers.forEach(function (u) { u.name = u.username || u.email; });
-
   document.getElementById('btnCreateWs').addEventListener('click', openCreateWs);
   document.getElementById('btnWsBack').addEventListener('click', function () { showWsView('wsListView'); });
-  document.getElementById('btnWsPatientBack').addEventListener('click', function () { showWsView('wsListView'); });
-  document.getElementById('btnWsDetailBack').addEventListener('click', function () { showWsView('wsPatientView'); });
+  document.getElementById('btnWsDetailBack').addEventListener('click', function () { showWsView('wsListView'); });
   document.getElementById('btnWsMinus').addEventListener('click', function () {
     if (wsRepeatCount > 1) { wsRepeatCount--; document.getElementById('wsRepeatDisplay').textContent = wsRepeatCount; }
   });
@@ -257,7 +228,7 @@ async function initWorksheetsPage() {
 }
 
 function showWsView(viewId) {
-  ['wsListView', 'wsPatientView', 'wsDetailView', 'wsCreateView'].forEach(function (id) {
+  ['wsListView', 'wsDetailView', 'wsCreateView'].forEach(function (id) {
     document.getElementById(id).style.display = id === viewId ? 'block' : 'none';
   });
 }
@@ -289,7 +260,7 @@ async function loadWorksheetList() {
         '<span class="text-secondary small ms-2">' + wordCount + ' คำ · พูดคำละ ' + (ws.repeat_count || 5) + ' ครั้ง</span>' +
       '</span>' +
       '<i class="bi bi-chevron-right text-secondary"></i>';
-    row.addEventListener('click', function () { loadWsRounds(ws); });
+    row.addEventListener('click', function () { openWorksheetPreview(ws); });
     container.appendChild(row);
   });
 }
@@ -348,181 +319,42 @@ async function createWorksheet() {
   }
 }
 
-/* ── Rounds: every (patient, round) a worksheet has been played through ── */
-async function loadWsRounds(ws) {
+/* ── Preview: what words are in this worksheet and how many times each
+   needs to be spoken — a blank template, not tied to any patient. To check
+   a specific patient's actual attempts (with play/✅/notes), open their
+   profile in the "ผู้ฝึก" tab of management.html instead — that already
+   lists every round they've played through each worksheet. ── */
+async function openWorksheetPreview(ws) {
   wsCurrentWorksheet = ws;
-  document.getElementById('wsPatientViewName').textContent = ws.name || 'แบบฝึกหัด #' + ws.id;
-  document.getElementById('wsRoundGrid').innerHTML = '<p class="text-secondary text-center py-3 small">กำลังโหลด...</p>';
-  document.getElementById('wsRoundEmpty').style.display = 'none';
-  showWsView('wsPatientView');
-
-  // RLS already scopes this to rounds belonging to this specialist's linked
-  // patients (see worksheet_progress_specialist_select_linked policy).
-  var { data } = await sb.from('worksheet_progress')
-    .select('id, patient_user_id, started_at')
-    .eq('worksheet_id', ws.id)
-    .order('started_at', { ascending: true });
-  var rounds = data || [];
-
-  if (!rounds.length) {
-    document.getElementById('wsRoundGrid').innerHTML = '';
-    document.getElementById('wsRoundEmpty').style.display = 'block';
-    return;
-  }
-
-  // Round number = position within that patient's own rounds for this worksheet.
-  var seenByPatient = {};
-  rounds.forEach(function (r) {
-    seenByPatient[r.patient_user_id] = (seenByPatient[r.patient_user_id] || 0) + 1;
-    r.roundNum = seenByPatient[r.patient_user_id];
-  });
-
-  var progressIds = rounds.map(function (r) { return r.id; });
-  var { data: pData } = await sb.from('practice').select('word_id, worksheet_progress_id').in('worksheet_progress_id', progressIds);
-  var practiceData = pData || [];
-
-  var totalWords = (ws.worksheet_words || []).length;
-  var repeatCount = ws.repeat_count || 5;
-
-  var grid = document.getElementById('wsRoundGrid');
-  grid.innerHTML = '';
-  // Most recent round first.
-  rounds.slice().reverse().forEach(function (r) {
-    var patient = allSpecialistUsers.find(function (u) { return u.user_id === r.patient_user_id; }) || { name: 'ไม่ทราบชื่อ' };
-    var rP = practiceData.filter(function (p) { return p.worksheet_progress_id === r.id; });
-    var counts = {};
-    rP.forEach(function (p) { counts[p.word_id] = (counts[p.word_id] || 0) + 1; });
-    var wordIds = (ws.worksheet_words || []).map(function (w) { return w.word_id; });
-    var doneCount = wordIds.filter(function (wid) { return (counts[wid] || 0) >= repeatCount; }).length;
-    var allDone = totalWords > 0 && doneCount === totalWords;
-
-    var card = document.createElement('div');
-    card.style.cssText = 'background:' + (allDone ? '#e8f8f5' : '#fff') + ';border:1.5px solid ' + (allDone ? '#2ec4b6' : '#e8e3f5') + ';border-radius:14px;padding:1rem 1.2rem;cursor:pointer;min-width:180px;max-width:240px;position:relative;';
-    card.innerHTML =
-      (allDone ? '<div style="position:absolute;top:8px;right:10px;font-size:1.1rem;">✅</div>' : '') +
-      '<div class="d-flex align-items-center gap-2 mb-1">' + avatarHTML(patient, 26) + '<span style="font-weight:700;font-size:0.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + patient.name + '</span></div>' +
-      '<div style="font-size:0.8rem;color:#9b93b0;">รอบที่ ' + r.roundNum + ' · ' + doneCount + '/' + totalWords + ' เสร็จ</div>' +
-      '<div style="font-size:0.75rem;color:#c0bbd0;margin-top:4px;">' + new Date(r.started_at).toLocaleDateString('th-TH') + '</div>';
-    card.addEventListener('click', function () { openWsRoundDetail(r, ws, patient); });
-    grid.appendChild(card);
-  });
-}
-
-async function openWsRoundDetail(progressRow, ws, patient) {
-  document.getElementById('wsDetailTitle').textContent = (ws.name || 'แบบฝึกหัด #' + ws.id) + ' — ' + patient.name + ' (รอบที่ ' + progressRow.roundNum + ')';
-  document.getElementById('wsDetailStatus').textContent = '';
+  document.getElementById('wsDetailTitle').textContent = ws.name || 'แบบฝึกหัด #' + ws.id;
   document.getElementById('wsDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
   showWsView('wsDetailView');
 
-  var results = await Promise.all([
-    sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
-    sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
-  ]);
-  var words = results[0].data || [];
-  var practices = results[1].data || [];
-  var feedbacks = results[2].data || [];
-  var repeatCount = ws.repeat_count || 5;
+  var { data } = await sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id);
+  var words = data || [];
 
-  var allDone = words.length > 0 && words.every(function (w) {
-    return practices.filter(function (p) { return p.word_id === w.word_id; }).length >= repeatCount;
-  });
-  var statusEl = document.getElementById('wsDetailStatus');
-  statusEl.className = 'badge ' + (allDone ? 'bg-success' : 'bg-warning text-dark');
-  statusEl.textContent = allDone ? 'เสร็จแล้ว ✅' : 'ยังไม่เสร็จ';
-
-  renderWorksheetDetailTable('wsDetailTableWrap', words, practices, feedbacks, progressRow.id, repeatCount);
+  renderWorksheetPreviewTable('wsDetailTableWrap', words, ws.repeat_count || 5);
 
   document.getElementById('btnWsDetailPrint').onclick = function () {
-    printWorksheet((ws.name || 'แบบฝึกหัด #' + ws.id) + ' — รอบที่ ' + progressRow.roundNum, 'wsDetailTableWrap', patient.name);
+    printWorksheet(ws.name || 'แบบฝึกหัด #' + ws.id, 'wsDetailTableWrap');
   };
 }
 
-/* ── Word × attempt table (own copy of management.html's renderHwDetailTable,
-   hardcoded to worksheet_word_feedback/worksheet_progress_id — this page has
-   no access to management.html's script, and this repo's convention is to
-   duplicate small page-local UI logic across files rather than share a
-   module for it) ── */
-function renderWorksheetDetailTable(containerId, words, practices, feedbacks, progressId, repeatCount) {
-  var byWord = {};
-  practices.forEach(function (p) {
-    if (!byWord[p.word_id]) byWord[p.word_id] = [];
-    byWord[p.word_id].push(p);
-  });
-  var maxCols = repeatCount;
-
+function renderWorksheetPreviewTable(containerId, words, repeatCount) {
   var html = '<table class="table table-bordered align-middle" style="font-size:0.88rem;"><thead><tr><th>คำ</th>';
-  for (var c = 1; c <= maxCols; c++) html += '<th style="white-space:nowrap;text-align:center;">ครั้งที่ ' + c + '</th>';
-  html += '<th>หมายเหตุ</th></tr></thead><tbody>';
+  for (var c = 1; c <= repeatCount; c++) html += '<th style="white-space:nowrap;text-align:center;">ครั้งที่ ' + c + '</th>';
+  html += '</tr></thead><tbody>';
 
   words.forEach(function (hww) {
     var w = hww.words;
     if (!w) return;
-    var recs = byWord[hww.word_id] || [];
-    var fb = feedbacks.find(function (f) { return f.word_id === hww.word_id; });
-    var noteVal = fb ? (fb.note || '') : '';
-    var isDoneWord = recs.length >= repeatCount;
-    html += '<tr style="' + (isDoneWord ? 'background:rgba(46,196,182,0.07);' : '') + '">';
-    html += '<td style="font-weight:600;white-space:nowrap;">' + wordLabel(w) + '</td>';
-    for (var i = 0; i < maxCols; i++) {
-      var rec = recs[i];
-      if (rec) {
-        var icon = rec.parent_marked_correct === true ? '✅' : rec.parent_marked_correct === false ? '❌' : '⏳';
-        html += '<td style="text-align:center;white-space:nowrap;">' +
-          (rec.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 px-1 btn-ws-play" data-path="' + rec.file_path + '" style="font-size:0.7rem;margin-right:3px;">▶</button>' : '') +
-          '<span class="ws-result-toggle" data-prac-id="' + rec.id + '" data-correct="' + rec.parent_marked_correct + '" style="cursor:pointer;font-size:1rem;" title="คลิกเพื่อเปลี่ยน">' + icon + '</span>' +
-          '</td>';
-      } else {
-        html += '<td style="color:#d0cce0;text-align:center;">—</td>';
-      }
-    }
-    html += '<td><input type="text" class="form-control form-control-sm ws-note-input" data-word-id="' + hww.word_id + '" data-progress-id="' + progressId + '" value="' + noteVal.replace(/"/g, '&quot;') + '" placeholder="หมายเหตุ" style="min-width:120px;"></td></tr>';
+    html += '<tr><td style="font-weight:600;white-space:nowrap;">' + wordLabel(w) + '</td>';
+    for (var i = 0; i < repeatCount; i++) html += '<td style="color:#d0cce0;text-align:center;">—</td>';
+    html += '</tr>';
   });
   html += '</tbody></table>';
 
-  var wrap = document.getElementById(containerId);
-  wrap.innerHTML = html;
-
-  wrap.querySelectorAll('.btn-ws-play').forEach(function (btn) {
-    btn.addEventListener('click', async function () {
-      btn.disabled = true; btn.textContent = '…';
-      var { data: signed } = await sb.storage.from('practice-audio').createSignedUrl(btn.getAttribute('data-path'), 3600);
-      if (!signed) { btn.disabled = false; btn.textContent = '▶'; return; }
-
-      var reset = function () { btn.disabled = false; btn.textContent = '▶'; };
-      var audio = new Audio(signed.signedUrl);
-      audio.addEventListener('ended', reset);
-      audio.addEventListener('error', reset);
-      audio.play().then(function () {
-        btn.textContent = '⏸';
-      }).catch(reset);
-    });
-  });
-
-  wrap.querySelectorAll('.ws-result-toggle').forEach(function (span) {
-    span.addEventListener('click', async function () {
-      var cur = span.getAttribute('data-correct');
-      var next = cur === 'true' ? false : cur === 'false' ? null : true;
-      await sb.from('practice').update({ parent_marked_correct: next }).eq('id', parseInt(span.getAttribute('data-prac-id')));
-      span.setAttribute('data-correct', String(next));
-      span.textContent = next === true ? '✅' : next === false ? '❌' : '⏳';
-    });
-  });
-
-  var noteTimers = {};
-  wrap.querySelectorAll('.ws-note-input').forEach(function (inp) {
-    inp.addEventListener('input', function () {
-      var wid = parseInt(inp.getAttribute('data-word-id'));
-      var pid = parseInt(inp.getAttribute('data-progress-id'));
-      clearTimeout(noteTimers[wid]);
-      noteTimers[wid] = setTimeout(async function () {
-        await sb.from('worksheet_word_feedback').upsert(
-          { worksheet_progress_id: pid, word_id: wid, note: inp.value, updated_at: new Date().toISOString() },
-          { onConflict: 'worksheet_progress_id,word_id' }
-        );
-      }, 700);
-    });
-  });
+  document.getElementById(containerId).innerHTML = html;
 }
 
 /* ── Printable worksheet (own copy of management.html's printHomeworkWorksheet) ── */
