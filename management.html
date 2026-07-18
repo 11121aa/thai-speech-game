@@ -246,7 +246,7 @@
           <!-- Patient detail (hidden until a patient is clicked) -->
           <div id="patientDetail" style="display:none;">
             <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-              <h5 class="mb-0" id="detailPatientName"></h5>
+              <h5 class="mb-0 d-flex align-items-center gap-2" id="detailPatientName"></h5>
               <button class="btn btn-sm btn-outline-secondary" id="btnCloseDetail"><i class="bi bi-x-lg"></i> ปิด</button>
             </div>
 
@@ -537,6 +537,33 @@ document.addEventListener('DOMContentLoaded', async function () {
 
 /* ── User profile ── */
 var GENDER_LABELS = { male: 'ชาย', female: 'หญิง' };
+
+// Small circular avatar (photo > preset emoji > initial letter), as an
+// HTML string — for list rows, not the big DOM-manipulated one on the
+// user's own profile card (see renderAvatar).
+function avatarHTML(person, size) {
+  size = size || 28;
+  var style = 'display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;' +
+    'width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;' +
+    'color:#fff;font-weight:700;font-size:' + Math.round(size * 0.4) + 'px;';
+  if (person && person.avatar_url) {
+    return '<span style="' + style + '"><img src="' + person.avatar_url + '" style="width:100%;height:100%;object-fit:cover;" alt=""></span>';
+  }
+  if (person && person.avatar_emoji) {
+    return '<span style="' + style + 'background:linear-gradient(135deg, ' + person.avatar_color + ' 0%, ' + (person.avatar_color2 || person.avatar_color) + ' 100%);font-size:' + Math.round(size * 0.55) + 'px;">' + person.avatar_emoji + '</span>';
+  }
+  var initial = person && person.name ? person.name[0].toUpperCase() : '?';
+  return '<span style="' + style + 'background:var(--color-primary-dark);">' + initial + '</span>';
+}
+
+// "อายุ X ปี · เพศ" subtitle line — hidden fields just get skipped, so
+// this is blank for specialists or accounts with nothing set yet.
+function ageGenderLabel(person) {
+  var parts = [];
+  if (person && person.age) parts.push('อายุ ' + person.age + ' ปี');
+  if (person && person.gender) parts.push(GENDER_LABELS[person.gender] || person.gender);
+  return parts.join(' · ');
+}
 
 async function initUserProfile(session) {
   console.log('[profile load] logged-in user_id:', session.user.id, 'email:', session.user.email);
@@ -1103,7 +1130,12 @@ async function loadPatientDashboard() {
   allPracticeData.forEach(function (p) { counts[p.user_id] = (counts[p.user_id] || 0) + 1; });
 
   var ranked = users.map(function (u) {
-    return { userId: u.user_id, name: u.name, count: counts[u.user_id] || 0 };
+    return {
+      userId: u.user_id, name: u.name, count: counts[u.user_id] || 0,
+      gender: u.gender, age: u.age,
+      avatar_url: u.avatar_url, avatar_emoji: u.avatar_emoji,
+      avatar_color: u.avatar_color, avatar_color2: u.avatar_color2
+    };
   }).sort(function (a, b) { return b.count - a.count; });
 
   renderPatientList(ranked);
@@ -1116,11 +1148,15 @@ function renderPatientList(ranked) {
   container.innerHTML = '';
   ranked.forEach(function (u, i) {
     var btn = document.createElement('button');
-    btn.className = 'w-100 text-start btn btn-light mb-1 py-2 px-3';
+    btn.className = 'w-100 text-start btn btn-light mb-1 py-2 px-3 d-flex align-items-center gap-2';
     btn.style.cssText = 'border-radius:10px;border:1px solid #e8e3f5;font-size:0.9rem;';
+    var subLabel = ageGenderLabel(u);
     btn.innerHTML =
-      '<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--color-primary-dark);color:#fff;text-align:center;line-height:26px;font-size:0.75rem;font-weight:700;margin-right:8px;">' + u.name[0].toUpperCase() + '</span>' +
-      '<span style="font-weight:600;">' + u.name + '</span>';
+      avatarHTML(u, 30) +
+      '<span>' +
+        '<span style="font-weight:600;display:block;">' + u.name + '</span>' +
+        (subLabel ? '<span style="font-size:0.72rem;color:var(--color-text-soft);">' + subLabel + '</span>' : '') +
+      '</span>';
     btn.addEventListener('click', function () { openPatientDetail(u); });
     container.appendChild(btn);
   });
@@ -1145,7 +1181,12 @@ function renderLeaderboard(ranked) {
 
 async function openPatientDetail(u) {
   currentDetailPatient = u;
-  document.getElementById('detailPatientName').textContent = u.name;
+  var subLabel = ageGenderLabel(u);
+  document.getElementById('detailPatientName').innerHTML =
+    avatarHTML(u, 36) +
+    '<span>' + u.name +
+      (subLabel ? ' <span class="text-secondary fw-normal" style="font-size:0.8rem;">(' + subLabel + ')</span>' : '') +
+    '</span>';
   document.getElementById('detailSearch').value = '';
   document.getElementById('detailHwDetailSection').style.display = 'none';
   document.getElementById('detailHwCards').parentElement.style.display = 'block';
