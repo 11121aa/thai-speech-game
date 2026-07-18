@@ -1848,6 +1848,17 @@ async function loadUserHw(session) {
   console.log('[hw load] query result — data:', data, 'error:', error);
   _userHwAssignments = data || [];
 
+  // An assignment row can be visible to the patient (their own-row SELECT
+  // policy) while its embedded `homework` comes back null because RLS
+  // separately blocks reading the `homework` table itself — PostgREST
+  // doesn't error in that case, it just omits the embed, and the missing
+  // homework then makes that card silently disappear. If that ever
+  // happens again, supabase/homework_patient_rls.sql is the fix to check.
+  var missingHw = _userHwAssignments.filter(function (a) { return !a.homework; });
+  if (missingHw.length) {
+    console.warn('[hw load] ' + missingHw.length + ' assignment(s) have no readable homework — likely missing RLS policy, see supabase/homework_patient_rls.sql', missingHw);
+  }
+
   if (!_userHwAssignments.length) {
     document.getElementById('userHwCards').innerHTML = '<p class="text-secondary small py-2">ยังไม่มีการบ้าน</p>';
     return;

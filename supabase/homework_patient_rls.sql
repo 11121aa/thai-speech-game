@@ -5,6 +5,7 @@
 
 -- Patients need to read the homework header (name, repeat_count)
 -- when it's assigned to them
+DROP POLICY IF EXISTS "patient read assigned homework" ON public.homework;
 CREATE POLICY "patient read assigned homework"
   ON public.homework FOR SELECT
   USING (
@@ -15,6 +16,7 @@ CREATE POLICY "patient read assigned homework"
   );
 
 -- Patients need to read which words are in their assigned homework
+DROP POLICY IF EXISTS "patient read assigned homework_words" ON public.homework_words;
 CREATE POLICY "patient read assigned homework_words"
   ON public.homework_words FOR SELECT
   USING (
