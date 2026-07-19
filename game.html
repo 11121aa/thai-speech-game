@@ -197,12 +197,19 @@
     <h4 class="mb-3">⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
 
     <div class="setup-row">
-      <label>ความยาก / โหมด</label>
+      <label>ชุดคำที่จะฝึก</label>
       <div class="diff-btns" id="hwDiffBtns">
-        <button class="diff-btn active" data-diff="easy">ง่าย <small class="text-secondary">มีตัวอย่างเสียง</small></button>
-        <button class="diff-btn" data-diff="hard">ยาก <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
+        <button class="diff-btn active" data-diff="custom">กำหนดเอง <small class="text-secondary">เลือกหมวดเสียงเอง</small></button>
         <button class="diff-btn" data-diff="hw" style="background:#e74c3c;color:#fff;border-color:#e74c3c;">การบ้าน</button>
         <button class="diff-btn" data-diff="worksheet" style="background:#8a5cf6;color:#fff;border-color:#8a5cf6;">แบบฝึกหัด</button>
+      </div>
+    </div>
+
+    <div class="setup-row">
+      <label>ระดับความยาก</label>
+      <div class="diff-btns" id="hardModeBtns">
+        <button class="diff-btn active" data-hardmode="easy">ง่าย <small class="text-secondary">มีตัวอย่างเสียง</small></button>
+        <button class="diff-btn" data-hardmode="hard">ยาก <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
       </div>
     </div>
 
@@ -628,9 +635,11 @@ function openSetup(mode) {
   _setupMode = mode;
   var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭', dressup: 'แต่งตัวตุ๊กตา 👗' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
-  // Reset to easy/normal mode
+  // Reset to custom word-set / easy difficulty
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
-  document.querySelector('#hwDiffBtns .diff-btn[data-diff="easy"]').classList.add('active');
+  document.querySelector('#hwDiffBtns .diff-btn[data-diff="custom"]').classList.add('active');
+  document.querySelectorAll('#hardModeBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelector('#hardModeBtns .diff-btn[data-hardmode="easy"]').classList.add('active');
   document.getElementById('hwSelectorRow').style.display = 'none';
   document.getElementById('worksheetSelectorRow').style.display = 'none';
   document.getElementById('soundLevelRows').style.display = 'block';
@@ -687,6 +696,13 @@ function isHwMode() {
 function isWorksheetMode() {
   var btn = document.querySelector('#hwDiffBtns .diff-btn.active');
   return btn && btn.getAttribute('data-diff') === 'worksheet';
+}
+
+// Difficulty (example sound shown or not) is now its own independent
+// toggle, decoupled from which word set is being used (custom/homework/worksheet).
+function isHardMode() {
+  var btn = document.querySelector('#hardModeBtns .diff-btn.active');
+  return btn && btn.getAttribute('data-hardmode') === 'hard';
 }
 
 function getPfDifficulty() {
@@ -869,11 +885,11 @@ async function getOrStartWorksheetRound(worksheetId, wordPool, repeatCount, user
 
 async function launchGame() {
   var diffBtn = document.querySelector('#hwDiffBtns .diff-btn.active');
-  var diff = diffBtn ? diffBtn.getAttribute('data-diff') : 'easy';
+  var diff = diffBtn ? diffBtn.getAttribute('data-diff') : 'custom';
   G.hwMode = diff === 'hw';
   G.hwAssignmentId = G.hwMode ? _selectedHwAssignmentId : null;
   G.worksheetMode = diff === 'worksheet';
-  G.hardMode = diff === 'hard';
+  G.hardMode = isHardMode();
   if (G.hwMode && !_selectedHwAssignmentId) { alert('กรุณาเลือกการบ้านก่อน'); return; }
   if (G.worksheetMode && !_selectedWorksheetId) { alert('กรุณาเลือกแบบฝึกหัดก่อน'); return; }
   var pool = getSetupPool();
@@ -1008,6 +1024,13 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (hw) { _selectedHwAssignmentId = null; _hwPool = []; loadHwSelectorList(); }
       if (worksheet) { _selectedWorksheetId = null; _worksheetPool = []; loadWorksheetSelectorList(); }
       updateWordCount();
+    });
+  });
+
+  document.querySelectorAll('#hardModeBtns .diff-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#hardModeBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
     });
   });
 
