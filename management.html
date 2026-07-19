@@ -448,6 +448,7 @@
               <div class="col-md-4">
                 <div class="soft-card h-100">
                   <h6 class="fw-bold mb-3">เลือกคำ</h6>
+                  <input type="text" class="form-control form-control-sm mb-2" id="hwWordSearch" placeholder="ค้นหาคำ / หมวด">
                   <div id="hwWordList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
                 </div>
               </div>
@@ -536,6 +537,7 @@
               <div class="col-md-6">
                 <div class="soft-card h-100">
                   <h6 class="fw-bold mb-3">เลือกคำ</h6>
+                  <input type="text" class="form-control form-control-sm mb-2" id="wsWordSearch" placeholder="ค้นหาคำ / หมวด">
                   <div id="wsWordList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
                 </div>
               </div>
@@ -1235,6 +1237,7 @@ async function initSpecialist() {
   document.getElementById('btnHwBack').addEventListener('click', function () { showHwView('hwListView'); });
   document.getElementById('btnHwPatientBack').addEventListener('click', function () { showHwView('hwListView'); });
   document.getElementById('btnHwDetailBack').addEventListener('click', function () { showHwView('hwPatientView'); });
+  document.getElementById('hwWordSearch').addEventListener('input', function () { filterWordCheckboxList('hwWordList', this.value); });
   document.getElementById('btnHwMinus').addEventListener('click', function () {
     if (hwRepeatCount > 1) { hwRepeatCount--; document.getElementById('hwRepeatDisplay').textContent = hwRepeatCount; }
   });
@@ -1797,6 +1800,7 @@ function initWorksheetsTab() {
   document.getElementById('btnCreateWs').addEventListener('click', openCreateWs);
   document.getElementById('btnWsBack').addEventListener('click', function () { showWsView('wsListView'); });
   document.getElementById('btnWsDetailBack').addEventListener('click', function () { showWsView('wsListView'); });
+  document.getElementById('wsWordSearch').addEventListener('input', function () { filterWordCheckboxList('wsWordList', this.value); });
   document.getElementById('btnWsMinus').addEventListener('click', function () {
     if (wsRepeatCount > 1) { wsRepeatCount--; document.getElementById('wsRepeatDisplay').textContent = wsRepeatCount; }
   });
@@ -1853,6 +1857,7 @@ function openCreateWs() {
   wsRepeatCount = 5;
   document.getElementById('wsRepeatDisplay').textContent = '5';
   document.getElementById('wsName').value = '';
+  document.getElementById('wsWordSearch').value = '';
   populateWsWords();
   showWsView('wsCreateView');
 }
@@ -1864,6 +1869,7 @@ function populateWsWords() {
   allWords.forEach(function (w) {
     var lbl = document.createElement('label');
     lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
+    lbl.setAttribute('data-search', (w.word + ' ' + w.letter_category).toLowerCase());
     lbl.innerHTML =
       '<input type="checkbox" value="' + w.id + '" style="width:15px;height:15px;flex-shrink:0;">' +
       '<span style="flex:1;">' + wordLabel(w) + '</span>' +
@@ -1981,9 +1987,21 @@ function openCreateHw() {
   hwRepeatCount = 5;
   document.getElementById('hwRepeatDisplay').textContent = '5';
   document.getElementById('hwName').value = '';
+  document.getElementById('hwWordSearch').value = '';
   populateHwWords();
   populateHwAssign();
   showHwView('hwCreateView');
+}
+
+// Filters a word-checkbox list built by populateHwWords()/populateWsWords()
+// by hiding non-matching rows (rather than rebuilding the list), so a
+// checked box stays checked even while its row is filtered out of view.
+function filterWordCheckboxList(containerId, query) {
+  var q = query.trim().toLowerCase();
+  document.querySelectorAll('#' + containerId + ' > label').forEach(function (lbl) {
+    var match = !q || lbl.getAttribute('data-search').indexOf(q) !== -1;
+    lbl.style.display = match ? 'flex' : 'none';
+  });
 }
 
 function populateHwWords() {
@@ -1993,6 +2011,7 @@ function populateHwWords() {
   allWords.forEach(function (w) {
     var lbl = document.createElement('label');
     lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
+    lbl.setAttribute('data-search', (w.word + ' ' + w.letter_category).toLowerCase());
     lbl.innerHTML =
       '<input type="checkbox" value="' + w.id + '" style="width:15px;height:15px;flex-shrink:0;">' +
       '<span style="flex:1;">' + wordLabel(w) + '</span>' +
