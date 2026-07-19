@@ -156,12 +156,9 @@ function createMatchingGame(words, callbacks) {
           label.setScale(Math.min(maxW / label.width, maxH / label.height));
           label.setVisible(false);
         } else {
-          // The word's own emoji field can be auto-set equal to its word
-          // text when it has no picture (see wordLabel() in management.html)
-          // — the 'word' card right next to this one already shows that
-          // same text, so falling through to it here would just print the
-          // word twice instead of showing a distinct picture-side icon.
-          var wEmoji = (cardData.w.emoji && cardData.w.emoji !== cardData.w.word) ? cardData.w.emoji : '🔸';
+          // No picture and no custom emoji — the "picture" card just shows
+          // the word itself (bigger) instead of a meaningless generic icon.
+          var wEmoji = (cardData.w.emoji && cardData.w.emoji !== cardData.w.word) ? cardData.w.emoji : cardData.w.word;
           label = self.add.text(
             0, isBig ? 8 : 2,
             isBig ? wEmoji : cardData.w.word,

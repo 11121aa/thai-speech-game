@@ -56,10 +56,9 @@ const PracticePanel = (function () {
     if (pictureUrl) {
       el("ppEmoji").innerHTML = '<img src="' + pictureUrl + '" alt="' + word.word + '" style="height:64px;max-width:100%;object-fit:contain;">';
     } else {
-      // A word's emoji field can be auto-set equal to its own word text
-      // when it has no picture — ppWord right below already shows that
-      // text, so this guard stops it printing twice.
-      el("ppEmoji").textContent = (word.emoji && word.emoji !== word.word) ? word.emoji : "🔸";
+      // No picture and no custom emoji — show the word itself rather
+      // than a meaningless generic icon.
+      el("ppEmoji").textContent = (word.emoji && word.emoji !== word.word) ? word.emoji : word.word;
     }
     el("ppWord").textContent = word.word;
     el("ppReading").textContent = word.level || "";

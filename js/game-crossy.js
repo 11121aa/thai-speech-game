@@ -262,9 +262,9 @@ function createCrossyGame(words, callbacks) {
     // ── Update the goal label text at the top of the screen ──────
     updateGoalLabel: function () {
       if (!this.currentWord || !this.goalLabel) return;
-      // A word's emoji field can be auto-set equal to its own word text
-      // when it has no picture — guard against printing the word twice.
-      var wEmoji = (this.currentWord.emoji && this.currentWord.emoji !== this.currentWord.word) ? this.currentWord.emoji : '🏁';
+      // No picture and no custom emoji — bookend with the word itself
+      // rather than a meaningless generic icon.
+      var wEmoji = (this.currentWord.emoji && this.currentWord.emoji !== this.currentWord.word) ? this.currentWord.emoji : this.currentWord.word;
       this.goalLabel.setText(
         wEmoji +
         '  ข้ามถนน → ' + this.currentWord.reading +

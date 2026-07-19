@@ -219,10 +219,11 @@ function createShootingGame(words, callbacks) {
 
       // A word's emoji field can be auto-set equal to its own word text
       // when it has no picture — the label right below already shows that
-      // text, so this guard stops it printing twice.
-      var wEmoji = (word.emoji && word.emoji !== word.word) ? word.emoji : '🎯';
-      var emoji = this.add.text(tx, ty - 40 - label.height - 2,
-        wEmoji, { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(2);
+      // text, so skip the icon line entirely rather than printing the
+      // same word twice stacked right on top of each other.
+      var wEmoji = (word.emoji && word.emoji !== word.word) ? word.emoji : '';
+      var emoji = wEmoji ? this.add.text(tx, ty - 40 - label.height - 2,
+        wEmoji, { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(2) : null;
 
       this.targets.push({
         x: tx, y: ty,
@@ -436,9 +437,9 @@ function createShootingGame(words, callbacks) {
           self.drawTarget(g, tgt, time, elapsed);
           var ly = tgt.y - 58 * tgt.s;
           tgt.label.setPosition(tgt.x, ly).setAlpha(tgt.hit ? 0.4 : tgt.s);
-          tgt.emoji.setPosition(tgt.x, ly - tgt.label.height - 2).setAlpha(tgt.hit ? 0.4 : tgt.s);
+          if (tgt.emoji) tgt.emoji.setPosition(tgt.x, ly - tgt.label.height - 2).setAlpha(tgt.hit ? 0.4 : tgt.s);
         } else if (tgt.done || tgt.expired) {
-          tgt.label.destroy(); tgt.emoji.destroy();
+          tgt.label.destroy(); if (tgt.emoji) tgt.emoji.destroy();
           toRemove.push(tgt);
         }
       });
