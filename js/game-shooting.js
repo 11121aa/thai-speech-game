@@ -217,8 +217,12 @@ function createShootingGame(words, callbacks) {
         color: '#2b2438', backgroundColor: '#ffffffcc', padding: { x: 6, y: 2 }
       }).setOrigin(0.5, 1).setDepth(2);
 
+      // A word's emoji field can be auto-set equal to its own word text
+      // when it has no picture — the label right below already shows that
+      // text, so this guard stops it printing twice.
+      var wEmoji = (word.emoji && word.emoji !== word.word) ? word.emoji : '🎯';
       var emoji = this.add.text(tx, ty - 40 - label.height - 2,
-        word.emoji || '🎯', { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(2);
+        wEmoji, { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(2);
 
       this.targets.push({
         x: tx, y: ty,

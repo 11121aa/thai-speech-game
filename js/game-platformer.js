@@ -553,7 +553,11 @@ function createPlatformerGame(words, callbacks, difficulty) {
         g.lineStyle(2.5, 0x8a5cf6);
         g.fillRoundedRect(  cx - bw / 2, wi.y - 22 + bob, bw, 44, 10);
         g.strokeRoundedRect(cx - bw / 2, wi.y - 22 + bob, bw, 44, 10);
-        var et = self.add.text(cx, wi.y - 6 + bob, wi.word.emoji || '🔸',
+        // A word's emoji field can be auto-set equal to its own word text
+        // when it has no picture — the word label right below already
+        // shows that text, so this guard stops it printing twice.
+        var wEmoji = (wi.word.emoji && wi.word.emoji !== wi.word.word) ? wi.word.emoji : '🔸';
+        var et = self.add.text(cx, wi.y - 6 + bob, wEmoji,
           { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(5);
         var wt = self.add.text(cx, wi.y + 8 + bob, wi.word.word,
           { fontFamily: 'Prompt', fontSize: '12px', fontStyle: 'bold', color: '#2b2438' })

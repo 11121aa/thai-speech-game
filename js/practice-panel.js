@@ -59,7 +59,10 @@ const PracticePanel = (function () {
     if (illUrl) {
       el("ppEmoji").innerHTML = '<img src="' + illUrl + '" alt="' + word.word + '" style="height:64px;max-width:100%;object-fit:contain;">';
     } else {
-      el("ppEmoji").textContent = word.emoji || "🔸";
+      // A word's emoji field can be auto-set equal to its own word text
+      // when it has no picture — ppWord right below already shows that
+      // text, so this guard stops it printing twice.
+      el("ppEmoji").textContent = (word.emoji && word.emoji !== word.word) ? word.emoji : "🔸";
     }
     el("ppWord").textContent = word.word;
     el("ppReading").textContent = word.level || "";

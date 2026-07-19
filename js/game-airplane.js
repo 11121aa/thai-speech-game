@@ -358,7 +358,11 @@ function createAirplaneGame(words, callbacks) {
       this.wordItems.forEach(function (w) {
         if (w.collected || w.x < -80 || w.x > W + 80) return;
         self.drawBubble(g, w.x, w.y);
-        var et = self.add.text(w.x, w.y - 6, w.word.emoji || '🔸',
+        // A word's emoji field can be auto-set equal to its own word text
+        // when it has no picture — the word label right below already
+        // shows that text, so this guard stops it printing twice.
+        var wEmoji = (w.word.emoji && w.word.emoji !== w.word.word) ? w.word.emoji : '🔸';
+        var et = self.add.text(w.x, w.y - 6, wEmoji,
           { fontSize: '16px' }).setOrigin(0.5, 1).setDepth(5);
         var wt = self.add.text(w.x, w.y + 8, w.word.word,
           { fontFamily: 'Prompt', fontSize: '12px', fontStyle: 'bold', color: '#2b2438' })

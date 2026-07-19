@@ -221,8 +221,12 @@ function createFlashcardGame(words, callbacks) {
         cont.add(img);
         cont.emojiImg = img;
       } else {
+        // A word's emoji field can be auto-set equal to its own word text
+        // when it has no picture — showing that here would leak the
+        // answer directly, since the choice buttons below show word text too.
+        var wEmoji = (this.currentWord.emoji && this.currentWord.emoji !== this.currentWord.word) ? this.currentWord.emoji : '🔸';
         cont.emojiTxt.setVisible(true);
-        cont.emojiTxt.setText(this.currentWord.emoji || '🔸');
+        cont.emojiTxt.setText(wEmoji);
       }
 
       // Update the "remaining cards" badge
