@@ -74,6 +74,7 @@ const PracticePanel = (function () {
     // clip is uploaded per sound (see management.html's Sounds tab) and
     // comes through on the nested `sounds` join from WordsApi.fetchAllWords().
     const animUrl = word.sounds && word.sounds.mouth_animation_url;
+    console.log('[mouth animation] word:', word.word, 'letter_category:', word.letter_category, 'sound_id:', word.sound_id, 'sounds join:', word.sounds, 'animUrl:', animUrl);
     const animSvg = animUrl ? '<img src="' + animUrl + '" alt="ปากเสียง ' + word.letter_category + '" style="width:100%;height:100%;display:block;">' : null;
     const animBox = el("ppMouthAnimation");
     if (animBox) {
