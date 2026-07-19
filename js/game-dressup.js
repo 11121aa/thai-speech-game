@@ -11,7 +11,8 @@
 //  How the game works:
 //    - A plain avatar stands on the left; a card on the right shows
 //      the next outfit piece to unlock (hat, shirt, pants, shoes, bag)
-//    - "🔊 ฟังตัวอย่าง" button → plays the word aloud using TTS
+//    - "🔊 ฟังตัวอย่าง" button → plays the word's recorded pronunciation
+//      clip if it has one (hidden otherwise — no TTS fallback)
 //    - "🎤 พูดคำนี้!" button → opens the pronunciation practice modal
 //    - After practicing, the piece animates onto the avatar and the
 //      next card slides in
@@ -214,8 +215,11 @@ function createDressupGame(words, callbacks) {
         return { gfx: gfx, txt: txt };
       }
 
+      // No TTS fallback — this button is hidden in showItem() below for any
+      // word with no real recorded sound_url, rather than falling back to
+      // browser text-to-speech.
       this.listenBtn = makeBtn(CARD_X - 90, 160, 50, 0x64748b, 0x475569, '🔊  ฟังตัวอย่าง', function () {
-        if (self.currentWord) SpeechTool.speak(self.currentWord.word);
+        if (self.currentWord && self.currentWord.sound_url) new Audio(self.currentWord.sound_url).play();
       });
 
       this.practiceBtn = makeBtn(CARD_X + 90, 160, 50, 0xf59e0b, 0xd97706, '🎤  พูดคำนี้!', function () {
@@ -243,6 +247,12 @@ function createDressupGame(words, callbacks) {
 
       var remaining = SLOTS.length - this.idx - 1;
       cont.badgeTxt.setText(remaining > 0 ? remaining + ' ชิ้น' : 'ชิ้นสุดท้าย!');
+
+      var hasSound = !!this.currentWord.sound_url;
+      this.listenBtn.gfx.setVisible(hasSound);
+      this.listenBtn.txt.setVisible(hasSound);
+      if (hasSound) this.listenBtn.txt.setInteractive({ useHandCursor: true });
+      else this.listenBtn.txt.disableInteractive();
 
       this.updateProgress();
       this.canInteract = true;

@@ -72,11 +72,18 @@ function createFlashcardGame(words, callbacks) {
       if (this.pool.length > MAX_CARDS) this.pool = this.pool.slice(0, MAX_CARDS); // cap
 
       // [ILLUSTRATIONS] Preload a real picture for any pool word that has
-      // one; words without one keep the emoji fallback (checked via
+      // one: the word's own uploaded image takes priority (keyed by id),
+      // falling back to the legacy generated-illustration manifest (keyed
+      // by word text) for older words that predate the upload feature.
+      // Words with neither keep the emoji fallback (checked via
       // texture-existence in showCard()).
       this.pool.forEach(function (w) {
-        var url = Illustrations.get(w.word);
-        if (url) this.load.image('ill_' + w.word, url);
+        if (w.image_url) {
+          this.load.image('img_' + w.id, w.image_url);
+        } else {
+          var url = Illustrations.get(w.word);
+          if (url) this.load.image('ill_' + w.word, url);
+        }
       }, this);
     },
 
@@ -210,12 +217,15 @@ function createFlashcardGame(words, callbacks) {
       var cont = this.cardCont;
 
       // [ILLUSTRATIONS] Use the real picture if this word has one and it
-      // loaded successfully; otherwise fall back to the emoji text.
+      // loaded successfully (own upload first, then the legacy manifest);
+      // otherwise fall back to the emoji text.
       if (cont.emojiImg) { cont.emojiImg.destroy(); cont.emojiImg = null; }
+      var imgKey = 'img_' + this.currentWord.id;
       var illKey = 'ill_' + this.currentWord.word;
-      if (this.textures.exists(illKey)) {
+      var pictureKey = this.textures.exists(imgKey) ? imgKey : (this.textures.exists(illKey) ? illKey : null);
+      if (pictureKey) {
         cont.emojiTxt.setVisible(false);
-        var img = this.add.image(0, 0, illKey).setOrigin(0.5, 0.5);
+        var img = this.add.image(0, 0, pictureKey).setOrigin(0.5, 0.5);
         var maxW = 220, maxH = 150;
         img.setScale(Math.min(maxW / img.width, maxH / img.height));
         cont.add(img);

@@ -222,16 +222,14 @@
     <div id="specialistView" style="display:none;">
       <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h1 class="h3 mb-0">🩺 แดชบอร์ดผู้เชี่ยวชาญ</h1>
-        <div class="d-flex gap-2">
-          <a href="worksheets.html" class="btn btn-outline-primary btn-bouncy"><i class="bi bi-journal-richtext me-1"></i>แบบฝึกหัด</a>
-          <button class="btn btn-outline-secondary btn-bouncy" id="btnLogoutSpec"><i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ</button>
-        </div>
+        <button class="btn btn-outline-secondary btn-bouncy" id="btnLogoutSpec"><i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ</button>
       </div>
 
       <ul class="nav nav-pills mb-4 gap-2">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tabPatients" type="button"><i class="bi bi-people-fill me-1"></i>ผู้ฝึก</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabHomework" type="button"><i class="bi bi-journal-check me-1"></i>การบ้าน</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabWords" type="button">จัดการคลังคำ</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabWorksheets" type="button"><i class="bi bi-journal-richtext me-1"></i>แบบฝึกหัด</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tabSounds" type="button">รูปปากตามเสียง</button></li>
       </ul>
 
@@ -342,10 +340,26 @@
             <h5 class="mb-3" id="wordFormTitle">เพิ่มคำฝึกออกเสียง</h5>
             <form id="wordForm" class="row g-3">
               <input type="hidden" id="wordId">
-              <div class="col-md-3"><label class="form-label fw-semibold">หมวดเสียง (ตัวอักษร)</label><input type="text" class="form-control" id="wordLetterCategory" required></div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">ประเภทคำ (หมวดเสียง)</label>
+                <select class="form-select" id="wordSoundId" required><option value="">— เลือก —</option></select>
+              </div>
               <div class="col-md-3"><label class="form-label fw-semibold">คำ</label><input type="text" class="form-control" id="wordWord" required></div>
               <div class="col-md-3"><label class="form-label fw-semibold">ระดับ</label><select class="form-select" id="wordLevel" required><option value="เสียง">เสียง</option><option value="1 พยางค์ไม่มีตัวสะกด">1 พยางค์ไม่มีตัวสะกด</option><option value="1 พยางค์">1 พยางค์</option><option value="2 พยางค์">2 พยางค์</option><option value="3 พยางค์">3 พยางค์</option><option value="ประโยค">ประโยค</option></select></div>
-              <div class="col-md-3"><label class="form-label fw-semibold">Emoji</label><input type="text" class="form-control" id="wordEmoji"></div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">รูปภาพ (สูงสุด 2MB)</label>
+                <input type="file" class="form-control" id="wordImageFile" accept="image/*">
+                <div id="wordImagePreview" class="mt-2"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">คลิปเสียงตัวอย่าง (สูงสุด 5MB)</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <input type="file" class="form-control" style="max-width:260px;" id="wordSoundFile" accept="audio/*">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="btnWordRecord"><i class="bi bi-mic-fill me-1"></i>อัดเสียง</button>
+                  <canvas id="wordRecordWave" width="160" height="36" style="display:none;background:var(--color-bg-soft);border-radius:8px;"></canvas>
+                </div>
+                <div id="wordSoundPreview" class="mt-2"></div>
+              </div>
               <div class="col-md-6 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-warning btn-bouncy" id="wordSubmitBtn">เพิ่มคำ</button>
                 <button type="button" class="btn btn-outline-secondary" id="wordCancelEditBtn" style="display:none;">ยกเลิก</button>
@@ -359,7 +373,7 @@
             </div>
             <div class="table-responsive" style="max-height:440px;overflow-y:auto;">
               <table class="table table-hover align-middle">
-                <thead><tr><th>คำ</th><th>หมวดเสียง</th><th>ระดับ</th><th>Emoji</th><th></th></tr></thead>
+                <thead><tr><th>คำ</th><th>หมวดเสียง</th><th>ระดับ</th><th>รูปภาพ</th><th>เสียง</th><th></th></tr></thead>
                 <tbody id="wordsTableBody"></tbody>
               </table>
             </div>
@@ -476,14 +490,110 @@
 
         </div>
 
+        <!-- ── Worksheets Tab ── -->
+        <div class="tab-pane fade" id="tabWorksheets">
+
+          <!-- List view: all worksheets + create button -->
+          <div id="wsListView">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <h5 class="mb-0">แบบฝึกหัดทั้งหมด</h5>
+              <button class="btn btn-warning btn-bouncy" id="btnCreateWs"><i class="bi bi-plus-circle-fill me-2"></i>สร้างแบบฝึกหัด</button>
+            </div>
+            <div class="soft-card">
+              <div id="wsList"><p class="text-secondary text-center py-3 small">กำลังโหลด...</p></div>
+            </div>
+          </div>
+
+          <!-- Preview view: what words are in this worksheet, and how many
+               times each needs to be spoken — a blank template, not tied to
+               any patient. To check a specific patient's actual attempts,
+               open their profile in the "ผู้ฝึก" tab instead. -->
+          <div id="wsDetailView" style="display:none;">
+            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+              <button class="btn btn-sm btn-outline-secondary" id="btnWsDetailBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+              <h5 class="mb-0" id="wsDetailTitle"></h5>
+              <button class="btn btn-sm btn-outline-primary ms-auto" id="btnWsDetailPrint"><i class="bi bi-printer-fill me-1"></i>พิมพ์ / บันทึกเป็น PDF</button>
+            </div>
+            <p class="text-secondary small mb-2">ตัวอย่างแบบฝึกหัด — คำที่มีและจำนวนครั้งที่ต้องพูด (ยังไม่มีข้อมูลการฝึกของผู้ฝึกคนใด ดูข้อมูลการฝึกจริงได้ที่หน้าโปรไฟล์ของผู้ฝึกแต่ละคน)</p>
+            <div class="soft-card">
+              <div class="table-responsive" id="wsDetailTableWrap">
+                <p class="text-secondary text-center py-3">กำลังโหลด...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Create view -->
+          <div id="wsCreateView" style="display:none;">
+            <div class="d-flex align-items-center gap-3 mb-4">
+              <button class="btn btn-sm btn-outline-secondary" id="btnWsBack"><i class="bi bi-arrow-left me-1"></i>กลับ</button>
+              <h5 class="mb-0">สร้างแบบฝึกหัด</h5>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">ชื่อแบบฝึกหัด</label>
+              <input type="text" class="form-control" id="wsName" placeholder="เช่น ป สัปดาห์ที่ 1">
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="soft-card h-100">
+                  <h6 class="fw-bold mb-3">เลือกคำ</h6>
+                  <div id="wsWordList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="soft-card h-100 d-flex flex-column align-items-center justify-content-center gap-2 py-4">
+                  <h6 class="fw-bold">จำนวนครั้งที่ต้องพูด</h6>
+                  <div class="d-flex align-items-center gap-3 mt-2">
+                    <button class="btn btn-outline-secondary" id="btnWsMinus" style="width:42px;height:42px;padding:0;font-size:1.5rem;line-height:1;">−</button>
+                    <span id="wsRepeatDisplay" style="font-size:3rem;font-weight:700;min-width:56px;text-align:center;">5</span>
+                    <button class="btn btn-outline-secondary" id="btnWsPlus" style="width:42px;height:42px;padding:0;font-size:1.5rem;line-height:1;">+</button>
+                  </div>
+                  <p class="text-secondary small text-center mt-2">ครั้งต่อคำ</p>
+                </div>
+              </div>
+            </div>
+            <div class="text-end mt-4">
+              <button class="btn btn-warning btn-bouncy px-5" id="btnWsCreate">
+                <i class="bi bi-check-circle-fill me-2"></i>สร้างแบบฝึกหัด
+              </button>
+            </div>
+          </div>
+
+          <!-- Success popup (fixed overlay) -->
+          <div id="wsSuccessMsg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:20px;padding:2.5rem 2rem;text-align:center;max-width:320px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+              <div style="font-size:3rem;">🎉</div>
+              <h4 class="mt-2 mb-1">สร้างแบบฝึกหัดสำเร็จ!</h4>
+              <p class="text-secondary mb-3">เพิ่มแบบฝึกหัดใหม่เรียบร้อยแล้ว</p>
+              <button class="btn btn-warning btn-bouncy w-100" id="btnWsReturn">กลับไปหน้าแบบฝึกหัด</button>
+            </div>
+          </div>
+
+        </div>
+
         <!-- ── Sounds Tab ── -->
         <div class="tab-pane fade" id="tabSounds">
+          <div class="soft-card mb-4">
+            <h5 class="mb-3" id="soundFormTitle">เพิ่มหมวดเสียงใหม่</h5>
+            <form id="soundForm" class="row g-3 align-items-end">
+              <input type="hidden" id="soundId">
+              <div class="col-md-3"><label class="form-label fw-semibold">หมวดเสียง (ตัวอักษร)</label><input type="text" class="form-control" id="soundLetter" required></div>
+              <div class="col-md-5">
+                <label class="form-label fw-semibold">คลิปรูปปากตามเสียง</label>
+                <input type="file" class="form-control" id="soundAnimationFile" accept="image/gif,image/*">
+                <div id="soundAnimationPreview" class="mt-2"></div>
+              </div>
+              <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-warning btn-bouncy" id="soundSubmitBtn">เพิ่มหมวดเสียง</button>
+                <button type="button" class="btn btn-outline-secondary" id="soundCancelEditBtn" style="display:none;">ยกเลิก</button>
+              </div>
+            </form>
+          </div>
           <div class="soft-card">
-            <p class="text-secondary mb-3">รายการหมวดเสียงทั้งหมดในระบบ (เพิ่มหมวดใหม่ด้วยการรัน SQL)</p>
+            <p class="text-secondary mb-3">รายการหมวดเสียงทั้งหมดในระบบ — ใช้เป็นตัวเลือก "ประเภทคำ" เวลาเพิ่มคำใหม่</p>
             <div class="table-responsive">
               <table class="table table-hover align-middle">
-                <thead><tr><th>หมวดเสียง (ตัวอักษร)</th><th>สร้างเมื่อ</th></tr></thead>
-                <tbody id="soundsTableBody"><tr><td colspan="2" class="text-secondary">กำลังโหลด...</td></tr></tbody>
+                <thead><tr><th>หมวดเสียง (ตัวอักษร)</th><th>คลิปรูปปาก</th><th>สร้างเมื่อ</th><th></th></tr></thead>
+                <tbody id="soundsTableBody"><tr><td colspan="4" class="text-secondary">กำลังโหลด...</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -525,6 +635,7 @@
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/recorder.js"></script>
 <script src="js/main.js"></script>
 <script>
 var currentSession, allWords = [], userEmailMap = {}, allSpecialistUsers = [];
@@ -1059,6 +1170,9 @@ var allPracticeData = [];  // all practice rows, used by patient detail
 async function initSpecialist() {
   await loadWords();
   await loadSounds();
+  populateWordSoundSelect('');
+  wireWordRecordButton();
+  initWorksheetsTab();
   await loadPatientDashboard();
   initHomeworkTab();
 
@@ -1085,6 +1199,8 @@ async function initSpecialist() {
 
   document.getElementById('wordForm').addEventListener('submit', onWordSubmit);
   document.getElementById('wordCancelEditBtn').addEventListener('click', resetWordForm);
+  document.getElementById('soundForm').addEventListener('submit', onSoundSubmit);
+  document.getElementById('soundCancelEditBtn').addEventListener('click', resetSoundForm);
   document.getElementById('wordSearchInput').addEventListener('input', renderWordsTable);
   document.getElementById('btnLogoutSpec').addEventListener('click', Auth.logout.bind(Auth));
   document.getElementById('btnCloseDetail').addEventListener('click', function () {
@@ -1398,23 +1514,109 @@ function renderDetailPracticeList(rows, filter) {
   });
 }
 
+var allSounds = [];
+
 async function loadSounds() {
   var { data } = await sb.from('sounds').select('*').order('letter', { ascending: true });
+  allSounds = data || [];
+  renderSoundsTable();
+}
+
+function renderSoundsTable() {
   var body = document.getElementById('soundsTableBody');
   body.innerHTML = '';
-  if (!data || !data.length) { body.innerHTML = '<tr><td colspan="2" class="text-secondary">ยังไม่มีข้อมูล — รัน wordlist2_migration.sql ก่อน</td></tr>'; return; }
-  data.forEach(function (s) {
+  if (!allSounds.length) { body.innerHTML = '<tr><td colspan="4" class="text-secondary">ยังไม่มีข้อมูล</td></tr>'; return; }
+  allSounds.forEach(function (s) {
     var tr = document.createElement('tr');
     tr.innerHTML =
       '<td style="font-size:1.4rem;font-weight:700;">' + s.letter + '</td>' +
-      '<td class="text-secondary small">' + new Date(s.created_at).toLocaleDateString('th-TH') + '</td>';
+      '<td>' + (s.mouth_animation_url ? '<img src="' + s.mouth_animation_url + '" style="height:36px;border-radius:6px;" alt="">' : '<span class="text-secondary small">—</span>') + '</td>' +
+      '<td class="text-secondary small">' + new Date(s.created_at).toLocaleDateString('th-TH') + '</td>' +
+      '<td class="text-end"><button class="btn btn-sm btn-outline-primary me-1 btn-edit-s">แก้ไข</button><button class="btn btn-sm btn-outline-danger btn-del-s">ลบ</button></td>';
+    tr.querySelector('.btn-edit-s').addEventListener('click', function () { fillSoundForm(s); });
+    tr.querySelector('.btn-del-s').addEventListener('click', function () { deleteSound(s.id); });
     body.appendChild(tr);
   });
+}
+
+function fillSoundForm(s) {
+  document.getElementById('soundId').value = s.id;
+  document.getElementById('soundLetter').value = s.letter;
+  document.getElementById('soundAnimationPreview').innerHTML = s.mouth_animation_url
+    ? '<img src="' + s.mouth_animation_url + '" style="height:48px;border-radius:6px;" alt="">' : '';
+  document.getElementById('soundFormTitle').textContent = 'แก้ไขหมวดเสียง';
+  document.getElementById('soundSubmitBtn').textContent = 'บันทึก';
+  document.getElementById('soundCancelEditBtn').style.display = 'inline-block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetSoundForm() {
+  document.getElementById('soundForm').reset();
+  document.getElementById('soundId').value = '';
+  document.getElementById('soundAnimationPreview').innerHTML = '';
+  document.getElementById('soundFormTitle').textContent = 'เพิ่มหมวดเสียงใหม่';
+  document.getElementById('soundSubmitBtn').textContent = 'เพิ่มหมวดเสียง';
+  document.getElementById('soundCancelEditBtn').style.display = 'none';
+}
+
+var SOUND_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+async function onSoundSubmit(e) {
+  e.preventDefault();
+  var id = document.getElementById('soundId').value;
+  var letter = document.getElementById('soundLetter').value.trim();
+  if (!letter) return;
+  var file = document.getElementById('soundAnimationFile').files[0];
+  if (file && file.size > SOUND_IMAGE_MAX_BYTES) { alert('ไฟล์รูปปากใหญ่เกิน 2MB กรุณาเลือกไฟล์ที่เล็กลง'); return; }
+
+  var btn = document.getElementById('soundSubmitBtn');
+  btn.disabled = true;
+  try {
+    var payload = { letter: letter };
+    if (file) {
+      var ext = (file.name.split('.').pop() || 'gif').toLowerCase();
+      var path = 'sounds/' + letter + '-' + Date.now() + '.' + ext;
+      var { error: upErr } = await sb.storage.from('word-media').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      var { data: pub } = sb.storage.from('word-media').getPublicUrl(path);
+      payload.mouth_animation_url = pub.publicUrl;
+    }
+    if (id) await sb.from('sounds').update(payload).eq('id', id);
+    else {
+      var { error: insErr } = await sb.from('sounds').insert(payload);
+      if (insErr) throw insErr;
+    }
+    resetSoundForm();
+    await loadSounds();
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteSound(id) {
+  if (!confirm('ลบหมวดเสียงนี้ใช่ไหม? คำที่ใช้หมวดนี้อยู่จะไม่ถูกลบ แต่จะไม่มีคลิปรูปปากอีกต่อไป')) return;
+  await sb.from('sounds').delete().eq('id', id);
+  await loadSounds();
 }
 
 async function loadWords() {
   var { data } = await sb.from('words').select('*').order('letter_category', { ascending: true }).order('level', { ascending: true });
   allWords = data || []; renderWordsTable();
+}
+
+function populateWordSoundSelect(selectedId) {
+  var sel = document.getElementById('wordSoundId');
+  var current = selectedId != null ? selectedId : sel.value;
+  sel.innerHTML = '<option value="">— เลือก —</option>';
+  allSounds.forEach(function (s) {
+    var opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.letter;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
 }
 
 function renderWordsTable() {
@@ -1424,7 +1626,10 @@ function renderWordsTable() {
   body.innerHTML = '';
   filtered.forEach(function (w) {
     var tr = document.createElement('tr');
-    tr.innerHTML = '<td>' + w.word + '</td><td>' + w.letter_category + '</td><td>' + (w.level||'') + '</td><td>' + (w.emoji||'') + '</td><td class="text-end"><button class="btn btn-sm btn-outline-primary me-1 btn-edit-w">แก้ไข</button><button class="btn btn-sm btn-outline-danger btn-del-w">ลบ</button></td>';
+    tr.innerHTML = '<td>' + w.word + '</td><td>' + w.letter_category + '</td><td>' + (w.level||'') + '</td>' +
+      '<td>' + (w.image_url ? '<img src="' + w.image_url + '" style="height:32px;border-radius:6px;" alt="">' : '<span class="text-secondary small">—</span>') + '</td>' +
+      '<td>' + (w.sound_url ? '<i class="bi bi-volume-up-fill text-success"></i>' : '<span class="text-secondary small">—</span>') + '</td>' +
+      '<td class="text-end"><button class="btn btn-sm btn-outline-primary me-1 btn-edit-w">แก้ไข</button><button class="btn btn-sm btn-outline-danger btn-del-w">ลบ</button></td>';
     tr.querySelector('.btn-edit-w').addEventListener('click', function () { fillWordForm(w); });
     tr.querySelector('.btn-del-w').addEventListener('click', function () { deleteWord(w.id); });
     body.appendChild(tr);
@@ -1433,10 +1638,16 @@ function renderWordsTable() {
 
 function fillWordForm(w) {
   document.getElementById('wordId').value = w.id;
-  document.getElementById('wordLetterCategory').value = w.letter_category;
+  populateWordSoundSelect(w.sound_id);
   document.getElementById('wordWord').value = w.word;
   document.getElementById('wordLevel').value = w.level || 'เสียง';
-  document.getElementById('wordEmoji').value = w.emoji || '';
+  document.getElementById('wordImageFile').value = '';
+  document.getElementById('wordSoundFile').value = '';
+  _wordExistingImageUrl = w.image_url || null;
+  _wordExistingSoundUrl = w.sound_url || null;
+  _wordRecordedBlob = null;
+  document.getElementById('wordImagePreview').innerHTML = w.image_url ? '<img src="' + w.image_url + '" style="height:48px;border-radius:6px;" alt="">' : '';
+  document.getElementById('wordSoundPreview').innerHTML = w.sound_url ? '<audio controls src="' + w.sound_url + '" style="height:32px;"></audio>' : '';
   document.getElementById('wordFormTitle').textContent = 'แก้ไขคำ';
   document.getElementById('wordSubmitBtn').textContent = 'บันทึก';
   document.getElementById('wordCancelEditBtn').style.display = 'inline-block';
@@ -1446,33 +1657,286 @@ function fillWordForm(w) {
 function resetWordForm() {
   document.getElementById('wordForm').reset();
   document.getElementById('wordId').value = '';
+  populateWordSoundSelect('');
+  document.getElementById('wordImagePreview').innerHTML = '';
+  document.getElementById('wordSoundPreview').innerHTML = '';
+  _wordExistingImageUrl = null;
+  _wordExistingSoundUrl = null;
+  _wordRecordedBlob = null;
   document.getElementById('wordFormTitle').textContent = 'เพิ่มคำฝึกออกเสียง';
   document.getElementById('wordSubmitBtn').textContent = 'เพิ่มคำ';
   document.getElementById('wordCancelEditBtn').style.display = 'none';
 }
 
+var WORD_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+var WORD_SOUND_MAX_BYTES = 5 * 1024 * 1024;
+var _wordExistingImageUrl = null;
+var _wordExistingSoundUrl = null;
+var _wordRecordedBlob = null;
+
 async function onWordSubmit(e) {
   e.preventDefault();
   var id = document.getElementById('wordId').value;
-  var lc = document.getElementById('wordLetterCategory').value.trim();
-  var payload = {
-    letter_category: lc,
-    word: document.getElementById('wordWord').value.trim(),
-    level: document.getElementById('wordLevel').value,
-    emoji: document.getElementById('wordEmoji').value.trim() || document.getElementById('wordWord').value.trim()
-  };
-  // Look up sound_id from sounds table
-  var { data: soundRow } = await sb.from('sounds').select('id').eq('letter', lc).maybeSingle();
-  if (soundRow) payload.sound_id = soundRow.id;
-  if (id) await sb.from('words').update(payload).eq('id', id);
-  else await sb.from('words').insert(payload);
-  resetWordForm(); await loadWords();
+  var soundId = document.getElementById('wordSoundId').value;
+  if (!soundId) { alert('กรุณาเลือกประเภทคำ'); return; }
+  var soundRow = allSounds.find(function (s) { return String(s.id) === String(soundId); });
+  if (!soundRow) { alert('ไม่พบหมวดเสียงที่เลือก'); return; }
+
+  var imageFile = document.getElementById('wordImageFile').files[0];
+  if (imageFile && imageFile.size > WORD_IMAGE_MAX_BYTES) { alert('ไฟล์รูปภาพใหญ่เกิน 2MB กรุณาเลือกไฟล์ที่เล็กลง'); return; }
+  var soundFile = document.getElementById('wordSoundFile').files[0];
+  if (soundFile && soundFile.size > WORD_SOUND_MAX_BYTES) { alert('ไฟล์เสียงใหญ่เกิน 5MB กรุณาเลือกไฟล์ที่เล็กลง'); return; }
+  if (_wordRecordedBlob && _wordRecordedBlob.size > WORD_SOUND_MAX_BYTES) { alert('คลิปเสียงที่อัดใหญ่เกิน 5MB กรุณาอัดใหม่ให้สั้นลง'); return; }
+
+  var btn = document.getElementById('wordSubmitBtn');
+  btn.disabled = true;
+  try {
+    var wordText = document.getElementById('wordWord').value.trim();
+    var payload = {
+      letter_category: soundRow.letter,
+      sound_id: soundRow.id,
+      word: wordText,
+      level: document.getElementById('wordLevel').value
+    };
+
+    var finalImageUrl = _wordExistingImageUrl;
+    if (imageFile) {
+      var imgExt = (imageFile.name.split('.').pop() || 'jpg').toLowerCase();
+      var imgPath = 'words/' + crypto.randomUUID() + '.' + imgExt;
+      var { error: imgErr } = await sb.storage.from('word-images').upload(imgPath, imageFile, { upsert: true });
+      if (imgErr) throw imgErr;
+      var { data: imgPub } = sb.storage.from('word-images').getPublicUrl(imgPath);
+      finalImageUrl = imgPub.publicUrl;
+    }
+    payload.image_url = finalImageUrl;
+
+    var finalSoundUrl = _wordExistingSoundUrl;
+    var soundBlob = _wordRecordedBlob || soundFile;
+    if (soundBlob) {
+      var soundExt = _wordRecordedBlob ? 'webm' : (soundFile.name.split('.').pop() || 'mp3').toLowerCase();
+      var soundPath = 'words/' + crypto.randomUUID() + '.' + soundExt;
+      var { error: sndErr } = await sb.storage.from('word-media').upload(soundPath, soundBlob, { upsert: true });
+      if (sndErr) throw sndErr;
+      var { data: sndPub } = sb.storage.from('word-media').getPublicUrl(soundPath);
+      finalSoundUrl = sndPub.publicUrl;
+    }
+    payload.sound_url = finalSoundUrl;
+
+    // Interim measure until a proper emoji/icon system exists: a word with
+    // no picture falls back to showing its own text (every game already
+    // guards against printing that text twice — see this session's
+    // emoji-fallback fix). A word that has a picture doesn't need it.
+    payload.emoji = finalImageUrl ? null : wordText;
+
+    if (id) await sb.from('words').update(payload).eq('id', id);
+    else await sb.from('words').insert(payload);
+    resetWordForm(); await loadWords();
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function deleteWord(id) {
   if (!confirm('ลบคำนี้ใช่ไหม?')) return;
   await sb.from('words').delete().eq('id', id);
   await loadWords();
+}
+
+/* ── Record a pronunciation clip inline in the word form ──
+   Reuses Recorder.startRecording (same mic-capture/waveform module the
+   kids' practice modal uses) but uploads straight to the word-media
+   bucket on submit instead of Recorder.uploadAndSavePractice, which is
+   hardcoded to insert into the practice table. */
+var _wordRecordController = null;
+var _wordIsRecording = false;
+
+function wireWordRecordButton() {
+  var btn = document.getElementById('btnWordRecord');
+  var canvas = document.getElementById('wordRecordWave');
+  btn.addEventListener('click', function () {
+    if (_wordIsRecording) {
+      if (_wordRecordController) _wordRecordController.stop();
+      return;
+    }
+    _wordIsRecording = true;
+    canvas.style.display = 'block';
+    btn.innerHTML = '<i class="bi bi-stop-fill me-1"></i>หยุด';
+    _wordRecordController = Recorder.startRecording(
+      canvas,
+      function (blob) {
+        _wordIsRecording = false;
+        canvas.style.display = 'none';
+        btn.innerHTML = '<i class="bi bi-mic-fill me-1"></i>อัดเสียง';
+        _wordRecordedBlob = blob;
+        document.getElementById('wordSoundFile').value = '';
+        var url = URL.createObjectURL(blob);
+        document.getElementById('wordSoundPreview').innerHTML = '<audio controls src="' + url + '" style="height:32px;"></audio>';
+      },
+      function () {
+        _wordIsRecording = false;
+        canvas.style.display = 'none';
+        btn.innerHTML = '<i class="bi bi-mic-fill me-1"></i>อัดเสียง';
+        alert('ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน');
+      }
+    );
+  });
+  // Picking a file clears any pending recording, and vice versa via fillWordForm/resetWordForm.
+  document.getElementById('wordSoundFile').addEventListener('change', function () {
+    if (this.files[0]) { _wordRecordedBlob = null; document.getElementById('wordSoundPreview').innerHTML = ''; }
+  });
+}
+
+/* ── Worksheets (แบบฝึกหัด) ── */
+var allWorksheets = [];
+var wsRepeatCount = 5;
+var wsCurrentWorksheet = null;
+
+function initWorksheetsTab() {
+  document.getElementById('btnCreateWs').addEventListener('click', openCreateWs);
+  document.getElementById('btnWsBack').addEventListener('click', function () { showWsView('wsListView'); });
+  document.getElementById('btnWsDetailBack').addEventListener('click', function () { showWsView('wsListView'); });
+  document.getElementById('btnWsMinus').addEventListener('click', function () {
+    if (wsRepeatCount > 1) { wsRepeatCount--; document.getElementById('wsRepeatDisplay').textContent = wsRepeatCount; }
+  });
+  document.getElementById('btnWsPlus').addEventListener('click', function () {
+    wsRepeatCount++; document.getElementById('wsRepeatDisplay').textContent = wsRepeatCount;
+  });
+  document.getElementById('btnWsCreate').addEventListener('click', createWorksheet);
+  document.getElementById('btnWsReturn').addEventListener('click', function () {
+    document.getElementById('wsSuccessMsg').style.display = 'none';
+    showWsView('wsListView');
+  });
+
+  loadWorksheetList();
+}
+
+function showWsView(viewId) {
+  ['wsListView', 'wsDetailView', 'wsCreateView'].forEach(function (id) {
+    document.getElementById(id).style.display = id === viewId ? 'block' : 'none';
+  });
+}
+
+async function loadWorksheetList() {
+  var container = document.getElementById('wsList');
+  container.innerHTML = '<p class="text-secondary text-center py-3 small">กำลังโหลด...</p>';
+
+  var { data } = await sb.from('worksheets')
+    .select('id, name, repeat_count, created_at, worksheet_words(word_id)')
+    .order('created_at', { ascending: false });
+  allWorksheets = data || [];
+
+  if (!allWorksheets.length) {
+    container.innerHTML = '<p class="text-secondary text-center py-3 small">ยังไม่มีแบบฝึกหัด</p>';
+    return;
+  }
+
+  container.innerHTML = '';
+  allWorksheets.forEach(function (ws) {
+    var wordCount = (ws.worksheet_words || []).length;
+    var row = document.createElement('button');
+    row.className = 'w-100 text-start btn btn-light mb-2 py-2 px-3 d-flex align-items-center gap-2';
+    row.style.cssText = 'border-radius:10px;border:1px solid #e8e3f5;';
+    row.innerHTML =
+      '<span style="flex:1;">' +
+        '<span style="font-weight:700;">' + (ws.name || 'แบบฝึกหัด #' + ws.id) + '</span>' +
+        '<span class="text-secondary small ms-2">' + wordCount + ' คำ · พูดคำละ ' + (ws.repeat_count || 5) + ' ครั้ง</span>' +
+      '</span>' +
+      '<i class="bi bi-chevron-right text-secondary"></i>';
+    row.addEventListener('click', function () { openWorksheetPreview(ws); });
+    container.appendChild(row);
+  });
+}
+
+function openCreateWs() {
+  wsRepeatCount = 5;
+  document.getElementById('wsRepeatDisplay').textContent = '5';
+  document.getElementById('wsName').value = '';
+  populateWsWords();
+  showWsView('wsCreateView');
+}
+
+function populateWsWords() {
+  var list = document.getElementById('wsWordList');
+  list.innerHTML = '';
+  if (!allWords.length) { list.innerHTML = '<p class="text-secondary small">ยังไม่มีคำในระบบ</p>'; return; }
+  allWords.forEach(function (w) {
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid #e8e3f5;cursor:pointer;font-size:0.88rem;user-select:none;';
+    lbl.innerHTML =
+      '<input type="checkbox" value="' + w.id + '" style="width:15px;height:15px;flex-shrink:0;">' +
+      '<span style="flex:1;">' + wordLabel(w) + '</span>' +
+      '<span style="font-size:0.7rem;color:#9b93b0;white-space:nowrap;">' + (w.level || '') + '</span>';
+    list.appendChild(lbl);
+  });
+}
+
+async function createWorksheet() {
+  var wordIds = [];
+  document.querySelectorAll('#wsWordList input[type="checkbox"]:checked').forEach(function (cb) {
+    wordIds.push(parseInt(cb.value, 10));
+  });
+  if (!wordIds.length) { alert('กรุณาเลือกคำอย่างน้อย 1 คำ'); return; }
+
+  var btn = document.getElementById('btnWsCreate');
+  btn.disabled = true; btn.textContent = 'กำลังสร้าง...';
+
+  try {
+    var wsName = (document.getElementById('wsName').value || '').trim() || ('แบบฝึกหัด ' + new Date().toLocaleDateString('th-TH'));
+    var { data: ws, error } = await sb.from('worksheets')
+      .insert({ created_by: currentSession.user.id, repeat_count: wsRepeatCount, name: wsName })
+      .select('id').single();
+    if (error) throw error;
+
+    await sb.from('worksheet_words').insert(wordIds.map(function (wid) { return { worksheet_id: ws.id, word_id: wid }; }));
+
+    await loadWorksheetList();
+    document.getElementById('wsSuccessMsg').style.display = 'flex';
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>สร้างแบบฝึกหัด';
+  }
+}
+
+// Preview: what words are in this worksheet and how many times each needs
+// to be spoken — a blank template, not tied to any patient. To check a
+// specific patient's actual attempts (with play/✅/notes), open their
+// profile in the "ผู้ฝึก" tab instead — that already lists every round
+// they've played through each worksheet (see loadDetailWs/openDetailWsDetail).
+async function openWorksheetPreview(ws) {
+  wsCurrentWorksheet = ws;
+  document.getElementById('wsDetailTitle').textContent = ws.name || 'แบบฝึกหัด #' + ws.id;
+  document.getElementById('wsDetailTableWrap').innerHTML = '<p class="text-secondary text-center py-3">กำลังโหลด...</p>';
+  showWsView('wsDetailView');
+
+  var { data } = await sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id);
+  var words = data || [];
+
+  renderWorksheetPreviewTable('wsDetailTableWrap', words, ws.repeat_count || 5);
+
+  document.getElementById('btnWsDetailPrint').onclick = function () {
+    printHomeworkWorksheet(ws.name || 'แบบฝึกหัด #' + ws.id, 'wsDetailTableWrap');
+  };
+}
+
+function renderWorksheetPreviewTable(containerId, words, repeatCount) {
+  var html = '<table class="table table-bordered align-middle" style="font-size:0.88rem;"><thead><tr><th>คำ</th>';
+  for (var c = 1; c <= repeatCount; c++) html += '<th style="white-space:nowrap;text-align:center;">ครั้งที่ ' + c + '</th>';
+  html += '</tr></thead><tbody>';
+
+  words.forEach(function (hww) {
+    var w = hww.words;
+    if (!w) return;
+    html += '<tr><td style="font-weight:600;white-space:nowrap;">' + wordLabel(w) + '</td>';
+    for (var i = 0; i < repeatCount; i++) html += '<td style="color:#d0cce0;text-align:center;">—</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  document.getElementById(containerId).innerHTML = html;
 }
 
 /* ── Homework ── */

@@ -64,12 +64,20 @@ function createMatchingGame(words, callbacks) {
       this.load.audio('CorrectSFX','soundeffect/CorrectSFX.mp3');
 
       // [ILLUSTRATIONS] Preload a real picture for any word in this
-      // session's pool that has one; words without one keep the emoji
+      // session's pool that has one: the word's own uploaded image takes
+      // priority (keyed by id — more correct than text, since word text
+      // isn't guaranteed unique), falling back to the legacy generated-
+      // illustration manifest (keyed by word text, for older words that
+      // predate the upload feature). Words with neither keep the emoji
       // fallback (checked via texture-existence in create()).
       var n = Math.min(MAX_PAIRS, words.length);
       words.slice(0, n).forEach(function (w) {
-        var url = Illustrations.get(w.word);
-        if (url) this.load.image('ill_' + w.word, url);
+        if (w.image_url) {
+          this.load.image('img_' + w.id, w.image_url);
+        } else {
+          var url = Illustrations.get(w.word);
+          if (url) this.load.image('ill_' + w.word, url);
+        }
       }, this);
     },
 
@@ -137,10 +145,13 @@ function createMatchingGame(words, callbacks) {
         // [ILLUSTRATIONS] Use the real picture if this word has one and it
         // loaded successfully; otherwise fall back to the emoji text, same
         // as before.
+        var imgKey = isBig ? 'img_' + cardData.w.id : null;
         var illKey = isBig ? 'ill_' + cardData.w.word : null;
+        var pictureKey = (imgKey && self.textures.exists(imgKey)) ? imgKey
+          : (illKey && self.textures.exists(illKey)) ? illKey : null;
         var label;
-        if (illKey && self.textures.exists(illKey)) {
-          label = self.add.image(0, 8, illKey).setOrigin(0.5, 0.5);
+        if (pictureKey) {
+          label = self.add.image(0, 8, pictureKey).setOrigin(0.5, 0.5);
           var maxW = CARD_W - 30, maxH = CARD_H - 30;
           label.setScale(Math.min(maxW / label.width, maxH / label.height));
           label.setVisible(false);

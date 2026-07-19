@@ -1,11 +1,4 @@
 const PracticePanel = (function () {
-  // Mouth animation img tags keyed by exercise_code.
-  // Files live in MouthAnimation/ and are referenced as <img> so CSS
-  // animations inside the SVG are isolated and always play in Chrome.
-  const MOUTH_ANIMATIONS = {
-    'ป': '<img src="MouthAnimation/PouFish.gif" alt="ปากเสียง ป" style="width:100%;height:100%;display:block;">'
-  };
-
   let modalEl = null;
   let modal = null;
   let currentWord = null;
@@ -29,7 +22,9 @@ const PracticePanel = (function () {
     if (!wired) {
       wired = true;
       el("ppBtnListen").addEventListener("click", function () {
-        if (currentWord) SpeechTool.speak(currentWord.word);
+        // No text-to-speech fallback — this button only ever shows when
+        // currentWord.sound_url exists (see resetPanelState).
+        if (currentWord && currentWord.sound_url) new Audio(currentWord.sound_url).play();
       });
       el("ppBtnMic").addEventListener("click", onMicClick);
       el("ppBtnCorrect").addEventListener("click", markCorrect);
@@ -54,10 +49,12 @@ const PracticePanel = (function () {
     currentWord = word;
     callbacks = cbs || {};
 
-    // Use the generated illustration when this word has one, else the emoji.
-    const illUrl = window.Illustrations && Illustrations.get(word.word);
-    if (illUrl) {
-      el("ppEmoji").innerHTML = '<img src="' + illUrl + '" alt="' + word.word + '" style="height:64px;max-width:100%;object-fit:contain;">';
+    // Picture priority: the word's own uploaded image > the legacy
+    // generated-illustration manifest (kept alive for older words that
+    // predate the upload feature) > the emoji fallback.
+    const pictureUrl = word.image_url || (window.Illustrations && Illustrations.get(word.word));
+    if (pictureUrl) {
+      el("ppEmoji").innerHTML = '<img src="' + pictureUrl + '" alt="' + word.word + '" style="height:64px;max-width:100%;object-fit:contain;">';
     } else {
       // A word's emoji field can be auto-set equal to its own word text
       // when it has no picture — ppWord right below already shows that
@@ -73,8 +70,11 @@ const PracticePanel = (function () {
     } else {
       repCounter.style.display = "none";
     }
-    // Animation box: animation > picture > hidden
-    const animSvg = MOUTH_ANIMATIONS[word.letter_category];
+    // Animation box: animation > picture > hidden. The mouth-animation
+    // clip is uploaded per sound (see management.html's Sounds tab) and
+    // comes through on the nested `sounds` join from WordsApi.fetchAllWords().
+    const animUrl = word.sounds && word.sounds.mouth_animation_url;
+    const animSvg = animUrl ? '<img src="' + animUrl + '" alt="ปากเสียง ' + word.letter_category + '" style="width:100%;height:100%;display:block;">' : null;
     const animBox = el("ppMouthAnimation");
     if (animBox) {
       if (animSvg) {
@@ -113,7 +113,9 @@ const PracticePanel = (function () {
     // Restore practice aids hidden during playback review
     var ps = el("ppPracticeStage");
     if (ps) ps.style.display = "";
-    el("ppBtnListen").style.display = (callbacks.showListen === false) ? "none" : "";
+    // No TTS fallback — the listen button only ever shows when this word
+    // actually has a real recorded pronunciation clip.
+    el("ppBtnListen").style.display = (callbacks.showListen === false || !(currentWord && currentWord.sound_url)) ? "none" : "";
     el("ppWaveCanvas").style.display = "";
     el("ppBtnMic").style.display = "";
     el("ppRecordHint").style.display = "";
