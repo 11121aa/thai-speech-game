@@ -2177,6 +2177,28 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
   };
 }
 
+var PASS_THRESHOLD_PCT = 80;
+
+// Recomputes the overall correctness score from the ✅/❌/⏳/— cells
+// currently in the DOM (each carries a data-correct attribute set when the
+// table is built, and kept in sync by the ✅/❌/⏳ toggle) and shows a
+// pass/fail badge — ≥80% of all expected repetitions marked correct.
+function updateHwScoreSummary(containerId) {
+  var wrap = document.getElementById(containerId);
+  var scoreEl = document.getElementById(containerId + '-score');
+  if (!wrap || !scoreEl) return;
+  var cells = wrap.querySelectorAll('.hw-score-cell');
+  var total = cells.length;
+  var correct = 0;
+  cells.forEach(function (c) { if (c.getAttribute('data-correct') === 'true') correct++; });
+  var pct = total ? Math.round((correct / total) * 100) : 0;
+  var pass = pct >= PASS_THRESHOLD_PCT;
+  scoreEl.innerHTML =
+    '<strong>คะแนนรวม: ' + pct + '%</strong> ' +
+    '<span class="text-secondary small">(' + correct + '/' + total + ' ครั้งที่ออกเสียงถูกต้อง)</span> ' +
+    '<span class="badge ' + (pass ? 'bg-success' : 'bg-danger') + ' ms-2">' + (pass ? 'ผ่าน ✅' : 'ไม่ผ่าน') + '</span>';
+}
+
 function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, repeatCount, isSpecialist, feedbackTable, fkColumn) {
   feedbackTable = feedbackTable || 'homework_word_feedback';
   fkColumn = fkColumn || 'homework_assignment_id';
@@ -2207,11 +2229,11 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, 
         html += '<td style="text-align:center;white-space:nowrap;">' +
           (rec.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 px-1 btn-hw-play" data-path="' + rec.file_path + '" style="font-size:0.7rem;margin-right:3px;">▶</button>' : '') +
           (isSpecialist
-            ? '<span class="hw-result-toggle" data-prac-id="' + rec.id + '" data-correct="' + rec.parent_marked_correct + '" style="cursor:pointer;font-size:1rem;" title="คลิกเพื่อเปลี่ยน">' + icon + '</span>'
-            : '<span style="font-size:1rem;">' + icon + '</span>') +
+            ? '<span class="hw-result-toggle hw-score-cell" data-prac-id="' + rec.id + '" data-correct="' + rec.parent_marked_correct + '" style="cursor:pointer;font-size:1rem;" title="คลิกเพื่อเปลี่ยน">' + icon + '</span>'
+            : '<span class="hw-score-cell" data-correct="' + rec.parent_marked_correct + '" style="font-size:1rem;">' + icon + '</span>') +
           '</td>';
       } else {
-        html += '<td style="color:#d0cce0;text-align:center;">—</td>';
+        html += '<td style="color:#d0cce0;text-align:center;" class="hw-score-cell" data-correct="null">—</td>';
       }
     }
     var noteCell = isSpecialist
@@ -2220,9 +2242,11 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, 
     html += '<td>' + noteCell + '</td></tr>';
   });
   html += '</tbody></table>';
+  html += '<div id="' + containerId + '-score" class="p-2 rounded" style="background:var(--color-bg-soft);"></div>';
 
   var wrap = document.getElementById(containerId);
   wrap.innerHTML = html;
+  updateHwScoreSummary(containerId);
 
   wrap.querySelectorAll('.btn-hw-play').forEach(function (btn) {
     btn.addEventListener('click', async function () {
@@ -2248,6 +2272,7 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, 
         await sb.from('practice').update({ parent_marked_correct: next }).eq('id', parseInt(span.getAttribute('data-prac-id')));
         span.setAttribute('data-correct', String(next));
         span.textContent = next === true ? '✅' : next === false ? '❌' : '⏳';
+        updateHwScoreSummary(containerId);
       });
     });
     var noteTimers = {};
