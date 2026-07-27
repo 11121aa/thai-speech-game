@@ -2155,7 +2155,7 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
   var words = (results[0].data || []);
@@ -2179,23 +2179,28 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
 
 var PASS_THRESHOLD_PCT = 80;
 
-// Recomputes the overall correctness score from the ✅/❌/⏳/— cells
-// currently in the DOM (each carries a data-correct attribute set when the
-// table is built, and kept in sync by the ✅/❌/⏳ toggle) and shows a
-// pass/fail badge — ≥80% of all expected repetitions marked correct.
+// Recomputes the overall score from every .hw-score-input currently in the
+// DOM (one per recorded attempt, editable by the specialist, read-only for
+// the patient) and shows a pass/fail badge — average of all *entered*
+// scores (blanks don't count against it) ≥80 is a pass.
 function updateHwScoreSummary(containerId) {
   var wrap = document.getElementById(containerId);
   var scoreEl = document.getElementById(containerId + '-score');
   if (!wrap || !scoreEl) return;
-  var cells = wrap.querySelectorAll('.hw-score-cell');
-  var total = cells.length;
-  var correct = 0;
-  cells.forEach(function (c) { if (c.getAttribute('data-correct') === 'true') correct++; });
-  var pct = total ? Math.round((correct / total) * 100) : 0;
-  var pass = pct >= PASS_THRESHOLD_PCT;
+  var scores = [];
+  wrap.querySelectorAll('.hw-score-input').forEach(function (inp) {
+    var v = parseFloat(inp.value);
+    if (!isNaN(v)) scores.push(v);
+  });
+  if (!scores.length) {
+    scoreEl.innerHTML = '<span class="text-secondary small">ยังไม่มีคะแนน</span>';
+    return;
+  }
+  var avg = scores.reduce(function (a, b) { return a + b; }, 0) / scores.length;
+  var pass = avg >= PASS_THRESHOLD_PCT;
   scoreEl.innerHTML =
-    '<strong>คะแนนรวม: ' + pct + '%</strong> ' +
-    '<span class="text-secondary small">(' + correct + '/' + total + ' ครั้งที่ออกเสียงถูกต้อง)</span> ' +
+    '<strong>คะแนนเฉลี่ย: ' + avg.toFixed(1) + '</strong> ' +
+    '<span class="text-secondary small">(' + scores.length + ' ครั้งที่ให้คะแนนแล้ว)</span> ' +
     '<span class="badge ' + (pass ? 'bg-success' : 'bg-danger') + ' ms-2">' + (pass ? 'ผ่าน ✅' : 'ไม่ผ่าน') + '</span>';
 }
 
@@ -2225,15 +2230,14 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, 
     for (var i = 0; i < maxCols; i++) {
       var rec = recs[i];
       if (rec) {
-        var icon = rec.parent_marked_correct === true ? '✅' : rec.parent_marked_correct === false ? '❌' : '⏳';
+        var scoreVal = (rec.score === null || rec.score === undefined) ? '' : rec.score;
         html += '<td style="text-align:center;white-space:nowrap;">' +
           (rec.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 px-1 btn-hw-play" data-path="' + rec.file_path + '" style="font-size:0.7rem;margin-right:3px;">▶</button>' : '') +
-          (isSpecialist
-            ? '<span class="hw-result-toggle hw-score-cell" data-prac-id="' + rec.id + '" data-correct="' + rec.parent_marked_correct + '" style="cursor:pointer;font-size:1rem;" title="คลิกเพื่อเปลี่ยน">' + icon + '</span>'
-            : '<span class="hw-score-cell" data-correct="' + rec.parent_marked_correct + '" style="font-size:1rem;">' + icon + '</span>') +
+          '<input type="number" min="0" max="100" class="hw-score-input" data-prac-id="' + rec.id + '" value="' + scoreVal + '" placeholder="คะแนน" style="width:56px;font-size:0.8rem;padding:1px 4px;' + (isSpecialist ? '' : 'background:#f5f3fa;') + '"' + (isSpecialist ? '' : ' readonly') + '>' +
+          (isSpecialist ? '<button class="btn btn-sm btn-warning py-0 px-1 btn-hw-save-score" data-prac-id="' + rec.id + '" style="font-size:0.7rem;margin-left:2px;">บันทึก</button>' : '') +
           '</td>';
       } else {
-        html += '<td style="color:#d0cce0;text-align:center;" class="hw-score-cell" data-correct="null">—</td>';
+        html += '<td style="color:#d0cce0;text-align:center;">—</td>';
       }
     }
     var noteCell = isSpecialist
@@ -2265,13 +2269,18 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, 
   });
 
   if (isSpecialist) {
-    wrap.querySelectorAll('.hw-result-toggle').forEach(function (span) {
-      span.addEventListener('click', async function () {
-        var cur = span.getAttribute('data-correct');
-        var next = cur === 'true' ? false : cur === 'false' ? null : true;
-        await sb.from('practice').update({ parent_marked_correct: next }).eq('id', parseInt(span.getAttribute('data-prac-id')));
-        span.setAttribute('data-correct', String(next));
-        span.textContent = next === true ? '✅' : next === false ? '❌' : '⏳';
+    wrap.querySelectorAll('.btn-hw-save-score').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var practiceId = parseInt(btn.getAttribute('data-prac-id'));
+        var inp = wrap.querySelector('.hw-score-input[data-prac-id="' + practiceId + '"]');
+        var raw = inp.value.trim();
+        var score = raw === '' ? null : Math.max(0, Math.min(100, parseFloat(raw)));
+        btn.disabled = true;
+        await sb.from('practice').update({ score: score }).eq('id', practiceId);
+        inp.value = score === null ? '' : score;
+        btn.disabled = false;
+        btn.textContent = 'บันทึกแล้ว';
+        setTimeout(function () { btn.textContent = 'บันทึก'; }, 900);
         updateHwScoreSummary(containerId);
       });
     });
@@ -2483,7 +2492,7 @@ async function openDetailHwDetail(assignmentId, hw, patient) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', hw.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
   var words = results[0].data || [];
@@ -2575,7 +2584,7 @@ async function openDetailWsDetail(progressRow, ws, patient) {
 
   var results = await Promise.all([
     sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
   var words = results[0].data || [];
@@ -2609,7 +2618,7 @@ async function openUserHwDetail(assignment) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignment.id)
   ]);
   var words = results[0].data || [];
@@ -2712,7 +2721,7 @@ async function openUserWorksheetDetail(progressRow, ws) {
 
   var results = await Promise.all([
     sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
   var words = results[0].data || [];
