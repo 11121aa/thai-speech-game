@@ -1586,7 +1586,7 @@ async function onSoundSubmit(e) {
     }
     if (id) await sb.from('sounds').update(payload).eq('id', id);
     else {
-      var { error: insErr } = await sb.from('sounds').insert(payload);
+      var { error: insErr } = await sb.from('sounds').insert(Object.assign({ created_by: currentSession.user.id }, payload));
       if (insErr) throw insErr;
     }
     resetSoundForm();
@@ -1732,7 +1732,7 @@ async function onWordSubmit(e) {
     payload.emoji = finalImageUrl ? null : wordText;
 
     if (id) await sb.from('words').update(payload).eq('id', id);
-    else await sb.from('words').insert(payload);
+    else await sb.from('words').insert(Object.assign({ created_by: currentSession.user.id }, payload));
     resetWordForm(); await loadWords();
   } catch (err) {
     alert('เกิดข้อผิดพลาด: ' + (err.message || err));
