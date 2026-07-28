@@ -345,7 +345,7 @@
                 <select class="form-select" id="wordSoundId" required><option value="">— เลือก —</option></select>
               </div>
               <div class="col-md-3"><label class="form-label fw-semibold">คำ</label><input type="text" class="form-control" id="wordWord" required></div>
-              <div class="col-md-3"><label class="form-label fw-semibold">ระดับ</label><select class="form-select" id="wordLevel" required><option value="เสียง">เสียง</option><option value="1 พยางค์ไม่มีตัวสะกด">1 พยางค์ไม่มีตัวสะกด</option><option value="1 พยางค์">1 พยางค์</option><option value="2 พยางค์">2 พยางค์</option><option value="3 พยางค์">3 พยางค์</option><option value="ประโยค">ประโยค</option></select></div>
+              <div class="col-md-3"><label class="form-label fw-semibold">ระดับ</label><select class="form-select" id="wordLevel" required><option value="คำ 1 พยางค์ไม่มีความหมาย">คำ 1 พยางค์ไม่มีความหมาย</option><option value="คำ 1 พยางค์ ไม่มีตัวสะกด มีความหมาย">คำ 1 พยางค์ ไม่มีตัวสะกด มีความหมาย</option><option value="คำ 1 พยางค์ มีตัวสะกด มีความหมาย">คำ 1 พยางค์ มีตัวสะกด มีความหมาย</option><option value="คำ 2 พยางค์">คำ 2 พยางค์</option><option value="คำ 3 พยางค์">คำ 3 พยางค์</option><option value="ประโยค">ประโยค</option></select></div>
               <div class="col-md-3">
                 <label class="form-label fw-semibold">รูปภาพ (สูงสุด 2MB)</label>
                 <input type="file" class="form-control" id="wordImageFile" accept="image/*">
@@ -1643,7 +1643,7 @@ function fillWordForm(w) {
   document.getElementById('wordId').value = w.id;
   populateWordSoundSelect(w.sound_id);
   document.getElementById('wordWord').value = w.word;
-  document.getElementById('wordLevel').value = w.level || 'เสียง';
+  document.getElementById('wordLevel').value = w.level || 'คำ 1 พยางค์ไม่มีความหมาย';
   document.getElementById('wordImageFile').value = '';
   document.getElementById('wordSoundFile').value = '';
   _wordExistingImageUrl = w.image_url || null;

@@ -199,17 +199,17 @@
     <div class="setup-row">
       <label>ชุดคำที่จะฝึก</label>
       <div class="diff-btns" id="hwDiffBtns">
-        <button class="diff-btn active" data-diff="custom">กำหนดเอง <small class="text-secondary">เลือกหมวดเสียงเอง</small></button>
         <button class="diff-btn" data-diff="hw" style="background:#e74c3c;color:#fff;border-color:#e74c3c;">การบ้าน</button>
         <button class="diff-btn" data-diff="worksheet" style="background:#8a5cf6;color:#fff;border-color:#8a5cf6;">แบบฝึกหัด</button>
+        <button class="diff-btn active" data-diff="custom">กำหนดเอง <small class="text-secondary">เลือกหมวดเสียงเอง</small></button>
       </div>
     </div>
 
     <div class="setup-row">
       <label>ระดับความยาก</label>
       <div class="diff-btns" id="hardModeBtns">
-        <button class="diff-btn active" data-hardmode="easy">ง่าย <small class="text-secondary">มีตัวอย่างเสียง</small></button>
-        <button class="diff-btn" data-hardmode="hard">ยาก <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
+        <button class="diff-btn active" data-hardmode="easy">พูดตาม <small class="text-secondary">มีตัวอย่างเสียง</small></button>
+        <button class="diff-btn" data-hardmode="hard">ไม่พูดตาม <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
       </div>
     </div>
 
@@ -625,7 +625,7 @@ function startTimer(limit) {
 
 /* ===== Setup overlay helpers ===== */
 var _allWords = [], _setupMode = null, _setupCam = null;
-var LEVELS_ALL = ['เสียง', '1 พยางค์ไม่มีตัวสะกด', '1 พยางค์', '2 พยางค์', '3 พยางค์', 'ประโยค'];
+var LEVELS_ALL = ['คำ 1 พยางค์ไม่มีความหมาย', 'คำ 1 พยางค์ ไม่มีตัวสะกด มีความหมาย', 'คำ 1 พยางค์ มีตัวสะกด มีความหมาย', 'คำ 2 พยางค์', 'คำ 3 พยางค์', 'ประโยค'];
 var _hwAssignments = [], _selectedHwAssignmentId = null, _hwPool = [];
 var _worksheets = [], _selectedWorksheetId = null, _worksheetPool = [];
 var _pronounceCount = 1;
