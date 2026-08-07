@@ -43,6 +43,7 @@ const Recorder = (function () {
   }
 
   function mimeToExt(mimeType) {
+    if (mimeType.indexOf("wav")  !== -1) return "wav";
     if (mimeType.indexOf("mp4")  !== -1) return "mp4";
     if (mimeType.indexOf("ogg")  !== -1) return "ogg";
     return "webm";
@@ -178,6 +179,205 @@ const Recorder = (function () {
     };
   }
 
+  // Records continuously for as long as the caller holds the mic button
+  // (no auto-stop threshold — the caller decides when to stop via
+  // .stop()). While recording, the same RMS voice-activity approach
+  // startRecording() uses keeps running, but instead of stopping at the
+  // first silence gap it logs each complete [speechStart, speechEnd]
+  // timestamp pair (relative to recording start) as its own segment --
+  // so a single hold can still yield more than one segment if multiple
+  // words are spoken before releasing.
+  function startHoldRecording(canvas, onStop, onError) {
+    const rafHolder = { id: null };
+    let audioCtx = null;
+    let mediaStream = null;
+    let mediaRecorder = null;
+    const chunks = [];
+    const mimeType = getSupportedMimeType();
+
+    const SPEECH_THRESH  = 0.012;
+    const MIN_SPEECH_MS  = 300;  // shorter than startRecording's 600ms -- reps said quickly in one hold are still short utterances
+    const SILENCE_GAP_MS = 350;  // gap length that closes out one segment and allows the next to start
+    const MAX_HOLD_MS    = 15000; // safety cap regardless of input, in case a hold is never released
+
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then(function (stream) {
+        mediaStream = stream;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const recStartedAt = Date.now();
+        const segments = [];         // completed [startMs, endMs] pairs
+        let speechStartedAt = null;
+        let silenceStartedAt = null;
+
+        function loop() {
+          rafHolder.id = requestAnimationFrame(loop);
+          analyser.getByteTimeDomainData(dataArray);
+
+          if (canvas) {
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#2ec4b6";
+            ctx.beginPath();
+            const sliceWidth = canvas.width / dataArray.length;
+            let x = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              const v = dataArray[i] / 128.0;
+              const y = (v * canvas.height) / 2;
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+              x += sliceWidth;
+            }
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+          }
+
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            const v = (dataArray[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / dataArray.length);
+          const now = Date.now();
+
+          if (rms > SPEECH_THRESH) {
+            if (!speechStartedAt) speechStartedAt = now;
+            silenceStartedAt = null;
+          } else if (speechStartedAt && !silenceStartedAt) {
+            silenceStartedAt = now;
+          }
+
+          if (speechStartedAt && silenceStartedAt) {
+            const hadSpeechMs  = silenceStartedAt - speechStartedAt;
+            const silenceLenMs = now - silenceStartedAt;
+            if (hadSpeechMs >= MIN_SPEECH_MS && silenceLenMs >= SILENCE_GAP_MS) {
+              segments.push([speechStartedAt - recStartedAt, silenceStartedAt - recStartedAt]);
+              speechStartedAt = null;
+              silenceStartedAt = null;
+            }
+          }
+
+          if (now - recStartedAt >= MAX_HOLD_MS && mediaRecorder && mediaRecorder.state !== "inactive") {
+            cancelAnimationFrame(rafHolder.id);
+            rafHolder.id = null;
+            mediaRecorder.stop();
+          }
+        }
+        loop();
+
+        mediaRecorder = mimeType
+          ? new MediaRecorder(stream, { mimeType: mimeType })
+          : new MediaRecorder(stream);
+        const actualMime = mediaRecorder.mimeType || mimeType || "audio/webm";
+
+        mediaRecorder.ondataavailable = function (e) {
+          if (e.data.size > 0) chunks.push(e.data);
+        };
+        mediaRecorder.onstop = function () {
+          if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
+          mediaStream.getTracks().forEach(function (t) { t.stop(); });
+          if (audioCtx.state !== "closed") audioCtx.close();
+          // Close out whatever segment was still open when the hold ended
+          // (released mid-utterance, before the silence-gap timer confirmed it).
+          if (speechStartedAt) {
+            segments.push([speechStartedAt - recStartedAt, Date.now() - recStartedAt]);
+          }
+          const blob = new Blob(chunks, { type: actualMime });
+          onStop(blob, actualMime, segments);
+        };
+        mediaRecorder.start();
+      })
+      .catch(function (err) {
+        onError(err);
+      });
+
+    return {
+      stop: function () {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      },
+      cancel: function () {
+        if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.ondataavailable = null;
+          mediaRecorder.onstop = null;
+          mediaRecorder.stop();
+        }
+        if (mediaStream) mediaStream.getTracks().forEach(function (t) { t.stop(); });
+        if (audioCtx && audioCtx.state !== "closed") audioCtx.close();
+      }
+    };
+  }
+
+  // Encodes mono Float32 PCM samples as a 16-bit WAV blob.
+  function encodeWav(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    function writeString(offset, str) {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    }
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, "data");
+    view.setUint32(40, samples.length * 2, true);
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += 2;
+    }
+    return new Blob([view], { type: "audio/wav" });
+  }
+
+  // Slices one [startSec, endSec) window of channel-0 samples out of a
+  // decoded AudioBuffer into its own standalone WAV blob.
+  function sliceToWav(audioBuffer, startSec, endSec) {
+    const sr = audioBuffer.sampleRate;
+    const startIdx = Math.max(0, Math.floor(startSec * sr));
+    const endIdx = Math.min(audioBuffer.length, Math.ceil(endSec * sr));
+    const channelData = audioBuffer.getChannelData(0);
+    const slice = channelData.subarray(startIdx, endIdx);
+    return encodeWav(slice, sr);
+  }
+
+  // Decodes a recorded blob once, then slices it into one WAV blob per
+  // [startMs, endMs] segment, each padded by padMs on either side (clamped
+  // to the recording's actual bounds by sliceToWav).
+  function sliceBlobToWavSegments(blob, segments, padMs) {
+    padMs = padMs || 150;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const decodeCtx = new AudioContextClass();
+    return blob.arrayBuffer()
+      .then(function (arrBuf) { return decodeCtx.decodeAudioData(arrBuf); })
+      .then(function (audioBuffer) {
+        const wavBlobs = segments.map(function (seg) {
+          const startSec = Math.max(0, seg[0] - padMs) / 1000;
+          const endSec = (seg[1] + padMs) / 1000;
+          return sliceToWav(audioBuffer, startSec, endSec);
+        });
+        decodeCtx.close();
+        return wavBlobs;
+      });
+  }
+
   async function uploadAndSavePractice(blob, wordId, userId, mimeType, extra) {
     const mime = mimeType || blob.type || "audio/webm";
     const ext  = mimeToExt(mime);
@@ -249,6 +449,8 @@ const Recorder = (function () {
 
   return {
     startRecording: startRecording,
+    startHoldRecording: startHoldRecording,
+    sliceBlobToWavSegments: sliceBlobToWavSegments,
     uploadAndSavePractice: uploadAndSavePractice,
     drawPlayback: drawPlayback
   };
