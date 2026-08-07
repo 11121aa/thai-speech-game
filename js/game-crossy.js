@@ -215,9 +215,12 @@ function createCrossyGame(words, callbacks) {
       var newRow = this.worldRow + dr;
 
       if (newCol < 0 || newCol >= COLS) return;
-      // Forward (smaller worldRow) is unlimited; backward is capped at
-      // the bottom edge of the currently generated/visible window.
-      if (newRow > Math.floor(this.scrollWorldRow) + ROWS - 1) return;
+      // Forward (smaller worldRow) is unlimited. Backward is capped at
+      // the edge of the already-generated buffer zone (not just the
+      // visible window) -- the frog re-settles at ANCHOR_ROW_SLOT after
+      // every hop, so a cap at the visible window's edge would equal the
+      // frog's own row and block backward movement entirely.
+      if (newRow > Math.floor(this.scrollWorldRow) + ROWS - 1 + GEN_BUFFER_ROWS) return;
 
       this.charCol  = newCol;
       this.worldRow = newRow;
@@ -239,7 +242,11 @@ function createCrossyGame(words, callbacks) {
         onComplete: function () {
           self.moving = false;
           self.ensureRowsGenerated();
-          if (rowDefAt(self.worldRow).type === 'goal') self.onReachGoal();
+          // Only re-check the goal on an actual row change (dr !== 0) --
+          // onReachGoal() no longer moves the frog off the goal row, so
+          // without this guard every sidestep taken while still standing
+          // on a goal row would reopen the practice modal.
+          if (dr !== 0 && rowDefAt(self.worldRow).type === 'goal') self.onReachGoal();
         }
       });
 
