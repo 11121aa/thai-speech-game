@@ -1,134 +1,137 @@
 // ============================================================
-//  CROSSY ROAD GAME — Phaser 3  (Grid-hop frogger)
+//  CROSSY ROAD GAME — Phaser 3  (Grid-hop frogger, endless forward scroll)
 // ============================================================
 //  POLISH GUIDE (search for the label to find where to edit):
-//    [TUNE]    Grid dimensions, car speed         (~line 15)
-//    [ROWS]    Row layout (road / grass / goal)   (~ROW_TYPES)
-//    [CARS]    Car count, colours, width range    (~createCars)
-//    [CHAR]    Character (frog) art               (~drawCharacter)
-//    [COLORS]  Row background colours             (~drawBg)
-//    [POP]     Hit/goal pop text style            (~showPop)
+//    [TUNE]    Grid dimensions, car speed              (~line 15)
+//    [ROWS]    Row generation (goal spacing, filler)   (~rowDefAt)
+//    [CARS]    Car count, colours, width range          (~generateCarsForRow)
+//    [CHAR]    Character (frog) art                     (~drawCharacter)
+//    [COLORS]  Row background colours                   (~ROW_COLOR)
+//    [POP]     Hit/goal pop text style                  (~showPop)
 // ============================================================
 //  How the game works:
-//    - A frog hops on a grid (7 rows × 11 columns)
-//    - The goal row is at the top; the start is at the bottom
-//    - Cars scroll across the 4 road rows in alternating directions
-//    - Hop forward with ↑; sidestep with ← →; hop back with ↓
-//    - Reach the goal row → word practice → new word, reset to start
-//    - Hit a car → -5 seconds timer penalty + reset to start
+//    - A frog hops on a grid (7 visible rows x 11 columns) that scrolls
+//      endlessly forward -- there is no fixed end, and no reset to a
+//      start position. The frog stays visually anchored near the bottom
+//      of the screen; the world scrolls past it as it advances.
+//    - Cars scroll across road rows in alternating directions.
+//    - Hop forward with UP; sidestep with LEFT/RIGHT; hop back with DOWN.
+//    - Every GOAL_SPACING rows, a safe "goal" row triggers word practice,
+//      then scrolling continues -- no teleport back to a start cell.
+//    - Hit a car -> -5 seconds timer penalty + knocked back a few rows
+//      (not reset to the absolute start).
 // ============================================================
 
-// createCrossyGame is called with:
-//   words     = array of word objects { word, emoji, reading, ... }
-//   callbacks = { onPoints, onPractice, onFinish, onTime }
 function createCrossyGame(words, callbacks) {
 
   // ── [TUNE] Grid and timing ────────────────────────────────────
-  var W = 800, H = 400;                        // canvas size in pixels
-  var COLS    = 11;                             // number of columns across the screen
-  var ROWS    = 7;                              // number of rows from top to bottom
-  var CELL_W  = Math.floor(W / COLS);          // width of each grid cell ≈ 72px
-  var CELL_H  = Math.floor(H / ROWS);          // height of each grid cell ≈ 57px
-  var HOP_MS  = 130;                           // duration of each hop animation (milliseconds)
+  var W = 800, H = 400;
+  var COLS    = 11;
+  var ROWS    = 7;                              // visible rows on screen at once
+  var CELL_W  = Math.floor(W / COLS);
+  var CELL_H  = Math.floor(H / ROWS);
+  var HOP_MS  = 130;
 
-  // ── [ROWS] Row layout — index 0 = top row, index 6 = bottom row ─
-  // 'goal'  = safe cyan strip at the top — reaching it triggers word practice
-  // 'road'  = dangerous car lane
-  // 'grass' = safe green rest zone in the middle
-  // 'start' = safe dark green spawn point at the bottom
-  var ROW_TYPES = ['goal',  'road', 'road', 'grass', 'road', 'road', 'start'];
+  // ── [ROWS] Endless row generation ───────────────────────────────
+  // Row type is a pure function of worldRow: every GOAL_SPACING rows is a
+  // safe 'goal' checkpoint (triggers word practice); the rows between two
+  // checkpoints cycle through the same hand-tuned filler rhythm the
+  // original fixed board used (road, road, grass, road, road) so the
+  // moment-to-moment feel is unchanged -- only "does it reset" changed.
+  var GOAL_SPACING     = 6;
+  var KNOCKBACK_ROWS   = 2;   // rows knocked back on a car hit
+  var ANCHOR_ROW_SLOT  = 6;   // frog's fixed screen row-slot (matches the old start row's position)
+  var GEN_BUFFER_ROWS  = 2;   // rows generated beyond each visible edge so scrolling never reveals a gap
+  var CLEANUP_MARGIN   = 2;   // rows kept beyond the visible window before being discarded
 
-  // Car direction per road row: +1 = left-to-right, -1 = right-to-left
-  var ROW_DIRS  = [0,  1,  -1,  0, -1,  1,  0];
-
-  // Base speed of cars in each row (pixels per frame at 60fps)
-  // Safe rows (goal/grass/start) have 0 speed since they have no cars
-  var ROW_SPEED = [0, 2.2, 1.7,  0, 2.5, 1.5, 0];
+  var FILLER_TEMPLATE = [
+    { type: 'road',  dir:  1, speed: 2.2 },
+    { type: 'road',  dir: -1, speed: 1.7 },
+    { type: 'grass', dir:  0, speed: 0   },
+    { type: 'road',  dir: -1, speed: 2.5 },
+    { type: 'road',  dir:  1, speed: 1.5 }
+  ];
 
   // ── [COLORS] Background colour for each row type ─────────────
   var ROW_COLOR = {
-    goal:  0x00bcd4, // teal/cyan — the safe finish zone
-    road:  0x616161, // dark grey — asphalt
-    grass: 0x4caf50, // medium green — rest zone
-    start: 0x388e3c  // darker green — starting position
+    goal:  0x00bcd4,
+    road:  0x616161,
+    grass: 0x4caf50
   };
 
-  // ── Scene class ───────────────────────────────────────────────
+  // Always-positive modulo (JS's % can return negative results for
+  // negative operands, and worldRow goes negative as the frog advances
+  // past the first several checkpoints).
+  function mod(n, m) { return ((n % m) + m) % m; }
+
+  // Pure function: given any worldRow (positive, zero, or negative),
+  // returns its {type, dir, speed}. No memory of past rows needed --
+  // this is what lets rows be generated lazily in any order.
+  function rowDefAt(worldRow) {
+    var offset = mod(worldRow, GOAL_SPACING);
+    if (offset === 0) return { type: 'goal', dir: 0, speed: 0 };
+    return FILLER_TEMPLATE[offset - 1];
+  }
+
   var CrossyScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
-    // initialize() — set up starting values before the scene runs
     initialize: function () {
-      Phaser.Scene.call(this, { key: 'crossy' }); // register scene
+      Phaser.Scene.call(this, { key: 'crossy' });
 
-      this.charCol     = 5;     // starting column (0 = left edge, COLS-1 = right edge)
-      this.charRow     = 6;     // starting row (6 = bottom start row)
-      this.charX       = 0;     // visual X position of the frog (tweened smoothly between hops)
-      this.charY       = 0;     // visual Y position of the frog (tweened smoothly)
-      this.moving      = false; // true while a hop tween is in progress (blocks new input)
-      this.isPaused    = false; // true while the practice modal is open
-      this.invincible  = 0;     // frames of invincibility after being hit (counts down each frame)
-      this.cars        = [];    // array of all car objects
-      this.wordIdx     = 0;     // which word to show next (cycles through the words array)
-      this.currentWord = null;  // the current word the player is trying to reach the goal for
+      this.charCol        = 5;                          // starting column
+      this.worldRow        = ANCHOR_ROW_SLOT;             // logical row position, unbounded
+      this.charX            = 0;                          // visual X (tweened smoothly between hops)
+      this.scrollWorldRow  = this.worldRow - ANCHOR_ROW_SLOT; // camera position (tweened)
+      this.moving           = false;
+      this.isPaused         = false;
+      this.invincible       = 0;
+      this.rows             = {};   // worldRow (int) -> { worldRow, type, dir, speed, cars: [] }
+      this.wordIdx          = 0;
+      this.currentWord      = null;
     },
 
-    // create() — runs once when the scene starts; sets everything up
     create: function () {
       var self = this;
 
-      // ── Static background (row stripes, drawn once) ───────────────
-      this.bgGfx = this.add.graphics();
-      this.drawBg(); // fills the row stripes, road markings, goal pattern
+      this.dynGfx = this.add.graphics().setDepth(1);
+      this.bgGfx  = this.add.graphics().setDepth(0);
 
-      // Dynamic layer: cleared and redrawn every frame (cars + frog)
-      this.dynGfx = this.add.graphics();
+      this.charX = this.charCol * CELL_W + CELL_W / 2;
 
-      // Set the frog's initial visual position to match its starting grid cell
-      this.charX = this.charCol * CELL_W + CELL_W / 2; // centre of column 5
-      this.charY = this.charRow * CELL_H + CELL_H / 2; // centre of row 6
+      this.ensureRowsGenerated();
 
-      // ── Spawn cars for all road rows ──────────────────────────────
-      this.createCars();
-
-      // ── Goal label: shows the target word at the top of the screen ─
       this.goalLabel = this.add.text(W / 2, CELL_H / 2, '', {
         fontFamily: 'Prompt, sans-serif', fontSize: '15px', fontStyle: 'bold',
         color: '#ffffff', backgroundColor: '#0097a7cc',
         padding: { x: 12, y: 5 }
       }).setOrigin(0.5).setDepth(5);
 
-      // Pick and display the first word
       if (words.length) {
         this.currentWord = words[this.wordIdx++ % words.length];
-        this.updateGoalLabel(); // update the label text with the word
+        this.updateGoalLabel();
       }
 
-      // ── Keyboard controls ─────────────────────────────────────────
-      // Supports both arrow keys and WASD
       this.keys = this.input.keyboard.addKeys({
         up:    Phaser.Input.Keyboard.KeyCodes.UP,
         down:  Phaser.Input.Keyboard.KeyCodes.DOWN,
         left:  Phaser.Input.Keyboard.KeyCodes.LEFT,
         right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-        w: Phaser.Input.Keyboard.KeyCodes.W, // W = up
-        s: Phaser.Input.Keyboard.KeyCodes.S, // S = down
-        a: Phaser.Input.Keyboard.KeyCodes.A, // A = left
-        d: Phaser.Input.Keyboard.KeyCodes.D  // D = right
+        w: Phaser.Input.Keyboard.KeyCodes.W,
+        s: Phaser.Input.Keyboard.KeyCodes.S,
+        a: Phaser.Input.Keyboard.KeyCodes.A,
+        d: Phaser.Input.Keyboard.KeyCodes.D
       });
 
-      // ── DOM buttons (↑ ← ↓ → buttons in game.html) ──────────────
-      // Save references to the handler functions so we can remove them in shutdown()
       var bUp    = document.getElementById('cryBtnUp');
       var bLeft  = document.getElementById('cryBtnLeft');
       var bRight = document.getElementById('cryBtnRight');
       var bDown  = document.getElementById('cryBtnDown');
-      this._upFn    = function () { self.tryMove(0,  -1); }; // up = row decreases
-      this._leftFn  = function () { self.tryMove(-1,  0); }; // left = col decreases
-      this._rightFn = function () { self.tryMove(1,   0); }; // right = col increases
-      this._downFn  = function () { self.tryMove(0,   1); }; // down = row increases
+      this._upFn    = function () { self.tryMove(0,  -1); };
+      this._leftFn  = function () { self.tryMove(-1,  0); };
+      this._rightFn = function () { self.tryMove(1,   0); };
+      this._downFn  = function () { self.tryMove(0,   1); };
 
-      // Attach both mouse (desktop) and touch (mobile) events
       function wire(el, fn) {
         if (!el) return;
         el.addEventListener('mousedown',  fn);
@@ -139,7 +142,6 @@ function createCrossyGame(words, callbacks) {
       wire(bRight, this._rightFn);
       wire(bDown, this._downFn);
 
-      // ── On-screen hint text (fades after 4 seconds) ────────────────
       var hint = this.add.text(W / 2, H - 14,
         '↑ เดินหน้า   ← → หลบซ้าย/ขวา   หลีกรถ 🚗', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px',
@@ -153,37 +155,53 @@ function createCrossyGame(words, callbacks) {
       });
     },
 
-    // ── [CARS] Create cars for every road row ─────────────────────
-    // Each road row gets 2–3 cars distributed evenly across the width
-    createCars: function () {
-      // [CARS] Change these colours for different car colours
+    // ── [ROWS] Get (or lazily create) the row at worldRow ──────────
+    getOrCreateRow: function (worldRow) {
+      var row = this.rows[worldRow];
+      if (row) return row;
+      var def = rowDefAt(worldRow);
+      row = { worldRow: worldRow, type: def.type, dir: def.dir, speed: def.speed, cars: [] };
+      if (def.type === 'road') row.cars = this.generateCarsForRow(def);
+      this.rows[worldRow] = row;
+      return row;
+    },
+
+    // ── [CARS] Generate cars for one road row (same logic the original
+    // fixed-board version used for all 4 road rows upfront, just now
+    // called lazily as each new row is generated) ──────────────────
+    generateCarsForRow: function (def) {
       var CAR_COLORS = [0xff5252, 0xffb300, 0x2196f3, 0x9c27b0, 0x00bcd4, 0xff9800];
+      var cars = [];
+      var nCars = 2 + Math.floor(Math.random() * 2); // [TUNE] 2 or 3 cars per lane
+      for (var i = 0; i < nCars; i++) {
+        var gap    = W / nCars;
+        var startX = i * gap + Math.random() * gap * 0.5;
+        if (def.dir === -1) startX = W - startX;
+        var carW = 55 + Math.random() * 35; // [CARS] car width range: 55-90px
+        cars.push({
+          x:     startX,
+          w:     carW,
+          h:     CELL_H - 12,
+          speed: def.speed * (0.75 + Math.random() * 0.5),
+          dir:   def.dir,
+          color: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)]
+        });
+      }
+      return cars;
+    },
 
-      for (var row = 0; row < ROWS; row++) {
-        if (ROW_TYPES[row] !== 'road') continue; // only spawn cars on road rows
+    // ── [ROWS] Ensure every row currently needed on screen (plus a
+    // small buffer) exists in the registry, and discard rows that have
+    // scrolled well past the bottom edge so memory stays flat over an
+    // arbitrarily long run ───────────────────────────────────────────
+    ensureRowsGenerated: function () {
+      var top    = Math.floor(this.scrollWorldRow) - GEN_BUFFER_ROWS;
+      var bottom = Math.floor(this.scrollWorldRow) + ROWS - 1 + GEN_BUFFER_ROWS;
+      for (var r = top; r <= bottom; r++) this.getOrCreateRow(r);
 
-        var dir   = ROW_DIRS[row];  // +1 = left→right, -1 = right→left
-        var spd   = ROW_SPEED[row]; // base speed for this row
-        var nCars = 2 + Math.floor(Math.random() * 2); // [TUNE] 2 or 3 cars per lane
-
-        for (var i = 0; i < nCars; i++) {
-          var gap    = W / nCars;  // evenly divide the width among cars
-          // Randomise within each gap to avoid perfectly uniform spacing
-          var startX = i * gap + Math.random() * gap * 0.5;
-          if (dir === -1) startX = W - startX; // right-to-left cars start on the right side
-
-          var carW = 55 + Math.random() * 35; // [CARS] car width range: 55–90px
-
-          this.cars.push({
-            row:   row,                  // which row this car belongs to
-            x:     startX,               // current X position
-            w:     carW,                 // car width (height is fixed: CELL_H - 12)
-            h:     CELL_H - 12,          // car height (slightly smaller than the cell)
-            speed: spd * (0.75 + Math.random() * 0.5), // slight speed variation per car
-            dir:   dir,                  // +1 or -1
-            color: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)]
-          });
-        }
+      var cleanupBelow = bottom + CLEANUP_MARGIN;
+      for (var key in this.rows) {
+        if (this.rows[key].worldRow > cleanupBelow) delete this.rows[key];
       }
     },
 
@@ -191,67 +209,55 @@ function createCrossyGame(words, callbacks) {
     // dc = column change (-1 left, 0 stay, +1 right)
     // dr = row change    (-1 forward/up, 0 stay, +1 backward/down)
     tryMove: function (dc, dr) {
-      if (this.moving || this.isPaused) return; // block input during tween or modal
+      if (this.moving || this.isPaused) return;
 
       var newCol = this.charCol + dc;
-      var newRow = this.charRow + dr;
+      var newRow = this.worldRow + dr;
 
-      // Boundary check: don't allow moving off the grid edges
       if (newCol < 0 || newCol >= COLS) return;
-      if (newRow < 0 || newRow > 6)    return;
+      // Forward (smaller worldRow) is unlimited; backward is capped at
+      // the bottom edge of the currently generated/visible window.
+      if (newRow > Math.floor(this.scrollWorldRow) + ROWS - 1) return;
 
-      // Update the logical grid position immediately
-      this.charCol = newCol;
-      this.charRow = newRow;
+      this.charCol  = newCol;
+      this.worldRow = newRow;
 
-      // Calculate the visual target position (centre of the new cell)
-      var targetX = newCol * CELL_W + CELL_W / 2;
-      var targetY = newRow * CELL_H + CELL_H / 2;
+      var targetX         = newCol * CELL_W + CELL_W / 2;
+      var targetScrollRow = newRow - ANCHOR_ROW_SLOT;
 
-      this.moving = true; // lock input until the hop animation completes
+      this.moving = true;
       var self    = this;
 
-      // ── Tween the visual position (charX, charY) to the new cell ──
-      // Phaser can tween any numeric property of any object — here we tween
-      // this.charX and this.charY directly on the scene object
+      // Both the frog's column slide AND the camera's row scroll are
+      // driven by this single tween, so they always move in lockstep.
       this.tweens.add({
-        targets:  this,    // tween properties on the scene itself
-        charX:    targetX, // smoothly move visual X to target
-        charY:    targetY, // smoothly move visual Y to target
+        targets:  this,
+        charX:          targetX,
+        scrollWorldRow: targetScrollRow,
         duration: HOP_MS,
-        ease:     'Power2Out', // fast start, decelerates at the end (snappy hop)
+        ease:     'Power2Out',
         onComplete: function () {
-          self.moving = false; // unlock input
-          if (self.charRow === 0) self.onReachGoal(); // check if player reached the goal row
+          self.moving = false;
+          self.ensureRowsGenerated();
+          if (rowDefAt(self.worldRow).type === 'goal') self.onReachGoal();
         }
       });
 
-      // Award a small bonus for hopping forward (toward the goal)
-      if (dr < 0) callbacks.onPoints(3); // dr < 0 means moving up (toward row 0)
+      if (dr < 0) callbacks.onPoints(3);
     },
 
-    // ── Player reached the goal row (row 0) ───────────────────────
-    // Triggered by tryMove's onComplete when charRow === 0
+    // ── Player reached a goal/checkpoint row ───────────────────────
     onReachGoal: function () {
       var self = this;
       if (!this.currentWord) return;
 
-      this.isPaused = true;            // freeze cars + input
-      callbacks.onPoints(20);          // [TUNE] bonus points for a full crossing
+      this.isPaused = true;
+      callbacks.onPoints(20);
 
-      // Open the pronunciation practice modal
       callbacks.onPractice(this.currentWord, null, function () {
-        self.isPaused = false; // unfreeze when modal closes
-
-        // Teleport frog back to starting position
-        self.charCol = 5; self.charRow = 6;
-        self.charX   = self.charCol * CELL_W + CELL_W / 2;
-        self.charY   = self.charRow * CELL_H + CELL_H / 2;
-
-        // Give brief invincibility on respawn so the player doesn't immediately get hit
-        self.invincible = 60; // ~1 second
-
-        // Advance to the next word and update the goal label
+        self.isPaused = false;
+        // No teleport -- the frog stays exactly where it is and
+        // scrolling continues toward the next checkpoint.
         if (words.length) {
           self.currentWord = words[self.wordIdx++ % words.length];
           self.updateGoalLabel();
@@ -259,29 +265,20 @@ function createCrossyGame(words, callbacks) {
       });
     },
 
-    // ── Update the goal label text at the top of the screen ──────
     updateGoalLabel: function () {
       if (!this.currentWord || !this.goalLabel) return;
-      // No picture and no custom emoji — bookend with the word itself
-      // rather than a meaningless generic icon.
       var wEmoji = (this.currentWord.emoji && this.currentWord.emoji !== this.currentWord.word) ? this.currentWord.emoji : this.currentWord.word;
       this.goalLabel.setText(
-        wEmoji +
-        '  ข้ามถนน → ' + this.currentWord.reading +
-        '  ' + wEmoji
+        wEmoji + '  ข้ามถนน → ' + this.currentWord.reading + '  ' + wEmoji
       );
     },
 
     // ── Per-frame update ──────────────────────────────────────────
-    // Handles keyboard input, car movement, collision, and drawing
     update: function (time, delta) {
-      if (this.isPaused) return; // freeze everything while practice modal is open
+      if (this.isPaused) return;
       var self = this;
 
-      // ── Keyboard input ─────────────────────────────────────────
-      // JustDown() means "only true on the exact frame the key was first pressed"
-      // This ensures one key press = one hop (not continuous movement)
-      if (!this.moving) { // only accept input when the previous hop has finished
+      if (!this.moving) {
         if      (Phaser.Input.Keyboard.JustDown(this.keys.up)    ||
                  Phaser.Input.Keyboard.JustDown(this.keys.w))    { this.tryMove(0,  -1); }
         else if (Phaser.Input.Keyboard.JustDown(this.keys.down)  ||
@@ -292,199 +289,168 @@ function createCrossyGame(words, callbacks) {
                  Phaser.Input.Keyboard.JustDown(this.keys.d))    { this.tryMove(1,   0); }
       }
 
-      // ── Move all cars ──────────────────────────────────────────
-      // delta = milliseconds since last frame; normalise to 60fps so speed is consistent
+      this.ensureRowsGenerated();
+
+      // ── Move all cars in every currently-generated road row ──────
       var dt = delta / 16;
-      this.cars.forEach(function (car) {
-        car.x += car.speed * car.dir * dt; // move the car in its direction
-        // Wrap around: when a car goes off one edge, it reappears on the other
-        if (car.dir ===  1 && car.x > W + car.w) car.x = -car.w;   // left-to-right wrap
-        if (car.dir === -1 && car.x < -car.w)    car.x = W + car.w; // right-to-left wrap
-      });
-
-      // ── Car collision detection ────────────────────────────────
-      if (this.invincible > 0) {
-        this.invincible--; // count down invincibility frames (no collision check while active)
-      } else if (ROW_TYPES[this.charRow] === 'road') {
-        // Only check collisions when the frog is on a road row
-        // Use the frog's visual position (charX/charY) for the hitbox
-        // The hitbox is 76% of a cell in each direction (0.38 * CELL_W/H per side)
-        var charLeft  = this.charX - CELL_W * 0.38;
-        var charRight = this.charX + CELL_W * 0.38;
-        var charTop   = this.charY - CELL_H * 0.38;
-        var charBot   = this.charY + CELL_H * 0.38;
-        var rowY      = this.charRow * CELL_H; // top Y of the current row
-
-        this.cars.forEach(function (car) {
-          if (car.row !== self.charRow) return; // skip cars in different rows
-
-          // Car hitbox
-          var carLeft  = car.x;
-          var carRight = car.x + car.w;
-          var carTop   = rowY + 5;
-          var carBot   = rowY + car.h + 5;
-
-          // AABB (Axis-Aligned Bounding Box) overlap test:
-          // Two rectangles overlap only if NONE of these conditions is true:
-          //   frog is completely to the left, right, above, or below the car
-          if (charLeft < carRight && charRight > carLeft &&
-              charTop  < carBot   && charBot   > carTop) {
-            // ── HIT! ──────────────────────────────────────────────
-            self.invincible = 90; // ~1.5 seconds of invincibility after the hit
-            if (callbacks.onTime) callbacks.onTime(-5); // subtract 5 seconds from the timer
-            self.showPop(self.charX, self.charY - 30, '-5s 💥');
-            // Teleport frog back to start
-            self.charCol = 5; self.charRow = 6;
-            self.charX   = self.charCol * CELL_W + CELL_W / 2;
-            self.charY   = self.charRow * CELL_H + CELL_H / 2;
-          }
+      for (var key in this.rows) {
+        var row = this.rows[key];
+        if (row.type !== 'road') continue;
+        row.cars.forEach(function (car) {
+          car.x += car.speed * car.dir * dt;
+          if (car.dir ===  1 && car.x > W + car.w) car.x = -car.w;
+          if (car.dir === -1 && car.x < -car.w)    car.x = W + car.w;
         });
       }
 
-      // ── Redraw everything ──────────────────────────────────────
+      // ── Car collision detection (current row only) ────────────────
+      if (this.invincible > 0) {
+        this.invincible--;
+      } else {
+        var currentRow = this.rows[this.worldRow];
+        if (currentRow && currentRow.type === 'road') {
+          var charLeft   = this.charX - CELL_W * 0.38;
+          var charRight  = this.charX + CELL_W * 0.38;
+          var rowScreenY = (currentRow.worldRow - this.scrollWorldRow) * CELL_H;
+          var charTop    = rowScreenY + CELL_H / 2 - CELL_H * 0.38;
+          var charBot    = rowScreenY + CELL_H / 2 + CELL_H * 0.38;
+
+          currentRow.cars.forEach(function (car) {
+            var carLeft  = car.x;
+            var carRight = car.x + car.w;
+            var carTop   = rowScreenY + 5;
+            var carBot   = rowScreenY + car.h + 5;
+
+            if (charLeft < carRight && charRight > carLeft &&
+                charTop  < carBot   && charBot   > carTop) {
+              self.invincible = 90; // ~1.5 seconds of invincibility after the hit
+              if (callbacks.onTime) callbacks.onTime(-5);
+              self.showPop(self.charX, ANCHOR_ROW_SLOT * CELL_H + CELL_H / 2 - 30, '-5s 💥');
+
+              // Knock back a few rows instead of resetting to the start --
+              // clamped so it can't go behind the bottom edge of the
+              // currently generated/visible window.
+              var maxBackRow = Math.floor(self.scrollWorldRow) + ROWS - 1;
+              self.worldRow = Math.min(self.worldRow + KNOCKBACK_ROWS, maxBackRow);
+              self.scrollWorldRow = self.worldRow - ANCHOR_ROW_SLOT;
+            }
+          });
+        }
+      }
+
       this.draw(time);
     },
 
-    // ── [COLORS] Draw static row backgrounds (called once in create) ─
-    // Draws coloured stripes for each row type, plus road/goal decoration
+    // ── [COLORS] Draw row backgrounds for every currently-visible row.
+    // Rows scroll now, so unlike the original fixed board this can no
+    // longer be a one-time static draw -- it redraws each frame. ─────
     drawBg: function () {
       var g = this.bgGfx;
-      for (var row = 0; row < ROWS; row++) {
-        var y    = row * CELL_H;        // top Y of this row in pixels
-        var type = ROW_TYPES[row];      // 'goal', 'road', 'grass', or 'start'
-        g.fillStyle(ROW_COLOR[type]);
-        g.fillRect(0, y, W, CELL_H);   // fill the entire row with its base colour
+      g.clear();
+      var top    = Math.floor(this.scrollWorldRow) - 1;
+      var bottom = Math.floor(this.scrollWorldRow) + ROWS;
+      for (var r = top; r <= bottom; r++) {
+        var row = this.rows[r];
+        if (!row) continue;
+        var y = (row.worldRow - this.scrollWorldRow) * CELL_H;
+        g.fillStyle(ROW_COLOR[row.type]);
+        g.fillRect(0, y, W, CELL_H);
 
-        if (type === 'road') {
-          // White dashed centre line running horizontally through the row
+        if (row.type === 'road') {
           g.fillStyle(0xffffff, 0.35);
-          for (var mx = 0; mx < W; mx += 40) {
-            g.fillRect(mx, y + CELL_H / 2 - 1, 24, 2); // short white dash every 40px
-          }
-          // Dark kerb strips at the top and bottom edges of the road lane
+          for (var mx = 0; mx < W; mx += 40) g.fillRect(mx, y + CELL_H / 2 - 1, 24, 2);
           g.fillStyle(0x424242, 0.5);
-          g.fillRect(0, y,              W, 4); // top kerb
-          g.fillRect(0, y + CELL_H - 4, W, 4); // bottom kerb
+          g.fillRect(0, y,              W, 4);
+          g.fillRect(0, y + CELL_H - 4, W, 4);
         }
-
-        if (type === 'goal') {
-          // Alternating zebra-crossing pattern (every other column is lighter)
+        if (row.type === 'goal') {
           g.fillStyle(0xffffff, 0.2);
           for (var zx = 0; zx < W; zx += CELL_W) {
-            if (Math.floor(zx / CELL_W) % 2 === 0) { // every even column
-              g.fillRect(zx, 0, CELL_W, CELL_H);
-            }
+            if (Math.floor(zx / CELL_W) % 2 === 0) g.fillRect(zx, y, CELL_W, CELL_H);
           }
         }
-
-        if (type === 'grass') {
-          // Subtle vertical grass-blade texture (thin strips spaced 16px apart)
+        if (row.type === 'grass') {
           g.fillStyle(0x43a047, 0.4);
-          for (var gx = 0; gx < W; gx += 16) {
-            g.fillRect(gx, y + 4, 4, CELL_H - 8); // small vertical rectangle
-          }
+          for (var gx = 0; gx < W; gx += 16) g.fillRect(gx, y + 4, 4, CELL_H - 8);
         }
       }
     },
 
     // ── Draw all dynamic objects every frame (cars + frog) ────────
     draw: function (time) {
+      this.drawBg();
       var g    = this.dynGfx;
       var self = this;
-      g.clear(); // erase everything from the previous frame
+      g.clear();
 
-      // ── [CARS] Draw each car ──────────────────────────────────
-      this.cars.forEach(function (car) {
-        var y = car.row * CELL_H + 6; // top Y of the car (6px margin from row top)
+      var top    = Math.floor(this.scrollWorldRow) - 1;
+      var bottom = Math.floor(this.scrollWorldRow) + ROWS;
+      for (var r = top; r <= bottom; r++) {
+        var row = this.rows[r];
+        if (!row || row.type !== 'road') continue;
+        var y = (row.worldRow - this.scrollWorldRow) * CELL_H + 6;
+        row.cars.forEach(function (car) {
+          g.fillStyle(car.color);
+          g.fillRoundedRect(car.x, y, car.w, car.h, 7);
+          g.fillStyle(0xbbdefb, 0.85);
+          var ww = car.w * 0.33;
+          g.fillRoundedRect(car.x + 5,              y + 4, ww,  car.h * 0.52, 3);
+          g.fillRoundedRect(car.x + car.w - ww - 5, y + 4, ww,  car.h * 0.52, 3);
+          g.fillStyle(0x212121);
+          g.fillCircle(car.x + 10,         y + car.h + 2, 7);
+          g.fillCircle(car.x + car.w - 10, y + car.h + 2, 7);
+          g.fillStyle(0xfff176, 0.9);
+          var lx = car.dir === 1 ? car.x + car.w - 4 : car.x;
+          g.fillRect(lx, y + 4, 4, 8);
+        });
+      }
 
-        // Car body (rounded rectangle in the car's colour)
-        g.fillStyle(car.color);
-        g.fillRoundedRect(car.x, y, car.w, car.h, 7);
-
-        // Two windows (light blue, proportional to car width)
-        g.fillStyle(0xbbdefb, 0.85);
-        var ww = car.w * 0.33; // each window is 33% of the car's width
-        g.fillRoundedRect(car.x + 5,              y + 4, ww,  car.h * 0.52, 3); // front window
-        g.fillRoundedRect(car.x + car.w - ww - 5, y + 4, ww,  car.h * 0.52, 3); // rear window
-
-        // Two wheels (dark circles, slightly below the car body)
-        g.fillStyle(0x212121);
-        g.fillCircle(car.x + 10,         y + car.h + 2, 7); // front wheel
-        g.fillCircle(car.x + car.w - 10, y + car.h + 2, 7); // rear wheel
-
-        // Headlight on the leading end (direction-dependent)
-        // car.dir === 1 means moving right, so headlight is on the right side
-        g.fillStyle(0xfff176, 0.9);
-        var lx = car.dir === 1 ? car.x + car.w - 4 : car.x; // right end or left end
-        g.fillRect(lx, y + 4, 4, 8); // small yellow rectangle
-      });
-
-      // ── [CHAR] Draw the frog (flash on/off when invincible) ────
-      // Every 6 frames the frog alternates between visible and invisible
-      // Math.floor(invincible/6) % 2 === 1 is true on alternate 6-frame windows
+      var frogY = ANCHOR_ROW_SLOT * CELL_H + CELL_H / 2;
       var flash = this.invincible > 0 && Math.floor(this.invincible / 6) % 2 === 1;
-      if (!flash) this.drawCharacter(g, this.charX, this.charY, time);
+      if (!flash) this.drawCharacter(g, this.charX, frogY, time);
     },
 
     // ── [CHAR] Draw the frog character at position (cx, cy) ──────
-    // POLISH: change r for a bigger/smaller frog; change colours below
     drawCharacter: function (g, cx, cy, time) {
-      var r = 17; // body radius — POLISH: larger = chubbier frog
-
-      // Circular body
-      g.fillStyle(0x66bb6a);          // POLISH: change for different frog colour (medium green)
+      var r = 17;
+      g.fillStyle(0x66bb6a);
       g.fillCircle(cx, cy, r);
       g.lineStyle(2, 0x388e3c);
-      g.strokeCircle(cx, cy, r);     // darker green outline
-
-      // White eyes (two circles on top of the head)
+      g.strokeCircle(cx, cy, r);
       g.fillStyle(0xffffff);
-      g.fillCircle(cx - 7, cy - 8, 6); // left eye white
-      g.fillCircle(cx + 7, cy - 8, 6); // right eye white
-
-      // Dark pupils
-      g.fillStyle(0x1a237e); // very dark blue
-      g.fillCircle(cx - 6, cy - 8, 3); // left pupil
-      g.fillCircle(cx + 6, cy - 8, 3); // right pupil
-
-      // Small white eye-shine highlights
+      g.fillCircle(cx - 7, cy - 8, 6);
+      g.fillCircle(cx + 7, cy - 8, 6);
+      g.fillStyle(0x1a237e);
+      g.fillCircle(cx - 6, cy - 8, 3);
+      g.fillCircle(cx + 6, cy - 8, 3);
       g.fillStyle(0xffffff, 0.8);
-      g.fillCircle(cx - 5, cy - 9, 1.2); // left shine
-      g.fillCircle(cx + 7, cy - 9, 1.2); // right shine
-
-      // Smile arc (curved line in the lower part of the face)
+      g.fillCircle(cx - 5, cy - 9, 1.2);
+      g.fillCircle(cx + 7, cy - 9, 1.2);
       g.lineStyle(2, 0x2e7d32);
       g.beginPath();
-      // arc(centre_x, centre_y, radius, start_angle, end_angle, anticlockwise, step)
-      // 0.1 to π-0.1 draws the lower half of a circle (a smile shape)
       g.arc(cx, cy + 5, 7, 0.1, Math.PI - 0.1, false, 0.02);
       g.strokePath();
-
-      // Back feet: two ellipses splayed out to the sides
-      // They bob up and down slightly using a sine wave for a "breathing" feel
       var bob = Math.sin(time * 0.008) * 2;
       g.fillStyle(0x4caf50);
-      g.fillEllipse(cx - 21, cy + 8 + bob, 20, 10); // left foot
-      g.fillEllipse(cx + 21, cy + 8 + bob, 20, 10); // right foot
+      g.fillEllipse(cx - 21, cy + 8 + bob, 20, 10);
+      g.fillEllipse(cx + 21, cy + 8 + bob, 20, 10);
     },
 
     // ── [POP] Floating feedback text ─────────────────────────────
-    // Creates a Phaser Text that floats upward and fades out
     showPop: function (x, y, text) {
-      var isNeg = text.charAt(0) === '-'; // penalty text starts with '-'
+      var isNeg = text.charAt(0) === '-';
       var pop   = this.add.text(x, y, text, {
         fontFamily: 'Prompt, sans-serif', fontSize: '20px', fontStyle: 'bold',
-        color: isNeg ? '#ff5252' : '#00e676', // red for penalty, bright green for bonus
+        color: isNeg ? '#ff5252' : '#00e676',
         stroke: '#ffffff', strokeThickness: 3
       }).setOrigin(0.5).setDepth(20);
       this.tweens.add({
         targets: pop, y: y - 45, alpha: 0, duration: 800, ease: 'Power2',
-        onComplete: function () { pop.destroy(); } // clean up when animation ends
+        onComplete: function () { pop.destroy(); }
       });
     },
 
     // ── Cleanup DOM event listeners when the scene is stopped ────
-    // IMPORTANT: must remove listeners to prevent them stacking up across game restarts
     shutdown: function () {
       var ids = ['cryBtnUp', 'cryBtnLeft', 'cryBtnRight', 'cryBtnDown'];
       var fns = [this._upFn, this._leftFn, this._rightFn, this._downFn];
@@ -498,10 +464,9 @@ function createCrossyGame(words, callbacks) {
     }
   });
 
-  // Create and return the Phaser.Game that runs CrossyScene
   return new Phaser.Game({
     type:   Phaser.AUTO,
-    parent: 'crossyCanvas', // injects canvas INSIDE platformer-wrap so buttons overlay correctly
+    parent: 'crossyCanvas',
     width:  W, height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:  CrossyScene,
@@ -510,12 +475,11 @@ function createCrossyGame(words, callbacks) {
 }
 
 // ── Public API ────────────────────────────────────────────────────
-// Wraps the game so it can be controlled with CrossyGame.start() / .stop()
 var CrossyGame = (function () {
-  var game = null; // holds the running Phaser.Game, or null if stopped
+  var game = null;
 
   function start(words, cbs) {
-    stop(); // always destroy the previous game before starting a new one
+    stop();
     setTimeout(function () { game = createCrossyGame(words, cbs); }, 60);
   }
 
