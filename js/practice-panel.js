@@ -295,7 +295,8 @@ const PracticePanel = (function () {
             multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false, practiceId: null });
           });
           renderMultiCards();
-        }).catch(function () {
+        }).catch(function (err) {
+          console.error("[multi-rep] sliceBlobToWavSegments failed:", err, "blob type:", blob && blob.type, "blob size:", blob && blob.size, "segments:", segments);
           showError("เกิดข้อผิดพลาดในการประมวลผลเสียง กรุณาลองใหม่");
         });
       },
