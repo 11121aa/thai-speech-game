@@ -103,6 +103,37 @@ function createPlatformerGame(words, callbacks, difficulty) {
     }
   ];
 
+  // ── [PATTERNS] Repeat-avoidance for spawnPattern() ──────────────
+  // A pattern can repeat back-to-back, but never more than
+  // PATTERN_MAX_STREAK times, and even before that cap its odds of being
+  // picked again are reduced by PATTERN_REPEAT_PENALTY (10 percentage
+  // points), redistributed evenly across the other patterns — makes
+  // repeats noticeably less common, not just capped.
+  var PATTERN_MAX_STREAK     = 2;
+  var PATTERN_REPEAT_PENALTY = 0.10;
+
+  function pickPatternIndex(lastIdx, lastStreak) {
+    var n = PATTERNS.length;
+    var weights = [];
+    for (var i = 0; i < n; i++) weights.push(1 / n);
+
+    if (lastIdx !== -1) {
+      weights[lastIdx] = (lastStreak >= PATTERN_MAX_STREAK)
+        ? 0
+        : Math.max(0, weights[lastIdx] - PATTERN_REPEAT_PENALTY);
+      var total = weights.reduce(function (a, b) { return a + b; }, 0);
+      for (var j = 0; j < n; j++) weights[j] /= total;
+    }
+
+    var r = Math.random();
+    var cum = 0;
+    for (var k = 0; k < n; k++) {
+      cum += weights[k];
+      if (r < cum) return k;
+    }
+    return n - 1; // floating-point fallback
+  }
+
   var PlatScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
@@ -118,6 +149,8 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.clouds     = [];
       this.player     = null;
       this.nextChunkX = W + 300; // clear runway before the first pattern
+      this.lastPatternIdx    = -1; // [PATTERNS] index of the last-spawned pattern
+      this.lastPatternStreak = 0;  // [PATTERNS] how many times it's repeated in a row
       this.wordTimer  = 0; // [WORDS] ms accumulated since the last word spawn
       this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
       this.slideHeld  = false; // true while the mobile slide button is pressed
@@ -271,10 +304,19 @@ function createPlatformerGame(words, callbacks, difficulty) {
     },
 
     // [PATTERNS] Spawns a random pattern at world-x startX, shifting every
-    // piece's relative offset into world space. Fully random each time —
-    // the same pattern can repeat back-to-back, no need to see all 3 first.
+    // piece's relative offset into world space. Weighted-random pick via
+    // pickPatternIndex() — repeats are discouraged (see PATTERN_REPEAT_PENALTY)
+    // and hard-capped at PATTERN_MAX_STREAK in a row.
     spawnPattern: function (startX) {
-      var pat = PATTERNS[Math.floor(Math.random() * PATTERNS.length)];
+      var idx = pickPatternIndex(this.lastPatternIdx, this.lastPatternStreak);
+      if (idx === this.lastPatternIdx) {
+        this.lastPatternStreak++;
+      } else {
+        this.lastPatternIdx = idx;
+        this.lastPatternStreak = 1;
+      }
+
+      var pat = PATTERNS[idx];
       var self = this;
       pat.gaps.forEach(function (gp) {
         self.gaps.push({ x: startX + gp.x, w: gp.w });
