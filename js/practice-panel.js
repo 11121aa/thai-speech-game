@@ -10,6 +10,12 @@ const PracticePanel = (function () {
   let continueTimer = null;
   let wired = false;
 
+  // Multi-rep capture state (see openMultiRep)
+  let multiTotal = 1;
+  let multiSegments = []; // [{ blob, url }]
+  let multiHoldController = null;
+  let multiIsHolding = false;
+
   function el(id) {
     return document.getElementById(id);
   }
@@ -31,6 +37,14 @@ const PracticePanel = (function () {
       el("ppBtnRetry").addEventListener("click", resetForRetry);
       el("ppBtnSkip").addEventListener("click", function () { modal.hide(); });
       modalEl.addEventListener("hidden.bs.modal", onModalHidden);
+
+      const micHoldBtn = el("ppBtnMicHold");
+      micHoldBtn.addEventListener("pointerdown", onMultiHoldStart);
+      micHoldBtn.addEventListener("pointerup", onMultiHoldEnd);
+      micHoldBtn.addEventListener("pointerleave", onMultiHoldEnd);
+      micHoldBtn.addEventListener("pointercancel", onMultiHoldEnd);
+      el("ppBtnMultiRedo").addEventListener("click", onMultiRedo);
+      el("ppBtnMultiDone").addEventListener("click", onMultiDone);
     }
   }
 
@@ -38,17 +52,9 @@ const PracticePanel = (function () {
     return null;
   }
 
-  async function open(word, cbs) {
-    const session = await Auth.getSession();
-    if (!session) {
-      const page = location.pathname.split("/").pop() || "game.html";
-      location.href = "login.html?redirect=" + encodeURIComponent(page);
-      return;
-    }
-    ensureModal();
-    currentWord = word;
-    callbacks = cbs || {};
-
+  // Shared word-display setup (picture, title, mouth animation) used by
+  // both the single-rep flow (open) and the multi-rep flow (openMultiRep).
+  function setupWordDisplay(word) {
     // Picture priority: the word's own uploaded image > the legacy
     // generated-illustration manifest (kept alive for older words that
     // predate the upload feature) > the emoji fallback.
@@ -62,18 +68,11 @@ const PracticePanel = (function () {
     }
     el("ppWord").textContent = word.word;
     el("ppReading").textContent = word.level || "";
-    const repCounter = el("ppRepCounter");
-    if (cbs && cbs.repTotal > 1) {
-      repCounter.textContent = "ครั้งที่ " + cbs.repIndex + " จาก " + cbs.repTotal;
-      repCounter.style.display = "block";
-    } else {
-      repCounter.style.display = "none";
-    }
+
     // Animation box: animation > picture > hidden. The mouth-animation
     // clip is uploaded per sound (see management.html's Sounds tab) and
     // comes through on the nested `sounds` join from WordsApi.fetchAllWords().
     const animUrl = word.sounds && word.sounds.mouth_animation_url;
-    console.log('[mouth animation] word:', word.word, 'letter_category:', word.letter_category, 'sound_id:', word.sound_id, 'sounds join:', word.sounds, 'animUrl:', animUrl);
     const animSvg = animUrl ? '<img src="' + animUrl + '" alt="ปากเสียง ' + word.letter_category + '" style="width:100%;height:100%;display:block;">' : null;
     const animBox = el("ppMouthAnimation");
     if (animBox) {
@@ -98,8 +97,48 @@ const PracticePanel = (function () {
       diag.style.display = "flex";
       diag.innerHTML = '<div class="mouth-diagram-icon">' + mouth.icon + "</div><div>" + mouth.label + "</div>";
     }
+  }
+
+  async function open(word, cbs) {
+    const session = await Auth.getSession();
+    if (!session) {
+      const page = location.pathname.split("/").pop() || "game.html";
+      location.href = "login.html?redirect=" + encodeURIComponent(page);
+      return;
+    }
+    ensureModal();
+    currentWord = word;
+    callbacks = cbs || {};
+    setupWordDisplay(word);
+
+    const repCounter = el("ppRepCounter");
+    if (cbs && cbs.repTotal > 1) {
+      repCounter.textContent = "ครั้งที่ " + cbs.repIndex + " จาก " + cbs.repTotal;
+      repCounter.style.display = "block";
+    } else {
+      repCounter.style.display = "none";
+    }
 
     resetPanelState();
+    modal.show();
+    startCameraMirror();
+  }
+
+  async function openMultiRep(word, cbs) {
+    const session = await Auth.getSession();
+    if (!session) {
+      const page = location.pathname.split("/").pop() || "game.html";
+      location.href = "login.html?redirect=" + encodeURIComponent(page);
+      return;
+    }
+    ensureModal();
+    currentWord = word;
+    callbacks = cbs || {};
+    multiTotal = (cbs && cbs.total) || 1;
+    setupWordDisplay(word);
+    el("ppRepCounter").style.display = "none";
+
+    resetMultiCaptureState();
     modal.show();
     startCameraMirror();
   }
@@ -119,11 +158,143 @@ const PracticePanel = (function () {
     el("ppWaveCanvas").style.display = "";
     el("ppBtnMic").style.display = "";
     el("ppRecordHint").style.display = "";
+    el("ppMultiCapture").style.display = "none";
     if (continueTimer) {
       clearTimeout(continueTimer);
       continueTimer = null;
     }
     resetMicButton();
+  }
+
+  function resetMultiCaptureState() {
+    el("ppPlaybackArea").style.display = "none";
+    el("ppErrorMsg").style.display = "none";
+    var ps = el("ppPracticeStage");
+    if (ps) ps.style.display = "";
+    el("ppBtnListen").style.display = (callbacks.showListen === false || !(currentWord && currentWord.sound_url)) ? "none" : "";
+
+    el("ppWaveCanvas").style.display = "";
+    el("ppBtnMic").style.display = "none";
+    el("ppRecordHint").style.display = "none";
+    el("ppMultiCapture").style.display = "block";
+
+    multiSegments.forEach(function (s) { if (s.url) URL.revokeObjectURL(s.url); });
+    multiSegments = [];
+    renderMultiCards();
+    resetMultiMicButton();
+  }
+
+  function resetMultiMicButton() {
+    multiIsHolding = false;
+    const btn = el("ppBtnMicHold");
+    btn.classList.remove("recording");
+    btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+    el("ppMultiHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
+  }
+
+  function renderMultiCards() {
+    const wrap = el("ppMultiCards");
+    wrap.innerHTML = "";
+    multiSegments.forEach(function (seg, i) {
+      const card = document.createElement("div");
+      card.style.cssText = "background:var(--color-bg-soft);border-radius:12px;padding:6px 8px;display:flex;align-items:center;gap:6px;";
+      card.innerHTML =
+        '<span style="font-weight:700;">' + (i + 1) + '</span>' +
+        '<button class="btn btn-sm btn-outline-primary py-0 px-2" data-idx="' + i + '" data-act="play">▶</button>' +
+        '<button class="btn btn-sm btn-outline-danger py-0 px-2" data-idx="' + i + '" data-act="del">ลบ</button>';
+      wrap.appendChild(card);
+    });
+    el("ppMultiProgress").textContent = multiSegments.length + " / " + multiTotal;
+    el("ppBtnMultiDone").disabled = multiSegments.length !== multiTotal;
+
+    wrap.querySelectorAll('[data-act="play"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const seg = multiSegments[parseInt(btn.getAttribute("data-idx"), 10)];
+        if (seg) new Audio(seg.url).play();
+      });
+    });
+    wrap.querySelectorAll('[data-act="del"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const idx = parseInt(btn.getAttribute("data-idx"), 10);
+        const seg = multiSegments[idx];
+        if (seg && seg.url) URL.revokeObjectURL(seg.url);
+        multiSegments.splice(idx, 1);
+        renderMultiCards();
+      });
+    });
+  }
+
+  function onMultiHoldStart(e) {
+    e.preventDefault();
+    if (multiIsHolding) return;
+    multiIsHolding = true;
+    const btn = el("ppBtnMicHold");
+    btn.classList.add("recording");
+    btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
+    el("ppMultiHint").textContent = "กำลังอัดเสียง... ปล่อยปุ่มเมื่อพูดเสร็จ";
+    el("ppErrorMsg").style.display = "none";
+
+    multiHoldController = Recorder.startHoldRecording(
+      el("ppWaveCanvas"),
+      function (blob, mimeType, segments) {
+        resetMultiMicButton();
+        if (!segments.length) return; // held the button but never actually spoke -- nothing to add
+        Recorder.sliceBlobToWavSegments(blob, segments).then(function (wavBlobs) {
+          wavBlobs.forEach(function (wavBlob) {
+            multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob) });
+          });
+          renderMultiCards();
+        }).catch(function () {
+          showError("เกิดข้อผิดพลาดในการประมวลผลเสียง กรุณาลองใหม่");
+        });
+      },
+      function () {
+        resetMultiMicButton();
+        showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
+      }
+    );
+  }
+
+  function onMultiHoldEnd(e) {
+    if (e) e.preventDefault();
+    if (!multiIsHolding) return;
+    if (multiHoldController) multiHoldController.stop();
+  }
+
+  function onMultiRedo() {
+    if (multiIsHolding && multiHoldController) multiHoldController.cancel();
+    multiSegments.forEach(function (s) { if (s.url) URL.revokeObjectURL(s.url); });
+    multiSegments = [];
+    renderMultiCards();
+    resetMultiMicButton();
+  }
+
+  async function onMultiDone() {
+    if (multiSegments.length !== multiTotal) return;
+    const btn = el("ppBtnMultiDone");
+    btn.disabled = true;
+    btn.textContent = "กำลังบันทึก...";
+    try {
+      const session = await Auth.getSession();
+      const extra = {};
+      if (callbacks.hwAssignmentId) extra.homework_assignment_id = callbacks.hwAssignmentId;
+      if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
+
+      for (let i = 0; i < multiSegments.length; i++) {
+        const result = await Recorder.uploadAndSavePractice(
+          multiSegments[i].blob, currentWord.id, session.user.id, "audio/wav",
+          Object.keys(extra).length ? extra : undefined
+        );
+        await sb.from("practice").update({ parent_marked_correct: true }).eq("id", result.id);
+      }
+
+      if (callbacks.onCorrect) callbacks.onCorrect();
+      modal.hide();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "เสร็จแล้ว";
+      showError("เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่");
+    }
   }
 
   function resetForRetry() {
@@ -277,9 +448,17 @@ const PracticePanel = (function () {
       recordController.cancel();
       recordController = null;
     }
+    if (multiHoldController) {
+      multiHoldController.cancel();
+      multiHoldController = null;
+    }
+    multiSegments.forEach(function (s) { if (s.url) URL.revokeObjectURL(s.url); });
+    multiSegments = [];
     resetMicButton();
+    resetMultiMicButton();
+    el("ppMultiCapture").style.display = "none";
     if (callbacks.onClosed) callbacks.onClosed();
   }
 
-  return { open: open };
+  return { open: open, openMultiRep: openMultiRep };
 })();
