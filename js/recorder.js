@@ -336,6 +336,13 @@ const Recorder = (function () {
 
           if (rms > SPEECH_THRESH) {
             if (!speechStartedAt) speechStartedAt = now;
+            if (silenceStartedAt) {
+              // Speech resumed before the silence gap was long enough to
+              // close the segment -- log how close it was, so tuning
+              // SILENCE_GAP_MS can be based on real numbers instead of a
+              // guess.
+              console.log("[multi-rep VAD] silence interrupted after " + (now - silenceStartedAt) + "ms (needs " + SILENCE_GAP_MS + "ms to split) at t=" + (now - recStartedAt) + "ms");
+            }
             silenceStartedAt = null;
           } else if (speechStartedAt && !silenceStartedAt) {
             silenceStartedAt = now;
@@ -345,6 +352,7 @@ const Recorder = (function () {
             const hadSpeechMs  = silenceStartedAt - speechStartedAt;
             const silenceLenMs = now - silenceStartedAt;
             if (hadSpeechMs >= MIN_SPEECH_MS && silenceLenMs >= SILENCE_GAP_MS) {
+              console.log("[multi-rep VAD] segment closed: spoke for " + hadSpeechMs + "ms, silence " + silenceLenMs + "ms, at t=" + (speechStartedAt - recStartedAt) + "-" + (silenceStartedAt - recStartedAt) + "ms");
               segments.push([speechStartedAt - recStartedAt, silenceStartedAt - recStartedAt]);
               speechStartedAt = null;
               silenceStartedAt = null;
