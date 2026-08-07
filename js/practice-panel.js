@@ -246,7 +246,7 @@ const PracticePanel = (function () {
         if (!segments.length) return; // held the button but never actually spoke -- nothing to add
         Recorder.sliceBlobToWavSegments(blob, segments).then(function (wavBlobs) {
           wavBlobs.forEach(function (wavBlob) {
-            multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false });
+            multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false, practiceId: null });
           });
           renderMultiCards();
         }).catch(function () {
@@ -286,14 +286,24 @@ const PracticePanel = (function () {
       if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
 
       for (let i = 0; i < multiSegments.length; i++) {
-        if (multiSegments[i].uploaded) continue; // already saved on an earlier attempt -- don't re-upload/duplicate on retry after a partial failure
-        const result = await Recorder.uploadAndSavePractice(
-          multiSegments[i].blob, currentWord.id, session.user.id, "audio/wav",
-          Object.keys(extra).length ? extra : undefined
-        );
-        const { error: markError } = await sb.from("practice").update({ parent_marked_correct: true }).eq("id", result.id);
+        const seg = multiSegments[i];
+        if (seg.uploaded) continue; // already fully saved on an earlier attempt
+
+        // practiceId is set as soon as the row exists, separately from
+        // `uploaded` (only set once parent_marked_correct also succeeds) --
+        // so a retry after the mark-correct step fails re-tries only that
+        // step against the row that already exists, instead of calling
+        // uploadAndSavePractice again and creating a duplicate row.
+        if (!seg.practiceId) {
+          const result = await Recorder.uploadAndSavePractice(
+            seg.blob, currentWord.id, session.user.id, "audio/wav",
+            Object.keys(extra).length ? extra : undefined
+          );
+          seg.practiceId = result.id;
+        }
+        const { error: markError } = await sb.from("practice").update({ parent_marked_correct: true }).eq("id", seg.practiceId);
         if (markError) throw markError;
-        multiSegments[i].uploaded = true;
+        seg.uploaded = true;
       }
 
       if (callbacks.onCorrect) callbacks.onCorrect();
