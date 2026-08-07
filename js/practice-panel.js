@@ -180,6 +180,11 @@ const PracticePanel = (function () {
 
     multiSegments.forEach(function (s) { if (s.url) URL.revokeObjectURL(s.url); });
     multiSegments = [];
+    // onMultiDone() relabels this button while saving; reset it here so a
+    // later word's capture screen doesn't inherit a stuck "กำลังบันทึก..."
+    // label from a previous successful submission.
+    var doneBtn = el("ppBtnMultiDone");
+    doneBtn.textContent = "เสร็จแล้ว";
     renderMultiCards();
     resetMultiMicButton();
   }
@@ -241,7 +246,7 @@ const PracticePanel = (function () {
         if (!segments.length) return; // held the button but never actually spoke -- nothing to add
         Recorder.sliceBlobToWavSegments(blob, segments).then(function (wavBlobs) {
           wavBlobs.forEach(function (wavBlob) {
-            multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob) });
+            multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false });
           });
           renderMultiCards();
         }).catch(function () {
@@ -281,11 +286,14 @@ const PracticePanel = (function () {
       if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
 
       for (let i = 0; i < multiSegments.length; i++) {
+        if (multiSegments[i].uploaded) continue; // already saved on an earlier attempt -- don't re-upload/duplicate on retry after a partial failure
         const result = await Recorder.uploadAndSavePractice(
           multiSegments[i].blob, currentWord.id, session.user.id, "audio/wav",
           Object.keys(extra).length ? extra : undefined
         );
-        await sb.from("practice").update({ parent_marked_correct: true }).eq("id", result.id);
+        const { error: markError } = await sb.from("practice").update({ parent_marked_correct: true }).eq("id", result.id);
+        if (markError) throw markError;
+        multiSegments[i].uploaded = true;
       }
 
       if (callbacks.onCorrect) callbacks.onCorrect();
