@@ -196,17 +196,11 @@ const PracticePanel = (function () {
     multiSegments = [];
     // onMultiDone() relabels this button while saving; reset it here so a
     // later word's capture screen doesn't inherit a stuck "กำลังบันทึก..."
-    // label from a previous successful submission.
+    // label from a previous successful submission. (Controls disabled
+    // during a save are re-enabled in onModalHidden, not here -- that
+    // covers every path back to a fresh modal, not just this one.)
     var doneBtn = el("ppBtnMultiDone");
     doneBtn.textContent = "เสร็จแล้ว";
-    // onMultiDone() only re-enables these on its failure path (a
-    // successful save closes the modal instead, so there's nothing to
-    // re-enable *there*) -- reset them here, on every new capture screen,
-    // so a successful submission doesn't leave the next word's controls
-    // permanently disabled. Must run before renderMultiCards(), which
-    // sets ppBtnMultiDone's own disabled state based on the (now-empty)
-    // segment count.
-    setMultiCaptureControlsEnabled(true);
     renderMultiCards();
     resetMultiMicButton();
   }
@@ -330,10 +324,18 @@ const PracticePanel = (function () {
   // otherwise a tap on ลบ, "อัดใหม่", the mic, or ✕ can let the game move
   // on to a new word while onMultiDone's loop is still running, uploading
   // its remaining segments against the *new* currentWord.
+  // Every lookup here is null-guarded: this needs to be safely callable
+  // from onModalHidden, which runs on every page that loads this module
+  // (including cooking.html/app.html, which lack the multi-rep markup --
+  // see ensureModal) and regardless of which flow (single-rep or
+  // multi-rep) is about to open next.
   function setMultiCaptureControlsEnabled(enabled) {
-    el("ppBtnMicHold").disabled = !enabled;
-    el("ppBtnMultiRedo").disabled = !enabled;
-    el("ppMultiCards").querySelectorAll("button").forEach(function (b) { b.disabled = !enabled; });
+    const micHoldBtn = el("ppBtnMicHold");
+    if (micHoldBtn) micHoldBtn.disabled = !enabled;
+    const redoBtn = el("ppBtnMultiRedo");
+    if (redoBtn) redoBtn.disabled = !enabled;
+    const cardsWrap = el("ppMultiCards");
+    if (cardsWrap) cardsWrap.querySelectorAll("button").forEach(function (b) { b.disabled = !enabled; });
     const skipBtn = el("ppBtnSkip");
     if (skipBtn) skipBtn.disabled = !enabled;
   }
@@ -562,6 +564,14 @@ const PracticePanel = (function () {
     multiSegments = [];
     resetMicButton();
     resetMultiMicButton();
+    // A save in progress when the modal closed left these disabled
+    // (see onMultiDone/setMultiCaptureControlsEnabled) -- reset here,
+    // on every close regardless of which flow opens next, rather than
+    // only in the multi-rep entry point. ppBtnSkip is shared with the
+    // single-rep flow, so fixing it only on the multi-rep side would
+    // still leave a single-rep game's ✕ dead after a multi-rep word
+    // that preceded it in the same session.
+    setMultiCaptureControlsEnabled(true);
     var multiCapture = el("ppMultiCapture");
     if (multiCapture) multiCapture.style.display = "none";
     if (callbacks.onClosed) callbacks.onClosed();
