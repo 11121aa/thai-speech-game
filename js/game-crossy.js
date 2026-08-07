@@ -371,11 +371,18 @@ function createCrossyGame(words, callbacks) {
 
               // Tween the camera to the knockback position instead of
               // snapping, matching the smooth scroll of a normal hop.
+              // Held under the same `moving` lock a normal hop uses, so
+              // an input within HOP_MS of a knockback can't start a
+              // second tween on scrollWorldRow while this one is still
+              // animating (both would write it every frame, jittering
+              // the camera until the first one finished).
+              self.moving = true;
               self.tweens.add({
                 targets: self,
                 scrollWorldRow: self.worldRow - ANCHOR_ROW_SLOT,
                 duration: HOP_MS,
-                ease:     'Power2Out'
+                ease:     'Power2Out',
+                onComplete: function () { self.moving = false; }
               });
             }
           });
