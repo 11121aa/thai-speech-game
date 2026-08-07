@@ -289,7 +289,10 @@ const Recorder = (function () {
           if (audioCtx.state !== "closed") audioCtx.close();
           // Close out whatever segment was still open when the hold ended
           // (released mid-utterance, before the silence-gap timer confirmed it).
-          if (speechStartedAt) {
+          // Same MIN_SPEECH_MS gate the in-loop close applies, so a mic
+          // pop or an accidental tap-and-release can't sneak in as a
+          // near-zero-length segment.
+          if (speechStartedAt && (Date.now() - speechStartedAt) >= MIN_SPEECH_MS) {
             segments.push([speechStartedAt - recStartedAt, Date.now() - recStartedAt]);
           }
           const blob = new Blob(chunks, { type: actualMime });
