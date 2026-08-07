@@ -254,23 +254,38 @@ const Recorder = (function () {
         const muteGain = audioCtx.createGain();
         muteGain.gain.value = 0;
         const pcmChunks = [];
+        // Running count of samples actually captured so far. ScriptProcessorNode
+        // runs its callback on the main thread; if the thread hasn't drained
+        // the previous callback in time (a GC pause, a slow frame elsewhere),
+        // that quantum's audio is silently dropped -- no event, no error. If
+        // segment boundaries were computed from wall-clock time instead, each
+        // drop would make every later boundary land progressively later than
+        // where the corresponding audio actually is in the captured array.
+        // Indexing by capturedSamples instead means a boundary always points
+        // at the sample that was actually captured at that transition,
+        // immune to drops, clock drift, or rAF throttling.
+        let capturedSamples = 0;
         processor.onaudioprocess = function (e) {
           pcmChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+          capturedSamples += e.inputBuffer.length;
         };
         source.connect(processor);
         processor.connect(muteGain);
         muteGain.connect(audioCtx.destination);
 
         const recStartedAt = Date.now();
-        const segments = [];         // completed [startMs, endMs] pairs
-        let speechStartedAt = null;
-        let silenceStartedAt = null;
+        const segments = [];         // completed [startSample, endSample] pairs
+        let speechStartedAt = null;      // wall-clock ms -- only used to decide MIN_SPEECH_MS/SILENCE_GAP_MS timing
+        let silenceStartedAt = null;     // wall-clock ms
+        let speechStartedSample = null;  // capturedSamples at the same transition -- what actually gets stored
+        let silenceStartedSample = null;
         let finished = false;
 
         finishRecording = function (invokeCallback) {
           if (finished) return;
           finished = true;
           if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
+          processor.onaudioprocess = null;
           processor.disconnect();
           source.disconnect();
           muteGain.disconnect();
@@ -287,7 +302,7 @@ const Recorder = (function () {
           // mic pop or an accidental tap-and-release can't sneak in as a
           // near-zero-length segment.
           if (speechStartedAt && (Date.now() - speechStartedAt) >= MIN_SPEECH_MS) {
-            segments.push([speechStartedAt - recStartedAt, Date.now() - recStartedAt]);
+            segments.push([speechStartedSample, capturedSamples]);
           }
 
           let totalLen = 0;
@@ -335,7 +350,7 @@ const Recorder = (function () {
           const now = Date.now();
 
           if (rms > SPEECH_THRESH) {
-            if (!speechStartedAt) speechStartedAt = now;
+            if (!speechStartedAt) { speechStartedAt = now; speechStartedSample = capturedSamples; }
             if (silenceStartedAt) {
               // Speech resumed before the silence gap was long enough to
               // close the segment -- log how close it was, so tuning
@@ -344,8 +359,10 @@ const Recorder = (function () {
               console.log("[multi-rep VAD] silence interrupted after " + (now - silenceStartedAt) + "ms (needs " + SILENCE_GAP_MS + "ms to split) at t=" + (now - recStartedAt) + "ms");
             }
             silenceStartedAt = null;
+            silenceStartedSample = null;
           } else if (speechStartedAt && !silenceStartedAt) {
             silenceStartedAt = now;
+            silenceStartedSample = capturedSamples;
           }
 
           if (speechStartedAt && silenceStartedAt) {
@@ -353,9 +370,11 @@ const Recorder = (function () {
             const silenceLenMs = now - silenceStartedAt;
             if (hadSpeechMs >= MIN_SPEECH_MS && silenceLenMs >= SILENCE_GAP_MS) {
               console.log("[multi-rep VAD] segment closed: spoke for " + hadSpeechMs + "ms, silence " + silenceLenMs + "ms, at t=" + (speechStartedAt - recStartedAt) + "-" + (silenceStartedAt - recStartedAt) + "ms");
-              segments.push([speechStartedAt - recStartedAt, silenceStartedAt - recStartedAt]);
+              segments.push([speechStartedSample, silenceStartedSample]);
               speechStartedAt = null;
               silenceStartedAt = null;
+              speechStartedSample = null;
+              silenceStartedSample = null;
             }
           }
 
@@ -374,6 +393,12 @@ const Recorder = (function () {
         // fails for any other reason) shouldn't surface an error against
         // whatever word the modal has since moved to.
         if (cancelled) return;
+        // If setup threw after getUserMedia resolved but before
+        // finishRecording was assigned (e.g. createScriptProcessor
+        // unsupported), the mic would otherwise stay live with no way to
+        // stop it until something else eventually calls cancel().
+        if (mediaStream) mediaStream.getTracks().forEach(function (t) { t.stop(); });
+        if (audioCtx && audioCtx.state !== "closed") audioCtx.close();
         onError(err);
       });
 
@@ -423,26 +448,39 @@ const Recorder = (function () {
     return new Blob([view], { type: "audio/wav" });
   }
 
-  // Slices one [startSec, endSec) window out of a full recording's raw
-  // Float32 PCM samples into its own standalone WAV blob.
-  function sliceToWav(samples, sampleRate, startSec, endSec) {
-    const startIdx = Math.max(0, Math.floor(startSec * sampleRate));
-    const endIdx = Math.min(samples.length, Math.ceil(endSec * sampleRate));
+  // Anything shorter than this is not a plausible real utterance -- if a
+  // slice ever comes out this short, something upstream indexed wrong
+  // (e.g. a boundary past the end of the captured samples), and producing
+  // a valid-but-silent WAV for it would upload that as if it were a real
+  // attempt with no visible error anywhere. Throwing surfaces it instead.
+  const MIN_SLICE_MS = 50;
+
+  // Slices one [startSample, endSample) window out of a full recording's
+  // raw Float32 PCM samples into its own standalone WAV blob. Indices are
+  // sample counts, not seconds/ms -- segments from startHoldRecording are
+  // already sample-indexed (see its capturedSamples comment for why).
+  function sliceToWav(samples, sampleRate, startSample, endSample) {
+    const startIdx = Math.max(0, Math.floor(startSample));
+    const endIdx = Math.min(samples.length, Math.ceil(endSample));
     const slice = samples.subarray(startIdx, endIdx);
+    const minSamples = Math.round(sampleRate * MIN_SLICE_MS / 1000);
+    if (slice.length < minSamples) {
+      throw new Error("Segment slice too short (" + slice.length + " samples, expected at least " + minSamples + ") -- refusing to produce a near-empty WAV.");
+    }
     return encodeWav(slice, sampleRate);
   }
 
   // Slices a full recording's raw PCM samples (as produced by
-  // startHoldRecording's onStop) into one WAV blob per [startMs, endMs]
-  // segment, each padded by padMs on either side (clamped to the
-  // recording's actual bounds by sliceToWav). Synchronous -- there's no
-  // decode step, the samples are already in memory.
+  // startHoldRecording's onStop) into one WAV blob per [startSample,
+  // endSample] segment, each padded by padMs worth of samples on either
+  // side (clamped to the recording's actual bounds by sliceToWav).
+  // Synchronous -- there's no decode step, the samples are already in
+  // memory.
   function sliceSamplesToWavSegments(samples, sampleRate, segments, padMs) {
     padMs = padMs || 150;
+    const padSamples = Math.round(sampleRate * padMs / 1000);
     return segments.map(function (seg) {
-      const startSec = Math.max(0, seg[0] - padMs) / 1000;
-      const endSec = (seg[1] + padMs) / 1000;
-      return sliceToWav(samples, sampleRate, startSec, endSec);
+      return sliceToWav(samples, sampleRate, seg[0] - padSamples, seg[1] + padSamples);
     });
   }
 
