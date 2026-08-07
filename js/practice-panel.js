@@ -199,6 +199,14 @@ const PracticePanel = (function () {
     // label from a previous successful submission.
     var doneBtn = el("ppBtnMultiDone");
     doneBtn.textContent = "เสร็จแล้ว";
+    // onMultiDone() only re-enables these on its failure path (a
+    // successful save closes the modal instead, so there's nothing to
+    // re-enable *there*) -- reset them here, on every new capture screen,
+    // so a successful submission doesn't leave the next word's controls
+    // permanently disabled. Must run before renderMultiCards(), which
+    // sets ppBtnMultiDone's own disabled state based on the (now-empty)
+    // segment count.
+    setMultiCaptureControlsEnabled(true);
     renderMultiCards();
     resetMultiMicButton();
   }
@@ -382,6 +390,7 @@ const PracticePanel = (function () {
       if (savingCallbacks.onCorrect) savingCallbacks.onCorrect();
       if (currentWord === savingWord) modal.hide(); // only close a modal that's still showing this same save
     } catch (err) {
+      if (currentWord !== savingWord) return; // this save's word isn't on screen anymore -- nothing here to repaint
       // Rebuild the cards first -- any segment that reached `uploaded`
       // before the failure needs its delete button gone (see
       // renderMultiCards), and this also gives the mic/redo buttons fresh,
