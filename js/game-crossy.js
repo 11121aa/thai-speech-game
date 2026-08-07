@@ -38,11 +38,18 @@ function createCrossyGame(words, callbacks) {
   // checkpoints cycle through the same hand-tuned filler rhythm the
   // original fixed board used (road, road, grass, road, road) so the
   // moment-to-moment feel is unchanged -- only "does it reset" changed.
-  var GOAL_SPACING     = 6;
-  var KNOCKBACK_ROWS   = 2;   // rows knocked back on a car hit
-  var ANCHOR_ROW_SLOT  = 6;   // frog's fixed screen row-slot (matches the old start row's position)
-  var GEN_BUFFER_ROWS  = 2;   // rows generated beyond each visible edge so scrolling never reveals a gap
-  var CLEANUP_MARGIN   = 2;   // rows kept beyond the visible window before being discarded
+  var GOAL_SPACING       = 6;
+  var KNOCKBACK_ROWS     = 2;   // rows knocked back on a car hit
+  var ANCHOR_ROW_SLOT    = 6;   // frog's fixed screen row-slot (matches the old start row's position)
+  var GEN_BUFFER_ROWS    = 2;   // rows generated beyond each visible edge so scrolling never reveals a gap
+  var CLEANUP_MARGIN     = 2;   // rows kept beyond the visible window before being discarded
+  // Because the camera re-settles the frog at ANCHOR_ROW_SLOT after every
+  // hop, a backward cap measured from the current camera position always
+  // equals the frog's own row -- there is no way to bound backward travel
+  // relative to the camera. MAX_BACKWARD_SLACK instead bounds it relative
+  // to the furthest-forward row ever reached (this.furthestWorldRow), which
+  // is a real, monotonically-improving reference point.
+  var MAX_BACKWARD_SLACK = 4;
 
   var FILLER_TEMPLATE = [
     { type: 'road',  dir:  1, speed: 2.2 },
@@ -79,16 +86,18 @@ function createCrossyGame(words, callbacks) {
     initialize: function () {
       Phaser.Scene.call(this, { key: 'crossy' });
 
-      this.charCol        = 5;                          // starting column
+      this.charCol         = 5;                          // starting column
       this.worldRow        = ANCHOR_ROW_SLOT;             // logical row position, unbounded
-      this.charX            = 0;                          // visual X (tweened smoothly between hops)
+      this.charX           = 0;                          // visual X (tweened smoothly between hops)
       this.scrollWorldRow  = this.worldRow - ANCHOR_ROW_SLOT; // camera position (tweened)
-      this.moving           = false;
-      this.isPaused         = false;
-      this.invincible       = 0;
-      this.rows             = {};   // worldRow (int) -> { worldRow, type, dir, speed, cars: [] }
-      this.wordIdx          = 0;
-      this.currentWord      = null;
+      this.moving          = false;
+      this.isPaused        = false;
+      this.invincible      = 0;
+      this.rows            = {};   // worldRow (int) -> { worldRow, type, dir, speed, cars: [] }
+      this.wordIdx         = 0;
+      this.currentWord     = null;
+      this.goalReached     = ANCHOR_ROW_SLOT; // lowest worldRow whose goal has already triggered practice
+      this.furthestWorldRow = ANCHOR_ROW_SLOT; // lowest worldRow ever reached (monotonic; bounds backward travel)
     },
 
     create: function () {
@@ -215,15 +224,17 @@ function createCrossyGame(words, callbacks) {
       var newRow = this.worldRow + dr;
 
       if (newCol < 0 || newCol >= COLS) return;
-      // Forward (smaller worldRow) is unlimited. Backward is capped at
-      // the edge of the already-generated buffer zone (not just the
-      // visible window) -- the frog re-settles at ANCHOR_ROW_SLOT after
-      // every hop, so a cap at the visible window's edge would equal the
-      // frog's own row and block backward movement entirely.
-      if (newRow > Math.floor(this.scrollWorldRow) + ROWS - 1 + GEN_BUFFER_ROWS) return;
+      // Forward (smaller worldRow) is unlimited. Backward is capped
+      // relative to furthestWorldRow (the best forward progress made so
+      // far), not the camera -- the camera re-settles the frog at
+      // ANCHOR_ROW_SLOT after every hop, so a cap measured from the
+      // camera's own position always equals the frog's current row and
+      // would block backward movement entirely.
+      if (newRow > this.furthestWorldRow + MAX_BACKWARD_SLACK) return;
 
       this.charCol  = newCol;
       this.worldRow = newRow;
+      if (newRow < this.furthestWorldRow) this.furthestWorldRow = newRow;
 
       var targetX         = newCol * CELL_W + CELL_W / 2;
       var targetScrollRow = newRow - ANCHOR_ROW_SLOT;
@@ -242,11 +253,16 @@ function createCrossyGame(words, callbacks) {
         onComplete: function () {
           self.moving = false;
           self.ensureRowsGenerated();
-          // Only re-check the goal on an actual row change (dr !== 0) --
-          // onReachGoal() no longer moves the frog off the goal row, so
-          // without this guard every sidestep taken while still standing
-          // on a goal row would reopen the practice modal.
-          if (dr !== 0 && rowDefAt(self.worldRow).type === 'goal') self.onReachGoal();
+          // Only trigger on an actual row change (dr !== 0) onto a goal
+          // row that hasn't already triggered practice (worldRow <
+          // goalReached) -- onReachGoal() no longer moves the frog off
+          // the goal row, so without both guards a sidestep, or a
+          // down-then-up shuffle back onto the same checkpoint, would
+          // reopen the practice modal and re-award points indefinitely.
+          if (dr !== 0 && self.worldRow < self.goalReached && rowDefAt(self.worldRow).type === 'goal') {
+            self.goalReached = self.worldRow;
+            self.onReachGoal();
+          }
         }
       });
 
@@ -323,6 +339,8 @@ function createCrossyGame(words, callbacks) {
           var charBot    = rowScreenY + CELL_H / 2 + CELL_H * 0.38;
 
           currentRow.cars.forEach(function (car) {
+            if (self.invincible > 0) return; // one hit per frame even if two cars overlap the frog at once
+
             var carLeft  = car.x;
             var carRight = car.x + car.w;
             var carTop   = rowScreenY + 5;
@@ -334,15 +352,31 @@ function createCrossyGame(words, callbacks) {
               if (callbacks.onTime) callbacks.onTime(-5);
               self.showPop(self.charX, ANCHOR_ROW_SLOT * CELL_H + CELL_H / 2 - 30, '-5s 💥');
 
+              // A hit can land mid-hop (collision is checked every frame,
+              // not just when settled). The in-flight hop tween must be
+              // killed before applying knockback -- otherwise Phaser keeps
+              // interpolating scrollWorldRow toward its pre-hit target on
+              // every following frame, silently undoing the assignment
+              // below the instant it's made. Resettle charX to the current
+              // column's centre so the frog isn't left half-tweened.
+              self.tweens.killTweensOf(self);
+              self.moving = false;
+              self.charX  = self.charCol * CELL_W + CELL_W / 2;
+
               // Knock back a few rows instead of resetting to the start --
-              // clamped to the already-generated buffer zone, same as the
-              // backward-hop boundary in tryMove(). A cap at the visible
-              // window's edge alone would equal the frog's own row when
-              // stationary (the common case for a collision), silently
-              // preventing any knockback at all.
-              var maxBackRow = Math.floor(self.scrollWorldRow) + ROWS - 1 + GEN_BUFFER_ROWS;
-              self.worldRow = Math.min(self.worldRow + KNOCKBACK_ROWS, maxBackRow);
-              self.scrollWorldRow = self.worldRow - ANCHOR_ROW_SLOT;
+              // clamped relative to furthestWorldRow (see MAX_BACKWARD_SLACK),
+              // the same real, camera-independent bound tryMove() uses.
+              var maxBackRow = self.furthestWorldRow + MAX_BACKWARD_SLACK;
+              self.worldRow  = Math.min(self.worldRow + KNOCKBACK_ROWS, maxBackRow);
+
+              // Tween the camera to the knockback position instead of
+              // snapping, matching the smooth scroll of a normal hop.
+              self.tweens.add({
+                targets: self,
+                scrollWorldRow: self.worldRow - ANCHOR_ROW_SLOT,
+                duration: HOP_MS,
+                ease:     'Power2Out'
+              });
             }
           });
         }
