@@ -187,13 +187,28 @@ const Recorder = (function () {
   // timestamp pair (relative to recording start) as its own segment --
   // so a single hold can still yield more than one segment if multiple
   // words are spoken before releasing.
+  // Captures raw PCM samples directly via a ScriptProcessorNode, instead of
+  // recording into a MediaRecorder/WebM blob and decoding it back out
+  // afterward. Browsers' AudioContext.decodeAudioData() frequently cannot
+  // decode WebM/Opus blobs MediaRecorder produces -- confirmed by hand
+  // during first real-device testing ("EncodingError: Unable to decode
+  // audio data" on a valid, non-empty, correctly-typed blob that plays
+  // back fine through a plain <audio> element). MediaRecorder streams a
+  // "live" WebM that never had reason to include the duration/seek
+  // metadata a stricter decoder like decodeAudioData expects, so this
+  // isn't a bug to patch around -- it's the wrong tool for needing the
+  // samples back out programmatically. Capturing them as they arrive
+  // sidesteps that decoder (and the whole blob/mimeType/decode step)
+  // entirely, and makes slicing a synchronous array operation afterward.
   function startHoldRecording(canvas, onStop, onError) {
     const rafHolder = { id: null };
     let audioCtx = null;
     let mediaStream = null;
-    let mediaRecorder = null;
-    const chunks = [];
-    const mimeType = getSupportedMimeType();
+    // Set once getUserMedia() resolves and the processing graph is live;
+    // calling it ends the recording and is what stop()/cancel() actually
+    // invoke. invokeCallback distinguishes stop() (finish and call onStop)
+    // from cancel() (tear down silently, never call onStop).
+    let finishRecording = null;
 
     // getUserMedia() can take an arbitrary amount of time to resolve --
     // notably, the browser's permission prompt on first use. stop()/cancel()
@@ -209,6 +224,7 @@ const Recorder = (function () {
     const MIN_SPEECH_MS  = 300;  // shorter than startRecording's 600ms -- reps said quickly in one hold are still short utterances
     const SILENCE_GAP_MS = 350;  // gap length that closes out one segment and allows the next to start
     const MAX_HOLD_MS    = 15000; // safety cap regardless of input, in case a hold is never released
+    const PROCESSOR_BUFFER_SIZE = 4096;
 
     navigator.mediaDevices
       .getUserMedia({ audio: true })
@@ -230,10 +246,62 @@ const Recorder = (function () {
         source.connect(analyser);
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+        // ScriptProcessorNode only reliably fires onaudioprocess while
+        // connected into a graph that reaches the destination -- routed
+        // through a silent (gain=0) node so the mic isn't also played
+        // back out the speakers while recording.
+        const processor = audioCtx.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
+        const muteGain = audioCtx.createGain();
+        muteGain.gain.value = 0;
+        const pcmChunks = [];
+        processor.onaudioprocess = function (e) {
+          pcmChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+        };
+        source.connect(processor);
+        processor.connect(muteGain);
+        muteGain.connect(audioCtx.destination);
+
         const recStartedAt = Date.now();
         const segments = [];         // completed [startMs, endMs] pairs
         let speechStartedAt = null;
         let silenceStartedAt = null;
+        let finished = false;
+
+        finishRecording = function (invokeCallback) {
+          if (finished) return;
+          finished = true;
+          if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
+          processor.disconnect();
+          source.disconnect();
+          muteGain.disconnect();
+          mediaStream.getTracks().forEach(function (t) { t.stop(); });
+
+          if (!invokeCallback) {
+            if (audioCtx.state !== "closed") audioCtx.close();
+            return;
+          }
+
+          // Close out whatever segment was still open when the hold ended
+          // (released mid-utterance, before the silence-gap timer confirmed
+          // it). Same MIN_SPEECH_MS gate the in-loop close applies, so a
+          // mic pop or an accidental tap-and-release can't sneak in as a
+          // near-zero-length segment.
+          if (speechStartedAt && (Date.now() - speechStartedAt) >= MIN_SPEECH_MS) {
+            segments.push([speechStartedAt - recStartedAt, Date.now() - recStartedAt]);
+          }
+
+          let totalLen = 0;
+          for (let i = 0; i < pcmChunks.length; i++) totalLen += pcmChunks[i].length;
+          const samples = new Float32Array(totalLen);
+          let offset = 0;
+          for (let j = 0; j < pcmChunks.length; j++) {
+            samples.set(pcmChunks[j], offset);
+            offset += pcmChunks[j].length;
+          }
+          const sampleRate = audioCtx.sampleRate;
+          if (audioCtx.state !== "closed") audioCtx.close();
+          onStop(samples, sampleRate, segments);
+        };
 
         function loop() {
           rafHolder.id = requestAnimationFrame(loop);
@@ -283,43 +351,15 @@ const Recorder = (function () {
             }
           }
 
-          if (now - recStartedAt >= MAX_HOLD_MS && mediaRecorder && mediaRecorder.state !== "inactive") {
-            cancelAnimationFrame(rafHolder.id);
-            rafHolder.id = null;
-            mediaRecorder.stop();
-          }
+          if (now - recStartedAt >= MAX_HOLD_MS) finishRecording(true);
         }
         loop();
 
-        mediaRecorder = mimeType
-          ? new MediaRecorder(stream, { mimeType: mimeType })
-          : new MediaRecorder(stream);
-        const actualMime = mediaRecorder.mimeType || mimeType || "audio/webm";
-
-        mediaRecorder.ondataavailable = function (e) {
-          if (e.data.size > 0) chunks.push(e.data);
-        };
-        mediaRecorder.onstop = function () {
-          if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
-          mediaStream.getTracks().forEach(function (t) { t.stop(); });
-          if (audioCtx.state !== "closed") audioCtx.close();
-          // Close out whatever segment was still open when the hold ended
-          // (released mid-utterance, before the silence-gap timer confirmed it).
-          // Same MIN_SPEECH_MS gate the in-loop close applies, so a mic
-          // pop or an accidental tap-and-release can't sneak in as a
-          // near-zero-length segment.
-          if (speechStartedAt && (Date.now() - speechStartedAt) >= MIN_SPEECH_MS) {
-            segments.push([speechStartedAt - recStartedAt, Date.now() - recStartedAt]);
-          }
-          const blob = new Blob(chunks, { type: actualMime });
-          onStop(blob, actualMime, segments);
-        };
-        mediaRecorder.start();
         // stop() ran before permission resolved -- honor it now instead of
-        // recording unattended. The normal onstop path still runs (with
+        // recording unattended. The normal finish path still runs (with
         // essentially no captured audio), so cleanup and the caller's
         // callback happen exactly the same way as any other stop.
-        if (stopRequested) mediaRecorder.stop();
+        if (stopRequested) finishRecording(true);
       })
       .catch(function (err) {
         // A cancelled hold whose permission request is then denied (or
@@ -332,18 +372,16 @@ const Recorder = (function () {
     return {
       stop: function () {
         stopRequested = true;
-        if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+        if (finishRecording) finishRecording(true);
       },
       cancel: function () {
         cancelled = true;
-        if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-          mediaRecorder.ondataavailable = null;
-          mediaRecorder.onstop = null;
-          mediaRecorder.stop();
+        if (finishRecording) {
+          finishRecording(false);
+        } else if (mediaStream) {
+          mediaStream.getTracks().forEach(function (t) { t.stop(); });
+          if (audioCtx && audioCtx.state !== "closed") audioCtx.close();
         }
-        if (mediaStream) mediaStream.getTracks().forEach(function (t) { t.stop(); });
-        if (audioCtx && audioCtx.state !== "closed") audioCtx.close();
       }
     };
   }
@@ -377,35 +415,27 @@ const Recorder = (function () {
     return new Blob([view], { type: "audio/wav" });
   }
 
-  // Slices one [startSec, endSec) window of channel-0 samples out of a
-  // decoded AudioBuffer into its own standalone WAV blob.
-  function sliceToWav(audioBuffer, startSec, endSec) {
-    const sr = audioBuffer.sampleRate;
-    const startIdx = Math.max(0, Math.floor(startSec * sr));
-    const endIdx = Math.min(audioBuffer.length, Math.ceil(endSec * sr));
-    const channelData = audioBuffer.getChannelData(0);
-    const slice = channelData.subarray(startIdx, endIdx);
-    return encodeWav(slice, sr);
+  // Slices one [startSec, endSec) window out of a full recording's raw
+  // Float32 PCM samples into its own standalone WAV blob.
+  function sliceToWav(samples, sampleRate, startSec, endSec) {
+    const startIdx = Math.max(0, Math.floor(startSec * sampleRate));
+    const endIdx = Math.min(samples.length, Math.ceil(endSec * sampleRate));
+    const slice = samples.subarray(startIdx, endIdx);
+    return encodeWav(slice, sampleRate);
   }
 
-  // Decodes a recorded blob once, then slices it into one WAV blob per
-  // [startMs, endMs] segment, each padded by padMs on either side (clamped
-  // to the recording's actual bounds by sliceToWav).
-  function sliceBlobToWavSegments(blob, segments, padMs) {
+  // Slices a full recording's raw PCM samples (as produced by
+  // startHoldRecording's onStop) into one WAV blob per [startMs, endMs]
+  // segment, each padded by padMs on either side (clamped to the
+  // recording's actual bounds by sliceToWav). Synchronous -- there's no
+  // decode step, the samples are already in memory.
+  function sliceSamplesToWavSegments(samples, sampleRate, segments, padMs) {
     padMs = padMs || 150;
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const decodeCtx = new AudioContextClass();
-    return blob.arrayBuffer()
-      .then(function (arrBuf) { return decodeCtx.decodeAudioData(arrBuf); })
-      .then(function (audioBuffer) {
-        const wavBlobs = segments.map(function (seg) {
-          const startSec = Math.max(0, seg[0] - padMs) / 1000;
-          const endSec = (seg[1] + padMs) / 1000;
-          return sliceToWav(audioBuffer, startSec, endSec);
-        });
-        decodeCtx.close();
-        return wavBlobs;
-      });
+    return segments.map(function (seg) {
+      const startSec = Math.max(0, seg[0] - padMs) / 1000;
+      const endSec = (seg[1] + padMs) / 1000;
+      return sliceToWav(samples, sampleRate, startSec, endSec);
+    });
   }
 
   async function uploadAndSavePractice(blob, wordId, userId, mimeType, extra) {
@@ -480,7 +510,7 @@ const Recorder = (function () {
   return {
     startRecording: startRecording,
     startHoldRecording: startHoldRecording,
-    sliceBlobToWavSegments: sliceBlobToWavSegments,
+    sliceSamplesToWavSegments: sliceSamplesToWavSegments,
     uploadAndSavePractice: uploadAndSavePractice,
     drawPlayback: drawPlayback
   };

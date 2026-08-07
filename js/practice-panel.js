@@ -285,20 +285,23 @@ const PracticePanel = (function () {
 
     multiHoldController = Recorder.startHoldRecording(
       el("ppWaveCanvas"),
-      function (blob, mimeType, segments) {
+      function (samples, sampleRate, segments) {
         resetMultiMicButton();
         if (currentWord !== heldWord) return; // modal moved on to a different word while this hold was pending
         if (!segments.length) return; // held the button but never actually spoke -- nothing to add
-        Recorder.sliceBlobToWavSegments(blob, segments).then(function (wavBlobs) {
-          if (currentWord !== heldWord) return; // re-check: the modal could have moved on during the async slice too
+        // Synchronous -- sliceSamplesToWavSegments works directly on the
+        // already-captured PCM, no decode step (see recorder.js for why
+        // that step was removed).
+        try {
+          const wavBlobs = Recorder.sliceSamplesToWavSegments(samples, sampleRate, segments);
           wavBlobs.forEach(function (wavBlob) {
             multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false, practiceId: null });
           });
           renderMultiCards();
-        }).catch(function (err) {
-          console.error("[multi-rep] sliceBlobToWavSegments failed:", err, "blob type:", blob && blob.type, "blob size:", blob && blob.size, "segments:", segments);
+        } catch (err) {
+          console.error("[multi-rep] sliceSamplesToWavSegments failed:", err, "sample count:", samples && samples.length, "sampleRate:", sampleRate, "segments:", segments);
           showError("เกิดข้อผิดพลาดในการประมวลผลเสียง กรุณาลองใหม่");
-        });
+        }
       },
       function () {
         resetMultiMicButton();
