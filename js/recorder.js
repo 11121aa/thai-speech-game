@@ -195,6 +195,16 @@ const Recorder = (function () {
     const chunks = [];
     const mimeType = getSupportedMimeType();
 
+    // getUserMedia() can take an arbitrary amount of time to resolve --
+    // notably, the browser's permission prompt on first use. stop()/cancel()
+    // called before it resolves would otherwise be silent no-ops (nothing
+    // to call them on yet), leaving an unstoppable recording that starts
+    // the moment permission is granted. These flags are checked once the
+    // promise resolves so a pre-resolution stop/cancel is honored instead
+    // of lost.
+    let cancelled = false;
+    let stopRequested = false;
+
     const SPEECH_THRESH  = 0.012;
     const MIN_SPEECH_MS  = 300;  // shorter than startRecording's 600ms -- reps said quickly in one hold are still short utterances
     const SILENCE_GAP_MS = 350;  // gap length that closes out one segment and allows the next to start
@@ -203,6 +213,12 @@ const Recorder = (function () {
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then(function (stream) {
+        if (cancelled) {
+          // cancel() ran before permission resolved -- never start
+          // anything, never call onStop.
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          return;
+        }
         mediaStream = stream;
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AudioContextClass();
@@ -299,6 +315,11 @@ const Recorder = (function () {
           onStop(blob, actualMime, segments);
         };
         mediaRecorder.start();
+        // stop() ran before permission resolved -- honor it now instead of
+        // recording unattended. The normal onstop path still runs (with
+        // essentially no captured audio), so cleanup and the caller's
+        // callback happen exactly the same way as any other stop.
+        if (stopRequested) mediaRecorder.stop();
       })
       .catch(function (err) {
         onError(err);
@@ -306,9 +327,11 @@ const Recorder = (function () {
 
     return {
       stop: function () {
+        stopRequested = true;
         if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       },
       cancel: function () {
+        cancelled = true;
         if (rafHolder.id) { cancelAnimationFrame(rafHolder.id); rafHolder.id = null; }
         if (mediaRecorder && mediaRecorder.state !== "inactive") {
           mediaRecorder.ondataavailable = null;

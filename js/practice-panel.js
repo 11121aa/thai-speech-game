@@ -38,13 +38,20 @@ const PracticePanel = (function () {
       el("ppBtnSkip").addEventListener("click", function () { modal.hide(); });
       modalEl.addEventListener("hidden.bs.modal", onModalHidden);
 
+      // The multi-rep capture markup only exists on pages built from
+      // game.html's practiceModal (cooking.html/app.html share this same
+      // module but predate this markup) -- guard so ensureModal() itself
+      // doesn't throw on those pages for callers that only ever use the
+      // single-rep open() flow.
       const micHoldBtn = el("ppBtnMicHold");
-      micHoldBtn.addEventListener("pointerdown", onMultiHoldStart);
-      micHoldBtn.addEventListener("pointerup", onMultiHoldEnd);
-      micHoldBtn.addEventListener("pointerleave", onMultiHoldEnd);
-      micHoldBtn.addEventListener("pointercancel", onMultiHoldEnd);
-      el("ppBtnMultiRedo").addEventListener("click", onMultiRedo);
-      el("ppBtnMultiDone").addEventListener("click", onMultiDone);
+      if (micHoldBtn) {
+        micHoldBtn.addEventListener("pointerdown", onMultiHoldStart);
+        micHoldBtn.addEventListener("pointerup", onMultiHoldEnd);
+        micHoldBtn.addEventListener("pointerleave", onMultiHoldEnd);
+        micHoldBtn.addEventListener("pointercancel", onMultiHoldEnd);
+        el("ppBtnMultiRedo").addEventListener("click", onMultiRedo);
+        el("ppBtnMultiDone").addEventListener("click", onMultiDone);
+      }
     }
   }
 
@@ -158,7 +165,11 @@ const PracticePanel = (function () {
     el("ppWaveCanvas").style.display = "";
     el("ppBtnMic").style.display = "";
     el("ppRecordHint").style.display = "";
-    el("ppMultiCapture").style.display = "none";
+    // Multi-rep markup only exists on pages built from game.html's
+    // practiceModal -- guard for cooking.html/app.html, which share this
+    // module's single-rep open() flow but predate this markup.
+    var multiCapture = el("ppMultiCapture");
+    if (multiCapture) multiCapture.style.display = "none";
     if (continueTimer) {
       clearTimeout(continueTimer);
       continueTimer = null;
@@ -191,7 +202,10 @@ const PracticePanel = (function () {
 
   function resetMultiMicButton() {
     multiIsHolding = false;
+    // Called unconditionally from onModalHidden on every page -- guard
+    // for cooking.html/app.html, which lack this markup (see ensureModal).
     const btn = el("ppBtnMicHold");
+    if (!btn) return;
     btn.classList.remove("recording");
     btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
     el("ppMultiHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
@@ -203,10 +217,17 @@ const PracticePanel = (function () {
     multiSegments.forEach(function (seg, i) {
       const card = document.createElement("div");
       card.style.cssText = "background:var(--color-bg-soft);border-radius:12px;padding:6px 8px;display:flex;align-items:center;gap:6px;";
+      // A segment that's already been uploaded (practiceId set) can't be
+      // discarded from here -- its practice row already exists in the DB,
+      // and this UI has no way to delete a row, only to avoid creating
+      // one. Only offer discard for segments still local-only.
+      const delBtn = seg.uploaded
+        ? ''
+        : '<button class="btn btn-sm btn-outline-danger py-0 px-2" data-idx="' + i + '" data-act="del">ลบ</button>';
       card.innerHTML =
         '<span style="font-weight:700;">' + (i + 1) + '</span>' +
         '<button class="btn btn-sm btn-outline-primary py-0 px-2" data-idx="' + i + '" data-act="play">▶</button>' +
-        '<button class="btn btn-sm btn-outline-danger py-0 px-2" data-idx="' + i + '" data-act="del">ลบ</button>';
+        delBtn;
       wrap.appendChild(card);
     });
     el("ppMultiProgress").textContent = multiSegments.length + " / " + multiTotal;
@@ -239,12 +260,21 @@ const PracticePanel = (function () {
     el("ppMultiHint").textContent = "กำลังอัดเสียง... ปล่อยปุ่มเมื่อพูดเสร็จ";
     el("ppErrorMsg").style.display = "none";
 
+    // getUserMedia() can resolve well after this call returns (notably,
+    // while a permission prompt is up). If the modal moved on to a
+    // different word in that window, this callback must not attribute its
+    // audio to the new currentWord -- capture which word this hold
+    // actually belongs to and bail if it no longer matches.
+    const heldWord = currentWord;
+
     multiHoldController = Recorder.startHoldRecording(
       el("ppWaveCanvas"),
       function (blob, mimeType, segments) {
         resetMultiMicButton();
+        if (currentWord !== heldWord) return; // modal moved on to a different word while this hold was pending
         if (!segments.length) return; // held the button but never actually spoke -- nothing to add
         Recorder.sliceBlobToWavSegments(blob, segments).then(function (wavBlobs) {
+          if (currentWord !== heldWord) return; // re-check: the modal could have moved on during the async slice too
           wavBlobs.forEach(function (wavBlob) {
             multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false, practiceId: null });
           });
@@ -268,10 +298,27 @@ const PracticePanel = (function () {
 
   function onMultiRedo() {
     if (multiIsHolding && multiHoldController) multiHoldController.cancel();
-    multiSegments.forEach(function (s) { if (s.url) URL.revokeObjectURL(s.url); });
-    multiSegments = [];
+    // Same rule as the per-card discard button: a segment that's already
+    // uploaded has a real practice row behind it that this UI can't
+    // delete, so "start over" only clears local-only segments, not ones
+    // already saved (e.g. after a partial upload failure).
+    multiSegments = multiSegments.filter(function (s) {
+      if (s.uploaded) return true;
+      if (s.url) URL.revokeObjectURL(s.url);
+      return false;
+    });
     renderMultiCards();
     resetMultiMicButton();
+  }
+
+  // Disables/re-enables every control that could mutate multiSegments or
+  // start a new hold while a save is in flight -- otherwise a tap on ลบ,
+  // "อัดใหม่", or the mic mid-upload can desync the array the upload loop
+  // is iterating (see onMultiDone).
+  function setMultiCaptureControlsEnabled(enabled) {
+    el("ppBtnMicHold").disabled = !enabled;
+    el("ppBtnMultiRedo").disabled = !enabled;
+    el("ppMultiCards").querySelectorAll("button").forEach(function (b) { b.disabled = !enabled; });
   }
 
   async function onMultiDone() {
@@ -279,14 +326,19 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMultiDone");
     btn.disabled = true;
     btn.textContent = "กำลังบันทึก...";
+    setMultiCaptureControlsEnabled(false);
     try {
       const session = await Auth.getSession();
       const extra = {};
       if (callbacks.hwAssignmentId) extra.homework_assignment_id = callbacks.hwAssignmentId;
       if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
 
-      for (let i = 0; i < multiSegments.length; i++) {
-        const seg = multiSegments[i];
+      // Snapshot the list being saved -- controls that could change it are
+      // disabled above, but iterating a stable copy is the cheap guarantee
+      // that a skipped/duplicated iteration can't happen even so.
+      const batch = multiSegments.slice();
+      for (let i = 0; i < batch.length; i++) {
+        const seg = batch[i];
         if (seg.uploaded) continue; // already fully saved on an earlier attempt
 
         // practiceId is set as soon as the row exists, separately from
@@ -309,6 +361,12 @@ const PracticePanel = (function () {
       if (callbacks.onCorrect) callbacks.onCorrect();
       modal.hide();
     } catch (err) {
+      // Rebuild the cards first -- any segment that reached `uploaded`
+      // before the failure needs its delete button gone (see
+      // renderMultiCards), and this also gives the mic/redo buttons fresh,
+      // enabled event listeners in one step.
+      renderMultiCards();
+      setMultiCaptureControlsEnabled(true);
       btn.disabled = false;
       btn.textContent = "เสร็จแล้ว";
       showError("เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่");
@@ -474,7 +532,8 @@ const PracticePanel = (function () {
     multiSegments = [];
     resetMicButton();
     resetMultiMicButton();
-    el("ppMultiCapture").style.display = "none";
+    var multiCapture = el("ppMultiCapture");
+    if (multiCapture) multiCapture.style.display = "none";
     if (callbacks.onClosed) callbacks.onClosed();
   }
 
