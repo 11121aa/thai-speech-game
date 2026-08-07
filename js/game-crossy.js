@@ -335,9 +335,12 @@ function createCrossyGame(words, callbacks) {
               self.showPop(self.charX, ANCHOR_ROW_SLOT * CELL_H + CELL_H / 2 - 30, '-5s 💥');
 
               // Knock back a few rows instead of resetting to the start --
-              // clamped so it can't go behind the bottom edge of the
-              // currently generated/visible window.
-              var maxBackRow = Math.floor(self.scrollWorldRow) + ROWS - 1;
+              // clamped to the already-generated buffer zone, same as the
+              // backward-hop boundary in tryMove(). A cap at the visible
+              // window's edge alone would equal the frog's own row when
+              // stationary (the common case for a collision), silently
+              // preventing any knockback at all.
+              var maxBackRow = Math.floor(self.scrollWorldRow) + ROWS - 1 + GEN_BUFFER_ROWS;
               self.worldRow = Math.min(self.worldRow + KNOCKBACK_ROWS, maxBackRow);
               self.scrollWorldRow = self.worldRow - ANCHOR_ROW_SLOT;
             }
