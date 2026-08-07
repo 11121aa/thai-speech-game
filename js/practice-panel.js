@@ -173,6 +173,12 @@ const PracticePanel = (function () {
     // module's single-rep open() flow but predate this markup.
     var multiCapture = el("ppMultiCapture");
     if (multiCapture) multiCapture.style.display = "none";
+    // Belt-and-braces: onModalHidden is what actually re-enables controls
+    // a save left disabled, but that only runs on an intervening hide.
+    // Not currently reachable without one, but cheap and idempotent
+    // (see setMultiCaptureControlsEnabled's null guards) to also reset
+    // here at the point a fresh panel is about to be shown.
+    setMultiCaptureControlsEnabled(true);
     if (continueTimer) {
       clearTimeout(continueTimer);
       continueTimer = null;
@@ -197,8 +203,11 @@ const PracticePanel = (function () {
     // onMultiDone() relabels this button while saving; reset it here so a
     // later word's capture screen doesn't inherit a stuck "กำลังบันทึก..."
     // label from a previous successful submission. (Controls disabled
-    // during a save are re-enabled in onModalHidden, not here -- that
-    // covers every path back to a fresh modal, not just this one.)
+    // during a save are primarily re-enabled in onModalHidden, which
+    // covers every path back to a fresh modal, not just this one -- the
+    // call below is belt-and-braces for a re-open without an intervening
+    // hide, not currently reachable but cheap and idempotent.)
+    setMultiCaptureControlsEnabled(true);
     var doneBtn = el("ppBtnMultiDone");
     doneBtn.textContent = "เสร็จแล้ว";
     renderMultiCards();
