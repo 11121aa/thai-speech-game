@@ -121,6 +121,12 @@
               <label class="form-label fw-semibold small mb-1">อายุ</label>
               <input type="number" class="form-control form-control-sm" id="editAge" min="1" max="120">
             </div>
+            <div class="mb-2 form-check">
+              <input type="checkbox" class="form-check-input" id="editRecordRepsTogether">
+              <label class="form-check-label small" for="editRecordRepsTogether">
+                พูดซ้ำในครั้งเดียว (อัดเสียงต่อเนื่องแล้วแยกให้อัตโนมัติ แทนการกดอัดทีละครั้ง)
+              </label>
+            </div>
             <div class="d-flex gap-2 mb-2">
               <button class="btn btn-sm btn-warning flex-fill" id="btnSaveProfile">บันทึก</button>
               <button class="btn btn-sm btn-outline-secondary flex-fill" id="btnCancelEditProfile">ยกเลิก</button>
@@ -715,7 +721,7 @@ function ageGenderLabel(person) {
 
 async function initUserProfile(session) {
   console.log('[profile load] logged-in user_id:', session.user.id, 'email:', session.user.email);
-  var { data: profile, error: profileErr } = await sb.from('profiles').select('username, gender, age, avatar_url, avatar_emoji, avatar_color, avatar_color2, patient_code').eq('user_id', session.user.id).maybeSingle();
+  var { data: profile, error: profileErr } = await sb.from('profiles').select('username, gender, age, avatar_url, avatar_emoji, avatar_color, avatar_color2, patient_code, record_reps_together').eq('user_id', session.user.id).maybeSingle();
   console.log('[profile load] query result — data:', profile, 'error:', profileErr);
   var displayName = (profile && profile.username) || session.user.email;
   var initial = displayName ? displayName[0].toUpperCase() : '?';
@@ -890,6 +896,7 @@ function wireProfileEdit(session, profile) {
     document.getElementById('editUsername').value = (profile && profile.username) || '';
     document.getElementById('editGender').value = (profile && profile.gender) || 'male';
     document.getElementById('editAge').value = (profile && profile.age) || '';
+    document.getElementById('editRecordRepsTogether').checked = !profile || profile.record_reps_together !== false;
     displayEl.style.display = 'none';
     editEl.style.display = 'block';
   });
@@ -904,10 +911,11 @@ function wireProfileEdit(session, profile) {
     var gender = document.getElementById('editGender').value;
     var ageVal = parseInt(document.getElementById('editAge').value, 10);
     var age = isNaN(ageVal) ? null : ageVal;
+    var recordRepsTogether = document.getElementById('editRecordRepsTogether').checked;
 
     if (!username) { alert('กรุณากรอกชื่อผู้ใช้'); return; }
 
-    var payload = { user_id: session.user.id, username: username, gender: gender, age: age };
+    var payload = { user_id: session.user.id, username: username, gender: gender, age: age, record_reps_together: recordRepsTogether };
     console.log('[profile save] logged-in user_id:', session.user.id);
     console.log('[profile save] upsert payload:', payload);
 
