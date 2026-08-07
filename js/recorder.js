@@ -322,6 +322,10 @@ const Recorder = (function () {
         if (stopRequested) mediaRecorder.stop();
       })
       .catch(function (err) {
+        // A cancelled hold whose permission request is then denied (or
+        // fails for any other reason) shouldn't surface an error against
+        // whatever word the modal has since moved to.
+        if (cancelled) return;
         onError(err);
       });
 

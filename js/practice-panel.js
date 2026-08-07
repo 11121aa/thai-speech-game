@@ -40,9 +40,12 @@ const PracticePanel = (function () {
 
       // The multi-rep capture markup only exists on pages built from
       // game.html's practiceModal (cooking.html/app.html share this same
-      // module but predate this markup) -- guard so ensureModal() itself
-      // doesn't throw on those pages for callers that only ever use the
-      // single-rep open() flow.
+      // module but predate this markup) -- guard so wiring the new
+      // multi-rep controls doesn't throw on those pages. This does NOT
+      // make the single-rep flow work on cooking.html/app.html in
+      // general -- both already dereference other, unrelated pre-existing
+      // ids (ppBtnSkip, ppRepCounter) that they also lack, a bug that
+      // predates this branch and isn't fixed here.
       const micHoldBtn = el("ppBtnMicHold");
       if (micHoldBtn) {
         micHoldBtn.addEventListener("pointerdown", onMultiHoldStart);
@@ -217,11 +220,13 @@ const PracticePanel = (function () {
     multiSegments.forEach(function (seg, i) {
       const card = document.createElement("div");
       card.style.cssText = "background:var(--color-bg-soft);border-radius:12px;padding:6px 8px;display:flex;align-items:center;gap:6px;";
-      // A segment that's already been uploaded (practiceId set) can't be
-      // discarded from here -- its practice row already exists in the DB,
-      // and this UI has no way to delete a row, only to avoid creating
-      // one. Only offer discard for segments still local-only.
-      const delBtn = seg.uploaded
+      // A segment's practice row can exist (practiceId set) before
+      // `uploaded` is true -- uploaded only flips once the follow-up
+      // parent_marked_correct update also succeeds. Gate on either: a row
+      // exists the moment practiceId is set, and this UI has no way to
+      // delete a row, only to avoid creating one. Only offer discard for
+      // segments that are still purely local.
+      const delBtn = (seg.practiceId || seg.uploaded)
         ? ''
         : '<button class="btn btn-sm btn-outline-danger py-0 px-2" data-idx="' + i + '" data-act="del">ลบ</button>';
       card.innerHTML =
@@ -298,12 +303,13 @@ const PracticePanel = (function () {
 
   function onMultiRedo() {
     if (multiIsHolding && multiHoldController) multiHoldController.cancel();
-    // Same rule as the per-card discard button: a segment that's already
-    // uploaded has a real practice row behind it that this UI can't
-    // delete, so "start over" only clears local-only segments, not ones
-    // already saved (e.g. after a partial upload failure).
+    // Same rule as the per-card discard button (see renderMultiCards): a
+    // segment with a practiceId already has a real practice row behind it
+    // -- possibly still mid-retry if parent_marked_correct hasn't
+    // succeeded yet -- so "start over" only clears purely local segments,
+    // never one that's been uploaded or is in the middle of being marked.
     multiSegments = multiSegments.filter(function (s) {
-      if (s.uploaded) return true;
+      if (s.practiceId || s.uploaded) return true;
       if (s.url) URL.revokeObjectURL(s.url);
       return false;
     });
@@ -311,14 +317,17 @@ const PracticePanel = (function () {
     resetMultiMicButton();
   }
 
-  // Disables/re-enables every control that could mutate multiSegments or
-  // start a new hold while a save is in flight -- otherwise a tap on ลบ,
-  // "อัดใหม่", or the mic mid-upload can desync the array the upload loop
-  // is iterating (see onMultiDone).
+  // Disables/re-enables every control that could mutate multiSegments,
+  // start a new hold, or close the modal while a save is in flight --
+  // otherwise a tap on ลบ, "อัดใหม่", the mic, or ✕ can let the game move
+  // on to a new word while onMultiDone's loop is still running, uploading
+  // its remaining segments against the *new* currentWord.
   function setMultiCaptureControlsEnabled(enabled) {
     el("ppBtnMicHold").disabled = !enabled;
     el("ppBtnMultiRedo").disabled = !enabled;
     el("ppMultiCards").querySelectorAll("button").forEach(function (b) { b.disabled = !enabled; });
+    const skipBtn = el("ppBtnSkip");
+    if (skipBtn) skipBtn.disabled = !enabled;
   }
 
   async function onMultiDone() {
@@ -327,11 +336,23 @@ const PracticePanel = (function () {
     btn.disabled = true;
     btn.textContent = "กำลังบันทึก...";
     setMultiCaptureControlsEnabled(false);
+
+    // setMultiCaptureControlsEnabled disables every control this module
+    // knows about that could close the modal or advance the word, but it's
+    // still only a defense against *this* module's own controls -- it
+    // can't stop a caller from tearing the modal down some other way.
+    // Snapshotting what this save belongs to, and using the snapshot
+    // everywhere below instead of the live currentWord/callbacks, means
+    // even if that happens, this save still finishes against the word and
+    // callbacks it started with rather than whatever replaced them.
+    const savingWord = currentWord;
+    const savingCallbacks = callbacks;
+
     try {
       const session = await Auth.getSession();
       const extra = {};
-      if (callbacks.hwAssignmentId) extra.homework_assignment_id = callbacks.hwAssignmentId;
-      if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
+      if (savingCallbacks.hwAssignmentId) extra.homework_assignment_id = savingCallbacks.hwAssignmentId;
+      if (savingCallbacks.worksheetProgressId) extra.worksheet_progress_id = savingCallbacks.worksheetProgressId;
 
       // Snapshot the list being saved -- controls that could change it are
       // disabled above, but iterating a stable copy is the cheap guarantee
@@ -348,7 +369,7 @@ const PracticePanel = (function () {
         // uploadAndSavePractice again and creating a duplicate row.
         if (!seg.practiceId) {
           const result = await Recorder.uploadAndSavePractice(
-            seg.blob, currentWord.id, session.user.id, "audio/wav",
+            seg.blob, savingWord.id, session.user.id, "audio/wav",
             Object.keys(extra).length ? extra : undefined
           );
           seg.practiceId = result.id;
@@ -358,8 +379,8 @@ const PracticePanel = (function () {
         seg.uploaded = true;
       }
 
-      if (callbacks.onCorrect) callbacks.onCorrect();
-      modal.hide();
+      if (savingCallbacks.onCorrect) savingCallbacks.onCorrect();
+      if (currentWord === savingWord) modal.hide(); // only close a modal that's still showing this same save
     } catch (err) {
       // Rebuild the cards first -- any segment that reached `uploaded`
       // before the failure needs its delete button gone (see
