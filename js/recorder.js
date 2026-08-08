@@ -223,7 +223,14 @@ const Recorder = (function () {
 
     const SPEECH_THRESH  = 0.012;
     const MIN_SPEECH_MS  = 300;  // shorter than startRecording's 600ms -- reps said quickly in one hold are still short utterances
-    const SILENCE_GAP_MS = 350;  // gap length that closes out one segment and allows the next to start
+    // Measured from real usage (see VAD diagnostic logging above): natural
+    // pauses between quick repetitions of a word cluster mostly in the
+    // 15-220ms range and only occasionally approach 350ms, so 350ms almost
+    // never closed a segment -- an entire multi-repetition hold merged into
+    // one giant "segment" instead of splitting at each pause. Lowered to
+    // sit above typical within-word noise (observed under ~100ms) and
+    // below typical between-word pauses (observed 100-220ms+).
+    const SILENCE_GAP_MS = 150;  // gap length that closes out one segment and allows the next to start
     const MAX_HOLD_MS    = 15000; // safety cap regardless of input, in case a hold is never released
     const PROCESSOR_BUFFER_SIZE = 4096;
 
