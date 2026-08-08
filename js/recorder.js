@@ -183,10 +183,11 @@ const Recorder = (function () {
   // (no auto-stop threshold — the caller decides when to stop via
   // .stop()). While recording, the same RMS voice-activity approach
   // startRecording() uses keeps running, but instead of stopping at the
-  // first silence gap it logs each complete [speechStart, speechEnd]
-  // timestamp pair (relative to recording start) as its own segment --
-  // so a single hold can still yield more than one segment if multiple
-  // words are spoken before releasing.
+  // first silence gap it logs each complete speech/silence transition as
+  // its own segment, recorded as a [startSample, endSample] pair indexing
+  // into the captured PCM (see capturedSamples below for why samples, not
+  // timestamps) -- so a single hold can still yield more than one segment
+  // if multiple words are spoken before releasing.
   // Captures raw PCM samples directly via a ScriptProcessorNode, instead of
   // recording into a MediaRecorder/WebM blob and decoding it back out
   // afterward. Browsers' AudioContext.decodeAudioData() frequently cannot
@@ -476,12 +477,24 @@ const Recorder = (function () {
   // side (clamped to the recording's actual bounds by sliceToWav).
   // Synchronous -- there's no decode step, the samples are already in
   // memory.
+  //
+  // A single degenerate segment (sliceToWav's MIN_SLICE_MS guard) is
+  // skipped rather than aborting the whole hold -- the caller already
+  // shows a running count of confirmed segments and lets the user hold
+  // again to add more, so losing one bad segment out of several just
+  // means one fewer card instead of throwing away an entire take.
   function sliceSamplesToWavSegments(samples, sampleRate, segments, padMs) {
     padMs = padMs || 150;
     const padSamples = Math.round(sampleRate * padMs / 1000);
-    return segments.map(function (seg) {
-      return sliceToWav(samples, sampleRate, seg[0] - padSamples, seg[1] + padSamples);
+    const wavBlobs = [];
+    segments.forEach(function (seg, i) {
+      try {
+        wavBlobs.push(sliceToWav(samples, sampleRate, seg[0] - padSamples, seg[1] + padSamples));
+      } catch (err) {
+        console.error("[multi-rep] segment " + i + " skipped:", err, "seg:", seg);
+      }
     });
+    return wavBlobs;
   }
 
   async function uploadAndSavePractice(blob, wordId, userId, mimeType, extra) {
