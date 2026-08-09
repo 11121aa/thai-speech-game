@@ -297,6 +297,16 @@
         <canvas id="ppWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px; margin-top:0.75rem;"></canvas>
         <button class="mic-btn mt-3" id="ppBtnMic"><i class="bi bi-mic-fill"></i></button>
         <p class="small text-secondary" id="ppRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด</p>
+        <div id="ppMultiCapture" style="display:none;">
+          <div id="ppMultiCards" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:0.5rem 0;"></div>
+          <p class="small fw-bold" id="ppMultiProgress" style="color:#8a5cf6;"></p>
+          <button class="mic-btn mt-2" id="ppBtnMicHold"><i class="bi bi-mic-fill"></i></button>
+          <p class="small text-secondary" id="ppMultiHint">กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ</p>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-success flex-fill" id="ppBtnMultiDone" disabled>เสร็จแล้ว</button>
+            <button class="btn btn-outline-secondary flex-fill" id="ppBtnMultiRedo">อัดใหม่</button>
+          </div>
+        </div>
         <div class="alert alert-danger" id="ppErrorMsg" style="display:none;"></div>
         <div id="ppPlaybackArea" style="display:none;">
           <audio id="ppPlaybackAudio" controls style="width:100%;"></audio>
@@ -360,15 +370,15 @@
 <script src="js/auth.js"></script>
 <script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
-<script src="js/recorder.js"></script>
-<script src="js/practice-panel.js?v=6"></script>
+<script src="js/recorder.js?v=5"></script>
+<script src="js/practice-panel.js?v=7"></script>
 <script src="js/main.js"></script>
 <script>
 /* ===== Global game-session state ===== */
 var G = {
   mode: null, words: [], pts: 0, timeLeft: 60,
   paused: false, timerHandle: null, hardMode: false,
-  hwMode: false, hwAssignmentId: null, worksheetMode: false, worksheetProgressId: null, pronounceCount: 1,
+  hwMode: false, hwAssignmentId: null, worksheetMode: false, worksheetProgressId: null, pronounceCount: 1, recordRepsTogether: true,
   highScores: JSON.parse(localStorage.getItem('ghsv2') || '{}')
 };
 
@@ -438,6 +448,24 @@ function addPts(n) {
 function openPractice(word, onCorrect, onClosed) {
   G.paused = true;
   var total = G.pronounceCount || 1;
+
+  // Combined multi-rep recording: say all `total` reps in one continuous
+  // hold-to-record take instead of pressing record once per rep. Only
+  // applies when there's more than one rep to record and the patient
+  // hasn't opted out in their profile (see management.html's profile
+  // edit form).
+  if (total > 1 && G.recordRepsTogether) {
+    PracticePanel.openMultiRep(word, {
+      showListen: !G.hardMode,
+      hwAssignmentId: G.hwAssignmentId,
+      worksheetProgressId: G.worksheetProgressId,
+      total: total,
+      onCorrect: function () { addPts(20 * total); if (onCorrect) onCorrect(); },
+      onClosed: function () { G.paused = false; if (onClosed) onClosed(); }
+    });
+    return;
+  }
+
   var repIndex = 1;
   function doRep() {
     PracticePanel.open(word, {
@@ -890,9 +918,24 @@ async function launchGame() {
   G.hwAssignmentId = G.hwMode ? _selectedHwAssignmentId : null;
   G.worksheetMode = diff === 'worksheet';
   G.hardMode = isHardMode();
+  var _launchSession = await Auth.getSession();
+  if (_launchSession) {
+    var { data: _launchProfile } = await sb.from('profiles').select('record_reps_together').eq('user_id', _launchSession.user.id).maybeSingle();
+    G.recordRepsTogether = !_launchProfile || _launchProfile.record_reps_together !== false;
+  } else {
+    G.recordRepsTogether = true;
+  }
   if (G.hwMode && !_selectedHwAssignmentId) { alert('กรุณาเลือกการบ้านก่อน'); return; }
   if (G.worksheetMode && !_selectedWorksheetId) { alert('กรุณาเลือกแบบฝึกหัดก่อน'); return; }
   var pool = getSetupPool();
+
+  // How many times to record each word: the custom-mode stepper's value
+  // for custom mode, but for homework/worksheet mode it must come from
+  // the assignment's own repeat_count instead -- that stepper is hidden
+  // and stuck at its default in those modes (see soundLevelRows' display
+  // toggle), so falling through to it silently asked for only 1 recording
+  // regardless of what the therapist actually configured.
+  var effectivePronounceCount = _pronounceCount;
 
   if (G.worksheetMode) {
     var startBtn = document.getElementById('btnSetupStart');
@@ -901,10 +944,11 @@ async function launchGame() {
     try {
       var session = await Auth.getSession();
       var ws = _worksheets.find(function (w) { return w.id === _selectedWorksheetId; });
+      effectivePronounceCount = (ws && ws.repeat_count) || 5;
       // Use the full worksheet word list (not `pool`, which the matching
       // game slices to 10) so "is this round done?" reflects every word in
       // the worksheet, regardless of which game mode is being played.
-      G.worksheetProgressId = await getOrStartWorksheetRound(_selectedWorksheetId, _worksheetPool, (ws && ws.repeat_count) || 5, session.user.id);
+      G.worksheetProgressId = await getOrStartWorksheetRound(_selectedWorksheetId, _worksheetPool, effectivePronounceCount, session.user.id);
     } catch (err) {
       alert('เกิดข้อผิดพลาด: ' + (err.message || err));
       startBtn.disabled = false; startBtn.innerHTML = startBtnOrigText;
@@ -914,11 +958,15 @@ async function launchGame() {
   } else {
     G.worksheetProgressId = null;
   }
+  if (G.hwMode) {
+    var hwAssignment = _hwAssignments.find(function (a) { return a.id === _selectedHwAssignmentId; });
+    effectivePronounceCount = (hwAssignment && hwAssignment.homework && hwAssignment.homework.repeat_count) || 5;
+  }
   if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
-  G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false; G.pronounceCount = _pronounceCount;
+  G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false; G.pronounceCount = effectivePronounceCount;
   document.getElementById('hudPoints').textContent = 0;
   var names = {
     matching:   'จับคู่ภาพ 🃏',

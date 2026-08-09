@@ -10,6 +10,12 @@ const PracticePanel = (function () {
   let continueTimer = null;
   let wired = false;
 
+  // Multi-rep capture state (see openMultiRep)
+  let multiTotal = 1;
+  let multiSegments = []; // [{ blob, url }]
+  let multiHoldController = null;
+  let multiIsHolding = false;
+
   function el(id) {
     return document.getElementById(id);
   }
@@ -31,6 +37,24 @@ const PracticePanel = (function () {
       el("ppBtnRetry").addEventListener("click", resetForRetry);
       el("ppBtnSkip").addEventListener("click", function () { modal.hide(); });
       modalEl.addEventListener("hidden.bs.modal", onModalHidden);
+
+      // The multi-rep capture markup only exists on pages built from
+      // game.html's practiceModal (cooking.html/app.html share this same
+      // module but predate this markup) -- guard so wiring the new
+      // multi-rep controls doesn't throw on those pages. This does NOT
+      // make the single-rep flow work on cooking.html/app.html in
+      // general -- both already dereference other, unrelated pre-existing
+      // ids (ppBtnSkip, ppRepCounter) that they also lack, a bug that
+      // predates this branch and isn't fixed here.
+      const micHoldBtn = el("ppBtnMicHold");
+      if (micHoldBtn) {
+        micHoldBtn.addEventListener("pointerdown", onMultiHoldStart);
+        micHoldBtn.addEventListener("pointerup", onMultiHoldEnd);
+        micHoldBtn.addEventListener("pointerleave", onMultiHoldEnd);
+        micHoldBtn.addEventListener("pointercancel", onMultiHoldEnd);
+        el("ppBtnMultiRedo").addEventListener("click", onMultiRedo);
+        el("ppBtnMultiDone").addEventListener("click", onMultiDone);
+      }
     }
   }
 
@@ -38,17 +62,9 @@ const PracticePanel = (function () {
     return null;
   }
 
-  async function open(word, cbs) {
-    const session = await Auth.getSession();
-    if (!session) {
-      const page = location.pathname.split("/").pop() || "game.html";
-      location.href = "login.html?redirect=" + encodeURIComponent(page);
-      return;
-    }
-    ensureModal();
-    currentWord = word;
-    callbacks = cbs || {};
-
+  // Shared word-display setup (picture, title, mouth animation) used by
+  // both the single-rep flow (open) and the multi-rep flow (openMultiRep).
+  function setupWordDisplay(word) {
     // Picture priority: the word's own uploaded image > the legacy
     // generated-illustration manifest (kept alive for older words that
     // predate the upload feature) > the emoji fallback.
@@ -62,18 +78,11 @@ const PracticePanel = (function () {
     }
     el("ppWord").textContent = word.word;
     el("ppReading").textContent = word.level || "";
-    const repCounter = el("ppRepCounter");
-    if (cbs && cbs.repTotal > 1) {
-      repCounter.textContent = "ครั้งที่ " + cbs.repIndex + " จาก " + cbs.repTotal;
-      repCounter.style.display = "block";
-    } else {
-      repCounter.style.display = "none";
-    }
+
     // Animation box: animation > picture > hidden. The mouth-animation
     // clip is uploaded per sound (see management.html's Sounds tab) and
     // comes through on the nested `sounds` join from WordsApi.fetchAllWords().
     const animUrl = word.sounds && word.sounds.mouth_animation_url;
-    console.log('[mouth animation] word:', word.word, 'letter_category:', word.letter_category, 'sound_id:', word.sound_id, 'sounds join:', word.sounds, 'animUrl:', animUrl);
     const animSvg = animUrl ? '<img src="' + animUrl + '" alt="ปากเสียง ' + word.letter_category + '" style="width:100%;height:100%;display:block;">' : null;
     const animBox = el("ppMouthAnimation");
     if (animBox) {
@@ -98,8 +107,48 @@ const PracticePanel = (function () {
       diag.style.display = "flex";
       diag.innerHTML = '<div class="mouth-diagram-icon">' + mouth.icon + "</div><div>" + mouth.label + "</div>";
     }
+  }
+
+  async function open(word, cbs) {
+    const session = await Auth.getSession();
+    if (!session) {
+      const page = location.pathname.split("/").pop() || "game.html";
+      location.href = "login.html?redirect=" + encodeURIComponent(page);
+      return;
+    }
+    ensureModal();
+    currentWord = word;
+    callbacks = cbs || {};
+    setupWordDisplay(word);
+
+    const repCounter = el("ppRepCounter");
+    if (cbs && cbs.repTotal > 1) {
+      repCounter.textContent = "ครั้งที่ " + cbs.repIndex + " จาก " + cbs.repTotal;
+      repCounter.style.display = "block";
+    } else {
+      repCounter.style.display = "none";
+    }
 
     resetPanelState();
+    modal.show();
+    startCameraMirror();
+  }
+
+  async function openMultiRep(word, cbs) {
+    const session = await Auth.getSession();
+    if (!session) {
+      const page = location.pathname.split("/").pop() || "game.html";
+      location.href = "login.html?redirect=" + encodeURIComponent(page);
+      return;
+    }
+    ensureModal();
+    currentWord = word;
+    callbacks = cbs || {};
+    multiTotal = (cbs && cbs.total) || 1;
+    setupWordDisplay(word);
+    el("ppRepCounter").style.display = "none";
+
+    resetMultiCaptureState();
     modal.show();
     startCameraMirror();
   }
@@ -119,11 +168,254 @@ const PracticePanel = (function () {
     el("ppWaveCanvas").style.display = "";
     el("ppBtnMic").style.display = "";
     el("ppRecordHint").style.display = "";
+    // Multi-rep markup only exists on pages built from game.html's
+    // practiceModal -- guard for cooking.html/app.html, which share this
+    // module's single-rep open() flow but predate this markup.
+    var multiCapture = el("ppMultiCapture");
+    if (multiCapture) multiCapture.style.display = "none";
+    // Belt-and-braces: onModalHidden is what actually re-enables controls
+    // a save left disabled, but that only runs on an intervening hide.
+    // Not currently reachable without one, but cheap and idempotent
+    // (see setMultiCaptureControlsEnabled's null guards) to also reset
+    // here at the point a fresh panel is about to be shown.
+    setMultiCaptureControlsEnabled(true);
     if (continueTimer) {
       clearTimeout(continueTimer);
       continueTimer = null;
     }
     resetMicButton();
+  }
+
+  function resetMultiCaptureState() {
+    el("ppPlaybackArea").style.display = "none";
+    el("ppErrorMsg").style.display = "none";
+    var ps = el("ppPracticeStage");
+    if (ps) ps.style.display = "";
+    el("ppBtnListen").style.display = (callbacks.showListen === false || !(currentWord && currentWord.sound_url)) ? "none" : "";
+
+    el("ppWaveCanvas").style.display = "";
+    el("ppBtnMic").style.display = "none";
+    el("ppRecordHint").style.display = "none";
+    el("ppMultiCapture").style.display = "block";
+
+    multiSegments.forEach(function (s) { if (s.url) URL.revokeObjectURL(s.url); });
+    multiSegments = [];
+    // onMultiDone() relabels this button while saving; reset it here so a
+    // later word's capture screen doesn't inherit a stuck "กำลังบันทึก..."
+    // label from a previous successful submission. (Controls disabled
+    // during a save are primarily re-enabled in onModalHidden, which
+    // covers every path back to a fresh modal, not just this one -- the
+    // call below is belt-and-braces for a re-open without an intervening
+    // hide, not currently reachable but cheap and idempotent.)
+    setMultiCaptureControlsEnabled(true);
+    var doneBtn = el("ppBtnMultiDone");
+    doneBtn.textContent = "เสร็จแล้ว";
+    renderMultiCards();
+    resetMultiMicButton();
+  }
+
+  function resetMultiMicButton() {
+    multiIsHolding = false;
+    // Called unconditionally from onModalHidden on every page -- guard
+    // for cooking.html/app.html, which lack this markup (see ensureModal).
+    const btn = el("ppBtnMicHold");
+    if (!btn) return;
+    btn.classList.remove("recording");
+    btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+    el("ppMultiHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
+  }
+
+  function renderMultiCards() {
+    const wrap = el("ppMultiCards");
+    wrap.innerHTML = "";
+    multiSegments.forEach(function (seg, i) {
+      const card = document.createElement("div");
+      card.style.cssText = "background:var(--color-bg-soft);border-radius:12px;padding:6px 8px;display:flex;align-items:center;gap:6px;";
+      // A segment's practice row can exist (practiceId set) before
+      // `uploaded` is true -- uploaded only flips once the follow-up
+      // parent_marked_correct update also succeeds. Gate on either: a row
+      // exists the moment practiceId is set, and this UI has no way to
+      // delete a row, only to avoid creating one. Only offer discard for
+      // segments that are still purely local.
+      const delBtn = (seg.practiceId || seg.uploaded)
+        ? ''
+        : '<button class="btn btn-sm btn-outline-danger py-0 px-2" data-idx="' + i + '" data-act="del">ลบ</button>';
+      card.innerHTML =
+        '<span style="font-weight:700;">' + (i + 1) + '</span>' +
+        '<button class="btn btn-sm btn-outline-primary py-0 px-2" data-idx="' + i + '" data-act="play">▶</button>' +
+        delBtn;
+      wrap.appendChild(card);
+    });
+    el("ppMultiProgress").textContent = multiSegments.length + " / " + multiTotal;
+    el("ppBtnMultiDone").disabled = multiSegments.length !== multiTotal;
+
+    wrap.querySelectorAll('[data-act="play"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const seg = multiSegments[parseInt(btn.getAttribute("data-idx"), 10)];
+        if (seg) new Audio(seg.url).play();
+      });
+    });
+    wrap.querySelectorAll('[data-act="del"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const idx = parseInt(btn.getAttribute("data-idx"), 10);
+        const seg = multiSegments[idx];
+        if (seg && seg.url) URL.revokeObjectURL(seg.url);
+        multiSegments.splice(idx, 1);
+        renderMultiCards();
+      });
+    });
+  }
+
+  function onMultiHoldStart(e) {
+    e.preventDefault();
+    if (multiIsHolding) return;
+    multiIsHolding = true;
+    const btn = el("ppBtnMicHold");
+    btn.classList.add("recording");
+    btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
+    el("ppMultiHint").textContent = "กำลังอัดเสียง... ปล่อยปุ่มเมื่อพูดเสร็จ";
+    el("ppErrorMsg").style.display = "none";
+
+    // getUserMedia() can resolve well after this call returns (notably,
+    // while a permission prompt is up). If the modal moved on to a
+    // different word in that window, this callback must not attribute its
+    // audio to the new currentWord -- capture which word this hold
+    // actually belongs to and bail if it no longer matches.
+    const heldWord = currentWord;
+
+    multiHoldController = Recorder.startHoldRecording(
+      el("ppWaveCanvas"),
+      function (samples, sampleRate, segments) {
+        resetMultiMicButton();
+        if (currentWord !== heldWord) return; // modal moved on to a different word while this hold was pending
+        if (!segments.length) return; // held the button but never actually spoke -- nothing to add
+        // Synchronous -- sliceSamplesToWavSegments works directly on the
+        // already-captured PCM, no decode step (see recorder.js for why
+        // that step was removed).
+        try {
+          const wavBlobs = Recorder.sliceSamplesToWavSegments(samples, sampleRate, segments);
+          wavBlobs.forEach(function (wavBlob) {
+            multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false, practiceId: null });
+          });
+          renderMultiCards();
+        } catch (err) {
+          console.error("[multi-rep] sliceSamplesToWavSegments failed:", err, "sample count:", samples && samples.length, "sampleRate:", sampleRate, "segments:", segments);
+          showError("เกิดข้อผิดพลาดในการประมวลผลเสียง กรุณาลองใหม่");
+        }
+      },
+      function () {
+        resetMultiMicButton();
+        showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
+      }
+    );
+  }
+
+  function onMultiHoldEnd(e) {
+    if (e) e.preventDefault();
+    if (!multiIsHolding) return;
+    if (multiHoldController) multiHoldController.stop();
+  }
+
+  function onMultiRedo() {
+    if (multiIsHolding && multiHoldController) multiHoldController.cancel();
+    // Same rule as the per-card discard button (see renderMultiCards): a
+    // segment with a practiceId already has a real practice row behind it
+    // -- possibly still mid-retry if parent_marked_correct hasn't
+    // succeeded yet -- so "start over" only clears purely local segments,
+    // never one that's been uploaded or is in the middle of being marked.
+    multiSegments = multiSegments.filter(function (s) {
+      if (s.practiceId || s.uploaded) return true;
+      if (s.url) URL.revokeObjectURL(s.url);
+      return false;
+    });
+    renderMultiCards();
+    resetMultiMicButton();
+  }
+
+  // Disables/re-enables every control that could mutate multiSegments,
+  // start a new hold, or close the modal while a save is in flight --
+  // otherwise a tap on ลบ, "อัดใหม่", the mic, or ✕ can let the game move
+  // on to a new word while onMultiDone's loop is still running, uploading
+  // its remaining segments against the *new* currentWord.
+  // Every lookup here is null-guarded: this needs to be safely callable
+  // from onModalHidden, which runs on every page that loads this module
+  // (including cooking.html/app.html, which lack the multi-rep markup --
+  // see ensureModal) and regardless of which flow (single-rep or
+  // multi-rep) is about to open next.
+  function setMultiCaptureControlsEnabled(enabled) {
+    const micHoldBtn = el("ppBtnMicHold");
+    if (micHoldBtn) micHoldBtn.disabled = !enabled;
+    const redoBtn = el("ppBtnMultiRedo");
+    if (redoBtn) redoBtn.disabled = !enabled;
+    const cardsWrap = el("ppMultiCards");
+    if (cardsWrap) cardsWrap.querySelectorAll("button").forEach(function (b) { b.disabled = !enabled; });
+    const skipBtn = el("ppBtnSkip");
+    if (skipBtn) skipBtn.disabled = !enabled;
+  }
+
+  async function onMultiDone() {
+    if (multiSegments.length !== multiTotal) return;
+    const btn = el("ppBtnMultiDone");
+    btn.disabled = true;
+    btn.textContent = "กำลังบันทึก...";
+    setMultiCaptureControlsEnabled(false);
+
+    // setMultiCaptureControlsEnabled disables every control this module
+    // knows about that could close the modal or advance the word, but it's
+    // still only a defense against *this* module's own controls -- it
+    // can't stop a caller from tearing the modal down some other way.
+    // Snapshotting what this save belongs to, and using the snapshot
+    // everywhere below instead of the live currentWord/callbacks, means
+    // even if that happens, this save still finishes against the word and
+    // callbacks it started with rather than whatever replaced them.
+    const savingWord = currentWord;
+    const savingCallbacks = callbacks;
+
+    try {
+      const session = await Auth.getSession();
+      const extra = {};
+      if (savingCallbacks.hwAssignmentId) extra.homework_assignment_id = savingCallbacks.hwAssignmentId;
+      if (savingCallbacks.worksheetProgressId) extra.worksheet_progress_id = savingCallbacks.worksheetProgressId;
+
+      // Snapshot the list being saved -- controls that could change it are
+      // disabled above, but iterating a stable copy is the cheap guarantee
+      // that a skipped/duplicated iteration can't happen even so.
+      const batch = multiSegments.slice();
+      for (let i = 0; i < batch.length; i++) {
+        const seg = batch[i];
+        if (seg.uploaded) continue; // already fully saved on an earlier attempt
+
+        // practiceId is set as soon as the row exists, separately from
+        // `uploaded` (only set once parent_marked_correct also succeeds) --
+        // so a retry after the mark-correct step fails re-tries only that
+        // step against the row that already exists, instead of calling
+        // uploadAndSavePractice again and creating a duplicate row.
+        if (!seg.practiceId) {
+          const result = await Recorder.uploadAndSavePractice(
+            seg.blob, savingWord.id, session.user.id, "audio/wav",
+            Object.keys(extra).length ? extra : undefined
+          );
+          seg.practiceId = result.id;
+        }
+        const { error: markError } = await sb.from("practice").update({ parent_marked_correct: true }).eq("id", seg.practiceId);
+        if (markError) throw markError;
+        seg.uploaded = true;
+      }
+
+      if (savingCallbacks.onCorrect) savingCallbacks.onCorrect();
+      if (currentWord === savingWord) modal.hide(); // only close a modal that's still showing this same save
+    } catch (err) {
+      if (currentWord !== savingWord) return; // this save's word isn't on screen anymore -- nothing here to repaint
+      // Rebuild the cards first -- any segment that reached `uploaded`
+      // before the failure needs its delete button gone (see
+      // renderMultiCards), and this also gives the mic/redo buttons fresh,
+      // enabled event listeners in one step.
+      renderMultiCards();
+      setMultiCaptureControlsEnabled(true);
+      btn.disabled = false;
+      btn.textContent = "เสร็จแล้ว";
+      showError("เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่");
+    }
   }
 
   function resetForRetry() {
@@ -277,9 +569,26 @@ const PracticePanel = (function () {
       recordController.cancel();
       recordController = null;
     }
+    if (multiHoldController) {
+      multiHoldController.cancel();
+      multiHoldController = null;
+    }
+    multiSegments.forEach(function (s) { if (s.url) URL.revokeObjectURL(s.url); });
+    multiSegments = [];
     resetMicButton();
+    resetMultiMicButton();
+    // A save in progress when the modal closed left these disabled
+    // (see onMultiDone/setMultiCaptureControlsEnabled) -- reset here,
+    // on every close regardless of which flow opens next, rather than
+    // only in the multi-rep entry point. ppBtnSkip is shared with the
+    // single-rep flow, so fixing it only on the multi-rep side would
+    // still leave a single-rep game's ✕ dead after a multi-rep word
+    // that preceded it in the same session.
+    setMultiCaptureControlsEnabled(true);
+    var multiCapture = el("ppMultiCapture");
+    if (multiCapture) multiCapture.style.display = "none";
     if (callbacks.onClosed) callbacks.onClosed();
   }
 
-  return { open: open };
+  return { open: open, openMultiRep: openMultiRep };
 })();
