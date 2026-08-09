@@ -32,7 +32,10 @@ const PracticePanel = (function () {
         // currentWord.sound_url exists (see resetPanelState).
         if (currentWord && currentWord.sound_url) new Audio(currentWord.sound_url).play();
       });
-      el("ppBtnMic").addEventListener("click", onMicClick);
+      el("ppBtnMic").addEventListener("pointerdown", onSingleHoldStart);
+      el("ppBtnMic").addEventListener("pointerup", onSingleHoldEnd);
+      el("ppBtnMic").addEventListener("pointerleave", onSingleHoldEnd);
+      el("ppBtnMic").addEventListener("pointercancel", onSingleHoldEnd);
       el("ppBtnCorrect").addEventListener("click", markCorrect);
       el("ppBtnRetry").addEventListener("click", resetForRetry);
       el("ppBtnSkip").addEventListener("click", function () { modal.hide(); });
@@ -400,26 +403,26 @@ const PracticePanel = (function () {
       // disabled above, but iterating a stable copy is the cheap guarantee
       // that a skipped/duplicated iteration can't happen even so.
       const batch = multiSegments.slice();
-      for (let i = 0; i < batch.length; i++) {
-        const seg = batch[i];
-        if (seg.uploaded) continue; // already fully saved on an earlier attempt
+      const pending = batch.filter(function (seg) { return !seg.uploaded; }); // skip segments already fully saved on an earlier attempt
 
-        // practiceId is set as soon as the row exists, separately from
-        // `uploaded` (only set once parent_marked_correct also succeeds) --
-        // so a retry after the mark-correct step fails re-tries only that
-        // step against the row that already exists, instead of calling
-        // uploadAndSavePractice again and creating a duplicate row.
-        if (!seg.practiceId) {
-          const result = await Recorder.uploadAndSavePractice(
-            seg.blob, savingWord.id, session.user.id, "audio/wav",
-            Object.keys(extra).length ? extra : undefined
-          );
-          seg.practiceId = result.id;
-        }
-        const { error: markError } = await sb.from("practice").update({ parent_marked_correct: true }).eq("id", seg.practiceId);
-        if (markError) throw markError;
+      // One insert per segment (parent_marked_correct is set directly on
+      // the row -- see uploadAndSavePractice -- instead of a second
+      // sequential UPDATE), and all segments upload in parallel instead of
+      // one at a time. That's what made "เสร็จแล้ว" feel slow with 5
+      // recordings: up to 10 sequential round-trips became up to 5 run
+      // concurrently. Each segment mutates itself independently as its own
+      // promise settles, so a segment that fails stays retryable without
+      // touching the ones that already succeeded.
+      const results = await Promise.allSettled(pending.map(async function (seg) {
+        const result = await Recorder.uploadAndSavePractice(
+          seg.blob, savingWord.id, session.user.id, "audio/wav",
+          Object.assign({}, extra, { parent_marked_correct: true })
+        );
+        seg.practiceId = result.id;
         seg.uploaded = true;
-      }
+      }));
+      const failed = results.find(function (r) { return r.status === "rejected"; });
+      if (failed) throw failed.reason;
 
       if (savingCallbacks.onCorrect) savingCallbacks.onCorrect();
       if (currentWord === savingWord) modal.hide(); // only close a modal that's still showing this same save
@@ -444,7 +447,7 @@ const PracticePanel = (function () {
     el("ppRecordHint").textContent = "รอสักครู่...";
     setTimeout(function () {
       btn.disabled = false;
-      el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
+      el("ppRecordHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
     }, 1000);
   }
 
@@ -453,7 +456,7 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMic");
     btn.classList.remove("recording");
     btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
-    el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
+    el("ppRecordHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
   }
 
   function showError(message) {
@@ -488,49 +491,70 @@ const PracticePanel = (function () {
     }
   }
 
-  function onMicClick() {
-    if (!isRecording) {
-      isRecording = true;
-      const btn = el("ppBtnMic");
-      btn.classList.add("recording");
-      btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-      el("ppRecordHint").textContent = "กำลังอัดเสียง... หยุดอัตโนมัติเมื่อหยุดพูด หรือกดอีกครั้งเพื่อหยุดเอง";
-      el("ppErrorMsg").style.display = "none";
+  function onSingleHoldStart(e) {
+    e.preventDefault();
+    if (isRecording) return;
+    isRecording = true;
+    const btn = el("ppBtnMic");
+    btn.classList.add("recording");
+    btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
+    el("ppRecordHint").textContent = "กำลังอัดเสียง... ปล่อยปุ่มเมื่อพูดเสร็จ";
+    el("ppErrorMsg").style.display = "none";
 
-      recordController = Recorder.startRecording(
-        el("ppWaveCanvas"),
-        async function (blob, mimeType) {
-          resetMicButton();
-          const btn = el("ppBtnMic");
-          btn.disabled = true;
-          el("ppRecordHint").textContent = "รอสักครู่...";
-          setTimeout(function () {
-            btn.disabled = false;
-            if (el("ppPlaybackArea").style.display === "none") {
-              el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุดและบันทึก";
-            }
-          }, 1000);
-          try {
-            const session = await Auth.getSession();
-            const extra = {};
-            if (callbacks.hwAssignmentId) extra.homework_assignment_id = callbacks.hwAssignmentId;
-            if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
-            const result = await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id, mimeType,
-              Object.keys(extra).length ? extra : undefined);
-            lastPracticeId = result.id;
-            showPlayback(blob);
-          } catch (err) {
-            showError("เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่");
-          }
-        },
-        function () {
-          resetMicButton();
-          showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
+    // Same reasoning as onMultiHoldStart's heldWord: getUserMedia() can
+    // resolve after the modal has already moved on to a different word
+    // (e.g. a pending permission prompt), so the callback below must not
+    // attribute its audio to whatever currentWord happens to be by then.
+    const heldWord = currentWord;
+
+    recordController = Recorder.startHoldRecording(
+      el("ppWaveCanvas"),
+      async function (samples, sampleRate, segments) {
+        resetMicButton();
+        if (currentWord !== heldWord) return;
+        if (!segments.length) {
+          showError("ไม่ได้ยินเสียงพูด กรุณาลองใหม่");
+          return;
         }
-      );
-    } else {
-      if (recordController) recordController.stop();
-    }
+        const btn = el("ppBtnMic");
+        btn.disabled = true;
+        el("ppRecordHint").textContent = "รอสักครู่...";
+        setTimeout(function () {
+          btn.disabled = false;
+          if (el("ppPlaybackArea").style.display === "none") {
+            el("ppRecordHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
+          }
+        }, 1000);
+        try {
+          // Only one repetition is expected here -- take the first
+          // detected segment even if the child spoke more than once.
+          const wavBlobs = Recorder.sliceSamplesToWavSegments(samples, sampleRate, [segments[0]]);
+          const blob = wavBlobs[0];
+          const session = await Auth.getSession();
+          const extra = {};
+          if (callbacks.hwAssignmentId) extra.homework_assignment_id = callbacks.hwAssignmentId;
+          if (callbacks.worksheetProgressId) extra.worksheet_progress_id = callbacks.worksheetProgressId;
+          const result = await Recorder.uploadAndSavePractice(blob, currentWord.id, session.user.id, "audio/wav",
+            Object.keys(extra).length ? extra : undefined);
+          lastPracticeId = result.id;
+          showPlayback(blob);
+        } catch (err) {
+          console.error("[single-rep] recording failed:", err);
+          showError("เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่");
+        }
+      },
+      function () {
+        resetMicButton();
+        showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
+      },
+      estimateSilenceGapMs(heldWord)
+    );
+  }
+
+  function onSingleHoldEnd(e) {
+    if (e) e.preventDefault();
+    if (!isRecording) return;
+    if (recordController) recordController.stop();
   }
 
   function showPlayback(blob) {

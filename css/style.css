@@ -526,11 +526,11 @@ a {
 .mic-btn.recording {
   animation: pulse-rec 1s infinite;
 }
-/* #ppBtnMicHold is press-and-hold (see js/practice-panel.js's
-   pointerdown/pointerup wiring) -- without these, a long press on mobile
-   triggers the browser's native text-selection/callout instead of (or on
-   top of) the hold gesture. */
-#ppBtnMicHold {
+/* #ppBtnMicHold and #ppBtnMic are both press-and-hold (see
+   js/practice-panel.js's pointerdown/pointerup wiring) -- without these, a
+   long press on mobile triggers the browser's native text-selection/
+   callout instead of (or on top of) the hold gesture. */
+#ppBtnMicHold, #ppBtnMic {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
