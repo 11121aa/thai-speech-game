@@ -6,10 +6,13 @@
 <title>แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</title>
 <meta name="description" content="เว็บไซต์ฝึกออกเสียงภาษาไทยด้วยเกม สำหรับเด็กที่มีปัญหาทางการออกเสียง อายุ 4-7 ปี">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<!-- Landing page is the game page — this file only exists because
-     GitHub Pages requires index.html as the site's entry point. -->
-<meta http-equiv="refresh" content="0; url=game.html">
-<script>location.replace('game.html');</script>
+<!-- Landing page is the login page — this file only exists because
+     GitHub Pages requires index.html as the site's entry point.
+     login.html itself redirects straight through to game.html for
+     anyone who's already signed in, so this doesn't add an extra step
+     for returning users. -->
+<meta http-equiv="refresh" content="0; url=login.html">
+<script>location.replace('login.html');</script>
 <style>
   html, body { height:100%; margin:0; display:flex; align-items:center; justify-content:center;
     font-family:'Prompt', system-ui, sans-serif; background:#fdfaf6; color:#3a3d62; }
@@ -17,6 +20,6 @@
 </style>
 </head>
 <body>
-  <p>กำลังนำท่านไปหน้าเกม... หากไม่เปลี่ยนหน้าอัตโนมัติ <a href="game.html">คลิกที่นี่</a></p>
+  <p>กำลังนำท่านไปหน้าเข้าสู่ระบบ... หากไม่เปลี่ยนหน้าอัตโนมัติ <a href="login.html">คลิกที่นี่</a></p>
 </body>
 </html>

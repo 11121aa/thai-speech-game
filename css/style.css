@@ -667,10 +667,26 @@ a {
   font-family: "Prompt", sans-serif;
   transition: all 0.15s ease;
 }
-.diff-btn.active, .diff-btn:hover {
+.diff-btn.active {
+  background: var(--color-bg-soft);
+  color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+.diff-btn:hover {
   background: var(--color-primary);
   color: #fff;
 }
+/* การบ้าน (homework) / แบบฝึกหัด (worksheet) keep their own accent color
+   at every state instead of the generic teal above -- outlined (not
+   solid) normally, solid only on hover, and a light tint (not solid)
+   when selected, matching how "กำหนดเอง" already behaved. */
+.diff-btn[data-diff="hw"] { border-color:#e74c3c; color:#e74c3c; background:#fff; }
+.diff-btn[data-diff="hw"]:hover { background:#e74c3c; color:#fff; }
+.diff-btn[data-diff="hw"].active { background:#fdeceb; color:#c0392b; border-color:#c0392b; }
+
+.diff-btn[data-diff="worksheet"] { border-color:#8a5cf6; color:#8a5cf6; background:#fff; }
+.diff-btn[data-diff="worksheet"]:hover { background:#8a5cf6; color:#fff; }
+.diff-btn[data-diff="worksheet"].active { background:#f1ecfd; color:#6c3ce0; border-color:#6c3ce0; }
 .camera-preview-setup {
   width: 160px;
   height: 120px;
