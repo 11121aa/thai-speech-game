@@ -929,6 +929,14 @@ async function launchGame() {
   if (G.worksheetMode && !_selectedWorksheetId) { alert('กรุณาเลือกแบบฝึกหัดก่อน'); return; }
   var pool = getSetupPool();
 
+  // How many times to record each word: the custom-mode stepper's value
+  // for custom mode, but for homework/worksheet mode it must come from
+  // the assignment's own repeat_count instead -- that stepper is hidden
+  // and stuck at its default in those modes (see soundLevelRows' display
+  // toggle), so falling through to it silently asked for only 1 recording
+  // regardless of what the therapist actually configured.
+  var effectivePronounceCount = _pronounceCount;
+
   if (G.worksheetMode) {
     var startBtn = document.getElementById('btnSetupStart');
     var startBtnOrigText = startBtn.innerHTML;
@@ -936,10 +944,11 @@ async function launchGame() {
     try {
       var session = await Auth.getSession();
       var ws = _worksheets.find(function (w) { return w.id === _selectedWorksheetId; });
+      effectivePronounceCount = (ws && ws.repeat_count) || 5;
       // Use the full worksheet word list (not `pool`, which the matching
       // game slices to 10) so "is this round done?" reflects every word in
       // the worksheet, regardless of which game mode is being played.
-      G.worksheetProgressId = await getOrStartWorksheetRound(_selectedWorksheetId, _worksheetPool, (ws && ws.repeat_count) || 5, session.user.id);
+      G.worksheetProgressId = await getOrStartWorksheetRound(_selectedWorksheetId, _worksheetPool, effectivePronounceCount, session.user.id);
     } catch (err) {
       alert('เกิดข้อผิดพลาด: ' + (err.message || err));
       startBtn.disabled = false; startBtn.innerHTML = startBtnOrigText;
@@ -949,11 +958,15 @@ async function launchGame() {
   } else {
     G.worksheetProgressId = null;
   }
+  if (G.hwMode) {
+    var hwAssignment = _hwAssignments.find(function (a) { return a.id === _selectedHwAssignmentId; });
+    effectivePronounceCount = (hwAssignment && hwAssignment.homework && hwAssignment.homework.repeat_count) || 5;
+  }
   if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
-  G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false; G.pronounceCount = _pronounceCount;
+  G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false; G.pronounceCount = effectivePronounceCount;
   document.getElementById('hudPoints').textContent = 0;
   var names = {
     matching:   'จับคู่ภาพ 🃏',
