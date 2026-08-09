@@ -201,7 +201,7 @@ const Recorder = (function () {
   // samples back out programmatically. Capturing them as they arrive
   // sidesteps that decoder (and the whole blob/mimeType/decode step)
   // entirely, and makes slicing a synchronous array operation afterward.
-  function startHoldRecording(canvas, onStop, onError) {
+  function startHoldRecording(canvas, onStop, onError, silenceGapMs) {
     const rafHolder = { id: null };
     let audioCtx = null;
     let mediaStream = null;
@@ -224,16 +224,24 @@ const Recorder = (function () {
     const SPEECH_THRESH  = 0.012;
     const MIN_SPEECH_MS  = 300;  // shorter than startRecording's 600ms -- reps said quickly in one hold are still short utterances
     // Measured from real usage across two rounds of live testing (see VAD
-    // diagnostic logging above): at 350ms, segments almost never closed at
-    // all. At 150ms, most repetitions split correctly, but pacing sped up
-    // toward the end of a 5-rep hold and the last couple of pauses (85-
-    // 127ms) came in just under the threshold, merging into the previous
-    // segment. Within-word noise/artifacts observed separately topped out
-    // around 70ms. 90ms sits in the gap between those two clusters.
+    // diagnostic logging that used to live here): at 350ms, segments almost
+    // never closed at all. At 150ms, most repetitions split correctly, but
+    // pacing sped up toward the end of a 5-rep hold and the last couple of
+    // pauses (85-127ms) came in just under the threshold, merging into the
+    // previous segment. Within-word noise/artifacts observed separately
+    // topped out around 70ms. 90ms (the default below) sits in the gap
+    // between those two clusters -- but that tuning was done entirely with
+    // short, single-syllable words. A longer word or a full sentence has
+    // its own natural pauses *between its own syllables/words* that can
+    // easily exceed 90ms without the speaker intending a split at all --
+    // confirmed by testing, where 90ms chopped sentences into fragments.
+    // So this isn't one true constant: the caller (which knows what word
+    // is actually being recorded) is expected to pass a longer value for
+    // longer text; 90ms is only the fallback for when it doesn't.
     // Perfect 1:1 splitting isn't guaranteed for every pacing a real
     // person might use -- the review screen's discard-and-hold-again flow
     // is the actual safety net for whatever a fixed threshold misses.
-    const SILENCE_GAP_MS = 90;  // gap length that closes out one segment and allows the next to start
+    const SILENCE_GAP_MS = silenceGapMs || 90;  // gap length that closes out one segment and allows the next to start
     const MAX_HOLD_MS    = 15000; // safety cap regardless of input, in case a hold is never released
     const PROCESSOR_BUFFER_SIZE = 4096;
 

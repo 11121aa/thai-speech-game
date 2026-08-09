@@ -266,6 +266,24 @@ const PracticePanel = (function () {
     });
   }
 
+  // How long a silence has to last before it's treated as a real gap
+  // between repetitions, rather than a pause within a single longer
+  // utterance. A short single-syllable word only needs ~90ms (tuned
+  // against live testing of rapid repetition), but a longer word or a
+  // full sentence has its own natural pauses between its own syllables/
+  // words that can easily exceed that -- confirmed by testing, where a
+  // fixed 90ms chopped sentences into fragments mid-utterance. Character
+  // count is a rough proxy for how much speech a word represents (not a
+  // real syllable count, but Thai script length does track "how much
+  // there is to say" well enough for this without needing a real
+  // syllable analyzer). Capped so an unusually long sentence doesn't push
+  // the gap out far enough to feel unresponsive between real repetitions.
+  function estimateSilenceGapMs(word) {
+    const len = (word && word.word) ? word.word.length : 0;
+    const gap = 90 + Math.max(0, len - 2) * 40;
+    return Math.min(gap, 450);
+  }
+
   function onMultiHoldStart(e) {
     e.preventDefault();
     if (multiIsHolding) return;
@@ -306,7 +324,8 @@ const PracticePanel = (function () {
       function () {
         resetMultiMicButton();
         showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
-      }
+      },
+      estimateSilenceGapMs(heldWord)
     );
   }
 
