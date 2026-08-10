@@ -1,17 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 150">
-  <defs>
-    <linearGradient id="denimBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#6FA8DC"/>
-      <stop offset="100%" stop-color="#3D7BB8"/>
-    </linearGradient>
-  </defs>
-  <rect x="6" y="4" width="128" height="20" rx="10" fill="#2F5F91"/>
-  <path d="M 10 22 L 66 22 L 66 96 C 66 118 62 134 58 146 L 30 146 C 28 130 26 110 24 96 C 18 72 12 46 10 22 Z" fill="url(#denimBody)"/>
-  <path d="M 130 22 L 74 22 L 74 96 C 74 118 78 134 82 146 L 110 146 C 112 130 114 110 116 96 C 122 72 128 46 130 22 Z" fill="url(#denimBody)"/>
-  <rect x="66" y="22" width="8" height="30" fill="#2F5F91"/>
-  <path d="M 14 26 C 12 54 18 80 26 100" fill="none" stroke="#F5D97A" stroke-width="2" stroke-dasharray="3 3" opacity="0.8"/>
-  <path d="M 126 26 C 128 54 122 80 114 100" fill="none" stroke="#F5D97A" stroke-width="2" stroke-dasharray="3 3" opacity="0.8"/>
-  <path d="M 20 30 L 36 30 L 32 46 L 18 46 Z" fill="none" stroke="#F5D97A" stroke-width="2"/>
-  <rect x="24" y="136" width="38" height="12" rx="5" fill="#2F5F91"/>
-  <rect x="78" y="136" width="38" height="12" rx="5" fill="#2F5F91"/>
+  <rect x="6" y="4" width="128" height="20" rx="10" fill="#1466CC" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 10 22 L 66 22 L 66 96 C 66 118 62 134 58 146 L 30 146 C 28 130 26 110 24 96 C 18 72 12 46 10 22 Z" fill="#3D8FE0" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 130 22 L 74 22 L 74 96 C 74 118 78 134 82 146 L 110 146 C 112 130 114 110 116 96 C 122 72 128 46 130 22 Z" fill="#3D8FE0" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="66" y="22" width="8" height="30" fill="#1466CC"/>
+  <path d="M 14 26 C 12 54 18 80 26 100" fill="none" stroke="#FFD400" stroke-width="3" stroke-dasharray="4 4"/>
+  <path d="M 126 26 C 128 54 122 80 114 100" fill="none" stroke="#FFD400" stroke-width="3" stroke-dasharray="4 4"/>
+  <path d="M 20 30 L 36 30 L 32 46 L 18 46 Z" fill="none" stroke="#FFD400" stroke-width="3"/>
+  <rect x="24" y="136" width="38" height="12" rx="5" fill="#1466CC" stroke="#17130F" stroke-width="4"/>
+  <rect x="78" y="136" width="38" height="12" rx="5" fill="#1466CC" stroke="#17130F" stroke-width="4"/>
+  <ellipse cx="30" cy="46" rx="10" ry="20" fill="#FFFFFF" opacity="0.3" transform="rotate(-8 30 46)"/>
 </svg>

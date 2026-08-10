@@ -1,22 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 70">
-  <defs>
-    <linearGradient id="shoeBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FFC24D"/>
-      <stop offset="100%" stop-color="#EF9C00"/>
-    </linearGradient>
-  </defs>
-  <!-- left shoe -->
   <g>
-    <path d="M 4 52 C 4 34 12 20 26 16 L 60 16 C 68 16 72 22 76 28 L 88 38 C 92 41 92 48 86 50 L 10 52 Z" fill="url(#shoeBody)"/>
-    <path d="M 4 52 L 86 50 C 90 50 92 54 88 58 L 12 60 C 4 60 2 56 4 52 Z" fill="#FFF7EC"/>
-    <path d="M 30 22 L 40 32 M 40 20 L 50 30 M 50 18 L 60 28" stroke="#B97400" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="22" cy="20" r="3" fill="#B97400"/>
+    <path d="M 4 52 C 4 34 12 20 26 16 L 60 16 C 68 16 72 22 76 28 L 88 38 C 92 41 92 48 86 50 L 10 52 Z" fill="#FF8A00" stroke="#17130F" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M 4 52 L 86 50 C 90 50 92 54 88 58 L 12 60 C 4 60 2 56 4 52 Z" fill="#FFFFFF" stroke="#17130F" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M 30 22 L 40 32 M 40 20 L 50 30 M 50 18 L 60 28" stroke="#17130F" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="22" cy="20" r="3.5" fill="#17130F"/>
+    <ellipse cx="24" cy="26" rx="8" ry="5" fill="#FFFFFF" opacity="0.4" transform="rotate(-20 24 26)"/>
   </g>
-  <!-- right shoe (mirrored) -->
   <g transform="translate(200,0) scale(-1,1)">
-    <path d="M 4 52 C 4 34 12 20 26 16 L 60 16 C 68 16 72 22 76 28 L 88 38 C 92 41 92 48 86 50 L 10 52 Z" fill="url(#shoeBody)"/>
-    <path d="M 4 52 L 86 50 C 90 50 92 54 88 58 L 12 60 C 4 60 2 56 4 52 Z" fill="#FFF7EC"/>
-    <path d="M 30 22 L 40 32 M 40 20 L 50 30 M 50 18 L 60 28" stroke="#B97400" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="22" cy="20" r="3" fill="#B97400"/>
+    <path d="M 4 52 C 4 34 12 20 26 16 L 60 16 C 68 16 72 22 76 28 L 88 38 C 92 41 92 48 86 50 L 10 52 Z" fill="#FF8A00" stroke="#17130F" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M 4 52 L 86 50 C 90 50 92 54 88 58 L 12 60 C 4 60 2 56 4 52 Z" fill="#FFFFFF" stroke="#17130F" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M 30 22 L 40 32 M 40 20 L 50 30 M 50 18 L 60 28" stroke="#17130F" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="22" cy="20" r="3.5" fill="#17130F"/>
+    <ellipse cx="24" cy="26" rx="8" ry="5" fill="#FFFFFF" opacity="0.4" transform="rotate(-20 24 26)"/>
   </g>
 </svg>

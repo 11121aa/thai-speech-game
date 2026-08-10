@@ -1,18 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 150">
-  <defs>
-    <linearGradient id="stripeShirt" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="100%" stop-color="#F2F2F2"/>
-    </linearGradient>
-  </defs>
-  <path d="M 34 18 L 4 34 C -2 46 6 62 18 66 L 38 50 Z" fill="url(#stripeShirt)"/>
-  <path d="M 126 18 L 156 34 C 162 46 154 62 142 66 L 122 50 Z" fill="url(#stripeShirt)"/>
-  <path d="M 34 18 C 44 8 54 4 80 4 C 106 4 116 8 126 18 L 122 52 L 122 146 L 38 146 L 38 52 Z" fill="url(#stripeShirt)"/>
-  <rect x="38" y="56" width="84" height="12" fill="#2A4372"/>
-  <rect x="38" y="80" width="84" height="12" fill="#2A4372"/>
-  <rect x="38" y="104" width="84" height="12" fill="#2A4372"/>
-  <rect x="38" y="128" width="84" height="12" fill="#2A4372"/>
-  <path d="M 10 40 L 20 50 M 18 38 L 28 48" stroke="#2A4372" stroke-width="4" stroke-linecap="round"/>
-  <path d="M 150 40 L 140 50 M 142 38 L 132 48" stroke="#2A4372" stroke-width="4" stroke-linecap="round"/>
-  <path d="M 58 6 C 64 20 96 20 102 6 C 96 26 64 26 58 6 Z" fill="#2A4372"/>
+  <path d="M 34 18 L 4 34 C -2 46 6 62 18 66 L 38 50 Z" fill="#FFFFFF" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 126 18 L 156 34 C 162 46 154 62 142 66 L 122 50 Z" fill="#FFFFFF" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 34 18 C 44 8 54 4 80 4 C 106 4 116 8 126 18 L 122 52 L 122 146 L 38 146 L 38 52 Z" fill="#FFFFFF" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="38" y="56" width="84" height="13" fill="#2D5CE0"/>
+  <rect x="38" y="80" width="84" height="13" fill="#2D5CE0"/>
+  <rect x="38" y="104" width="84" height="13" fill="#2D5CE0"/>
+  <rect x="38" y="128" width="84" height="13" fill="#2D5CE0"/>
+  <path d="M 10 40 L 20 50 M 18 38 L 28 48" stroke="#2D5CE0" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 150 40 L 140 50 M 142 38 L 132 48" stroke="#2D5CE0" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 58 6 C 64 20 96 20 102 6 C 96 26 64 26 58 6 Z" fill="#2D5CE0" stroke="#17130F" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="56" cy="46" rx="16" ry="26" fill="#FFFFFF" opacity="0.5" transform="rotate(-10 56 46)"/>
 </svg>

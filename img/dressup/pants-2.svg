@@ -1,18 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 150">
-  <defs>
-    <linearGradient id="cargoBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#7FAE5C"/>
-      <stop offset="100%" stop-color="#547A38"/>
-    </linearGradient>
-  </defs>
-  <rect x="6" y="4" width="128" height="20" rx="10" fill="#466530"/>
-  <path d="M 10 22 L 66 22 L 66 76 C 66 88 62 96 58 104 L 30 104 C 28 92 26 80 24 68 C 18 52 12 36 10 22 Z" fill="url(#cargoBody)"/>
-  <path d="M 130 22 L 74 22 L 74 76 C 74 88 78 96 82 104 L 110 104 C 112 92 114 80 116 68 C 122 52 128 36 130 22 Z" fill="url(#cargoBody)"/>
-  <rect x="66" y="22" width="8" height="24" fill="#3B5527"/>
-  <rect x="14" y="50" width="26" height="20" rx="4" fill="#3B5527"/>
-  <rect x="14" y="48" width="26" height="8" rx="4" fill="#547A38"/>
-  <rect x="100" y="50" width="26" height="20" rx="4" fill="#3B5527"/>
-  <rect x="100" y="48" width="26" height="8" rx="4" fill="#547A38"/>
-  <rect x="24" y="98" width="34" height="10" rx="5" fill="#3B5527"/>
-  <rect x="82" y="98" width="34" height="10" rx="5" fill="#3B5527"/>
+  <rect x="6" y="4" width="128" height="20" rx="10" fill="#1D9E3B" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 10 22 L 66 22 L 66 76 C 66 88 62 96 58 104 L 30 104 C 28 92 26 80 24 68 C 18 52 12 36 10 22 Z" fill="#35D45A" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 130 22 L 74 22 L 74 76 C 74 88 78 96 82 104 L 110 104 C 112 92 114 80 116 68 C 122 52 128 36 130 22 Z" fill="#35D45A" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="66" y="22" width="8" height="24" fill="#1D9E3B"/>
+  <rect x="14" y="50" width="26" height="20" rx="4" fill="#1D9E3B" stroke="#17130F" stroke-width="3.5"/>
+  <rect x="100" y="50" width="26" height="20" rx="4" fill="#1D9E3B" stroke="#17130F" stroke-width="3.5"/>
+  <rect x="24" y="98" width="34" height="10" rx="5" fill="#1D9E3B" stroke="#17130F" stroke-width="3.5"/>
+  <rect x="82" y="98" width="34" height="10" rx="5" fill="#1D9E3B" stroke="#17130F" stroke-width="3.5"/>
+  <ellipse cx="30" cy="34" rx="10" ry="18" fill="#FFFFFF" opacity="0.3" transform="rotate(-8 30 34)"/>
 </svg>

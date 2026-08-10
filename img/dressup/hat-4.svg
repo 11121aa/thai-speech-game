@@ -1,17 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 130">
-  <defs>
-    <linearGradient id="partyHat" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#6FD86B"/>
-      <stop offset="100%" stop-color="#2FA82B"/>
-    </linearGradient>
-  </defs>
-  <path d="M 70 6 L 112 100 L 28 100 Z" fill="url(#partyHat)"/>
-  <path d="M 70 6 L 86 100 L 54 100 Z" fill="#FFF7EC" opacity="0.5"/>
-  <circle cx="46" cy="60" r="4" fill="#FFF7EC"/>
-  <circle cx="70" cy="40" r="4" fill="#FFF7EC"/>
-  <circle cx="94" cy="60" r="4" fill="#FFF7EC"/>
-  <circle cx="58" cy="80" r="4" fill="#FFF7EC"/>
-  <circle cx="82" cy="80" r="4" fill="#FFF7EC"/>
-  <ellipse cx="70" cy="100" rx="42" ry="10" fill="#2FA82B"/>
-  <circle cx="70" cy="8" r="10" fill="#FFF7EC"/>
+  <path d="M 70 6 L 112 100 L 28 100 Z" fill="#35D45A" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <circle cx="46" cy="60" r="5" fill="#FFD400" stroke="#17130F" stroke-width="2.5"/>
+  <circle cx="70" cy="40" r="5" fill="#FF3D9A" stroke="#17130F" stroke-width="2.5"/>
+  <circle cx="94" cy="60" r="5" fill="#FFD400" stroke="#17130F" stroke-width="2.5"/>
+  <circle cx="58" cy="80" r="5" fill="#2D8CFF" stroke="#17130F" stroke-width="2.5"/>
+  <circle cx="82" cy="80" r="5" fill="#FF3D9A" stroke="#17130F" stroke-width="2.5"/>
+  <ellipse cx="70" cy="100" rx="42" ry="10" fill="#1D9E3B" stroke="#17130F" stroke-width="5"/>
+  <circle cx="70" cy="8" r="11" fill="#FFFFFF" stroke="#17130F" stroke-width="5"/>
+  <ellipse cx="58" cy="30" rx="10" ry="16" fill="#FFFFFF" opacity="0.4" transform="rotate(-8 58 30)"/>
 </svg>

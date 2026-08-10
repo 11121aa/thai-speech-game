@@ -1,13 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 130">
-  <defs>
-    <linearGradient id="capDome" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#5B9BF2"/>
-      <stop offset="100%" stop-color="#2E6FD6"/>
-    </linearGradient>
-  </defs>
-  <path d="M 30 70 C 26 30 46 8 76 8 C 104 8 118 30 116 70 Z" fill="url(#capDome)"/>
-  <path d="M 76 8 L 76 70" stroke="#2559B0" stroke-width="3" opacity="0.5"/>
-  <path d="M 50 14 C 42 32 38 50 38 70" stroke="#2559B0" stroke-width="3" opacity="0.4" fill="none"/>
-  <circle cx="76" cy="10" r="5" fill="#1F4694"/>
-  <path d="M 24 68 C 24 62 30 60 40 60 L 132 66 C 140 68 140 80 130 82 L 40 78 C 28 78 22 74 24 68 Z" fill="#1F4694"/>
+  <path d="M 30 70 C 26 30 46 8 76 8 C 104 8 118 30 116 70 Z" fill="#2D8CFF" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 76 8 L 76 70" stroke="#1466CC" stroke-width="4"/>
+  <path d="M 50 14 C 42 32 38 50 38 70" stroke="#1466CC" stroke-width="4" fill="none"/>
+  <circle cx="76" cy="10" r="6" fill="#17130F"/>
+  <path d="M 24 68 C 24 62 30 60 40 60 L 132 66 C 140 68 140 80 130 82 L 40 78 C 28 78 22 74 24 68 Z" fill="#1466CC" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <ellipse cx="52" cy="30" rx="15" ry="9" fill="#FFFFFF" opacity="0.5" transform="rotate(-25 52 30)"/>
 </svg>

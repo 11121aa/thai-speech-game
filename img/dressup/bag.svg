@@ -1,20 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 150">
-  <defs>
-    <linearGradient id="bagBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#D179AC"/>
-      <stop offset="100%" stop-color="#A5477E"/>
-    </linearGradient>
-  </defs>
-  <!-- strap -->
-  <path d="M 30 8 C 10 40 10 90 34 132" fill="none" stroke="#8C3868" stroke-width="12" stroke-linecap="round"/>
-  <path d="M 30 8 C 10 40 10 90 34 132" fill="none" stroke="#B1568C" stroke-width="7" stroke-linecap="round"/>
-  <!-- bag body -->
-  <rect x="14" y="78" width="82" height="66" rx="14" fill="url(#bagBody)"/>
-  <!-- flap -->
-  <path d="M 14 90 C 14 68 24 58 55 58 C 86 58 96 68 96 90 L 96 100 C 96 108 90 112 82 108 L 55 96 L 28 108 C 20 112 14 108 14 100 Z" fill="#8C3868"/>
-  <!-- buckle -->
-  <circle cx="55" cy="86" r="9" fill="#FFF7EC"/>
-  <circle cx="55" cy="86" r="4" fill="#A5477E"/>
-  <!-- stitch line -->
-  <path d="M 22 132 L 88 132" stroke="#8C3868" stroke-width="2.5" stroke-dasharray="4 4" opacity="0.7"/>
+  <path d="M 30 8 C 10 40 10 90 34 132" fill="none" stroke="#17130F" stroke-width="14" stroke-linecap="round"/>
+  <path d="M 30 8 C 10 40 10 90 34 132" fill="none" stroke="#D6237A" stroke-width="8" stroke-linecap="round"/>
+  <rect x="14" y="78" width="82" height="66" rx="14" fill="#FF3D9A" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M 14 90 C 14 68 24 58 55 58 C 86 58 96 68 96 90 L 96 100 C 96 108 90 112 82 108 L 55 96 L 28 108 C 20 112 14 108 14 100 Z" fill="#D6237A" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <circle cx="55" cy="86" r="9" fill="#FFD400" stroke="#17130F" stroke-width="3.5"/>
+  <circle cx="55" cy="86" r="4" fill="#17130F"/>
+  <ellipse cx="34" cy="98" rx="10" ry="16" fill="#FFFFFF" opacity="0.3" transform="rotate(-10 34 98)"/>
 </svg>
