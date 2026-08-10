@@ -13,14 +13,19 @@ function createCookingGame(words, callbacks) {
   /* ── Colours ───────────────────────────────────────────── */
   var C = {
     bg:'#111827', ui:'#1e2a40', panel:'#0f3460',
-    bun:'#D4943A', bunD:'#8C5E1E',
-    tom:'#E74C3C', tomD:'#C0392B',
-    cab:'#27AE60', cabD:'#1a7a44',
-    sau:'#7B3F10', sauL:'#A85520',
-    kni:'#B8C0CC', kniH:'#5E4A38',
+    /* Food colours sampled/matched from img/cooking/bg.jpg's flat-vector
+       kitchen illustration (golden board, blue tile, warm reds/greens) so
+       the drawn food reads as part of the same illustration, not a
+       separate rendering style pasted on top of it. */
+    bun:'#EFAE55', bunD:'#C67C2C', bunHi:'#FBD48C',
+    tom:'#EB4B36', tomD:'#C22E20', tomHi:'#FF8C74', tomLeaf:'#3FC17B',
+    cab:'#3FC17B', cabD:'#237A4A', cabHi:'#8CE0AE',
+    sau:'#B2531F', sauD:'#7E3712', sauL:'#E68A46',
+    kni:'#E7ECF2', kniD:'#AEB9C7', kniH:'#C0392B', kniHD:'#8F2419',
     acc:'#2EC4B6', gold:'#F0A500',
     red:'#E53935', grn:'#27AE60',
     w:'#fff', gray:'#606880',
+    sh:'rgba(20,15,5,.28)',
     sDone:'#27AE60', sAct:'#2EC4B6', sOff:'#1e2a40',
   };
 
@@ -109,10 +114,22 @@ function createCookingGame(words, callbacks) {
   /* ── Bun ─────────────────────────────────────────────────── */
   function drawBunSprite(){
     fillRR(BLX,BTY,BW,BH,14,C.bun);
-    ctx.strokeStyle=C.bunD; ctx.lineWidth=3; rr(BLX,BTY,BW,BH,14); ctx.stroke();
+    // Flat crust shading built from layered shapes (top highlight band,
+    // bottom shadow band) rather than a canvas gradient -- keeps it
+    // consistent with the flat-vector look of img/cooking/bg.jpg instead
+    // of reading as a separately-rendered style pasted on top of it.
+    ctx.save(); ctx.beginPath(); rr(BLX,BTY,BW,BH,14); ctx.clip();
+    ctx.fillStyle=C.bunHi; ctx.globalAlpha=.5;
+    ctx.beginPath(); ctx.ellipse(BCX,BTY+8,BW*.42,BH*.32,0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.fillStyle=C.bunD; ctx.globalAlpha=.3;
+    ctx.fillRect(BLX,BTY+BH-18,BW,18);
+    ctx.globalAlpha=1;
+    ctx.restore();
+    ctx.strokeStyle=C.bunD; ctx.lineWidth=2; rr(BLX,BTY,BW,BH,14); ctx.stroke();
     ctx.fillStyle=C.bunD;
     [[185,338],[225,348],[265,336],[305,348],[345,336],[160,352],[380,350]].forEach(function(d){
-      ctx.beginPath(); ctx.arc(d[0],d[1],4.5,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(d[0],d[1],4.5,3,0,0,Math.PI*2); ctx.fill();
     });
   }
   function drawBunPiece(poly,dx){
@@ -128,63 +145,110 @@ function createCookingGame(words, callbacks) {
   }
   function sBunTop(cx,cy,w,h){
     ctx.save();
-    ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=10; ctx.shadowOffsetY=5;
+    ctx.shadowColor=C.sh; ctx.shadowBlur=10; ctx.shadowOffsetY=5;
     ctx.fillStyle=C.bun;
     ctx.beginPath();
     ctx.ellipse(cx,cy+h*.35,w/2,h*.6,0,Math.PI,0,false);
     ctx.lineTo(cx+w/2,cy+h); ctx.lineTo(cx-w/2,cy+h); ctx.closePath(); ctx.fill();
+    ctx.shadowColor='transparent';
     ctx.fillStyle=C.bunD; ctx.fillRect(cx-w/2,cy+h-10,w,10);
-    ctx.fillStyle='rgba(255,255,255,.18)';
-    ctx.beginPath(); ctx.ellipse(cx-w*.13,cy+h*.15,w*.16,h*.1,-0.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=C.bunHi; ctx.globalAlpha=.5;
+    ctx.beginPath(); ctx.ellipse(cx-w*.13,cy+h*.15,w*.18,h*.12,-0.4,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.fillStyle=C.bunD;
+    [[-.18,-.1],[.05,-.16],[.24,-.04]].forEach(function(p){
+      ctx.beginPath(); ctx.ellipse(cx+p[0]*w,cy+h*.35+p[1]*h,3.5,2.5,0,0,Math.PI*2); ctx.fill();
+    });
     ctx.restore();
   }
   function sBunBot(cx,cy,w,h){
     ctx.save();
-    ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
     ctx.fillStyle=C.bunD;
     ctx.beginPath();
     ctx.ellipse(cx,cy+h*.65,w/2+6,h*.38,0,0,Math.PI,false);
     ctx.lineTo(cx-w/2-6,cy); ctx.lineTo(cx+w/2+6,cy); ctx.closePath(); ctx.fill();
+    ctx.shadowColor='transparent';
     ctx.fillStyle=C.bun; ctx.fillRect(cx-w/2,cy,w,h*.6);
+    ctx.fillStyle=C.bunHi; ctx.globalAlpha=.35;
+    ctx.beginPath(); ctx.ellipse(cx-w*.15,cy+h*.1,w*.14,h*.16,0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
     ctx.restore();
   }
 
   /* ── Tomato / Cabbage ─────────────────────────────────────── */
   function sTomato(cx,cy,r,st){
     ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
     if(st===0){
       ctx.fillStyle=C.tom; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle=C.cabD; ctx.lineWidth=4; ctx.lineCap='round';
-      ctx.beginPath(); ctx.moveTo(cx,cy-r); ctx.quadraticCurveTo(cx+12,cy-r-20,cx+7,cy-r-32); ctx.stroke();
-      ctx.fillStyle='rgba(255,255,255,.22)';
-      ctx.beginPath(); ctx.ellipse(cx-r*.26,cy-r*.26,r*.2,r*.14,-0.5,0,Math.PI*2); ctx.fill();
+      ctx.shadowColor='transparent';
+      // star-shaped calyx, coloured to match the leek leaves in bg.jpg
+      ctx.fillStyle=C.tomLeaf;
+      for(var k=0;k<5;k++){
+        var a0=(k/5)*Math.PI*2-Math.PI/2;
+        ctx.beginPath();
+        ctx.ellipse(cx+Math.cos(a0)*r*.22,cy-r*.86+Math.sin(a0)*r*.22,r*.16,r*.07,a0+Math.PI/2,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(cx,cy-r*.86,r*.13,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.3)';
+      ctx.beginPath(); ctx.ellipse(cx-r*.28,cy-r*.3,r*.22,r*.15,-0.5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=C.tomHi; ctx.globalAlpha=.6;
+      ctx.beginPath(); ctx.ellipse(cx-r*.22,cy-r*.32,r*.1,r*.06,-0.5,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
     }else if(st===1){
       ctx.fillStyle=C.tomD; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle='rgba(255,190,180,.5)'; ctx.lineWidth=3;
+      ctx.shadowColor='transparent';
+      ctx.strokeStyle='rgba(255,180,160,.5)'; ctx.lineWidth=3;
       for(var i=-3;i<=3;i++){ctx.beginPath();ctx.moveTo(cx+i*r/3.5,cy-r+6);ctx.lineTo(cx+i*r/3.5,cy+r-6);ctx.stroke();}
+      ctx.fillStyle='rgba(255,255,255,.22)';
+      ctx.beginPath(); ctx.ellipse(cx-r*.28,cy-r*.32,r*.18,r*.12,-0.5,0,Math.PI*2); ctx.fill();
     }else{
+      ctx.shadowColor='transparent';
       ctx.fillStyle=C.tomD;
       for(var j=0;j<9;j++){
         var a=(j/9)*Math.PI*2, d=r*.52+(j%3)*r*.28;
         ctx.beginPath(); ctx.ellipse(cx+Math.cos(a)*d,cy+Math.sin(a)*d,r*.3,r*.17,a,0,Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle='rgba(255,255,255,.2)';
+      for(var j2=0;j2<9;j2+=3){
+        var a2=(j2/9)*Math.PI*2, d2=r*.52+(j2%3)*r*.28;
+        ctx.beginPath(); ctx.ellipse(cx+Math.cos(a2)*d2-2,cy+Math.sin(a2)*d2-2,r*.1,r*.06,a2,0,Math.PI*2); ctx.fill();
       }
     }
     ctx.restore();
   }
   function sCabbage(cx,cy,r,st){
     ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
     if(st===0){
+      ctx.shadowColor='transparent';
       for(var i=4;i>=0;i--){ctx.fillStyle=i%2===0?C.cab:C.cabD;ctx.beginPath();ctx.ellipse(cx,cy+i*4,r-i*7,(r-i*7)*.85,0,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle=C.cabHi; ctx.globalAlpha=.4;
+      ctx.beginPath(); ctx.ellipse(cx-r*.22,cy-r*.28,r*.26,r*.16,-0.4,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
     }else if(st===1){
       ctx.fillStyle=C.cabD; ctx.beginPath(); ctx.ellipse(cx,cy,r,r*.85,0,0,Math.PI*2); ctx.fill();
+      ctx.shadowColor='transparent';
       ctx.strokeStyle='rgba(180,255,180,.4)'; ctx.lineWidth=2;
       for(var i=-3;i<=3;i++){ctx.beginPath();ctx.moveTo(cx-r+4,cy+i*r/4);ctx.lineTo(cx+r-4,cy+i*r/4);ctx.stroke();}
+      ctx.fillStyle=C.cabHi; ctx.globalAlpha=.3;
+      ctx.beginPath(); ctx.ellipse(cx-r*.25,cy-r*.25,r*.2,r*.12,-0.4,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
     }else{
+      ctx.shadowColor='transparent';
       ctx.fillStyle=C.cab;
       for(var j=0;j<13;j++){
         var a=(j/13)*Math.PI*2+.2, d=r*.25+Math.abs(Math.sin(j))*r*.75;
         ctx.beginPath(); ctx.ellipse(cx+Math.cos(a)*d,cy+Math.sin(a)*d,r*.22,r*.07,a+.4,0,Math.PI*2); ctx.fill();
       }
+      ctx.fillStyle=C.cabHi; ctx.globalAlpha=.3;
+      for(var j2=0;j2<13;j2+=4){
+        var a2=(j2/13)*Math.PI*2+.2, d2=r*.25+Math.abs(Math.sin(j2))*r*.75;
+        ctx.beginPath(); ctx.ellipse(cx+Math.cos(a2)*d2,cy+Math.sin(a2)*d2-1,r*.12,r*.04,a2+.4,0,Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha=1;
     }
     ctx.restore();
   }
@@ -192,14 +256,20 @@ function createCookingGame(words, callbacks) {
   /* ── Sausage ──────────────────────────────────────────────── */
   function sSauLink(cx,cy,w,h){
     ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=6; ctx.shadowOffsetY=3;
     ctx.fillStyle=C.sau; ctx.beginPath(); ctx.ellipse(cx,cy,w/2,h/2,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=C.sauL; ctx.beginPath(); ctx.ellipse(cx-w*.13,cy-h*.18,w*.17,h*.12,0,0,Math.PI*2); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.fillStyle=C.sauL; ctx.globalAlpha=.9;
+    ctx.beginPath(); ctx.ellipse(cx-w*.14,cy-h*.2,w*.15,h*.32,-0.3,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(255,255,255,.35)';
+    ctx.beginPath(); ctx.ellipse(cx-w*.16,cy-h*.22,w*.07,h*.14,-0.3,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }
   function sSausageFull(cuts){
     for(var i=0;i<NL-1;i++){
       var gy=STOP+i*LH+LH;
-      ctx.fillStyle='#4a2008';
+      ctx.fillStyle=C.sauD;
       ctx.fillRect(SCX-7,gy-4,14,STOP+(i+1)*LH-gy+8);
     }
     for(var i=0;i<NL;i++) sSauLink(SCX,STOP+i*LH+LH/2,LW,LH-10);
@@ -229,7 +299,7 @@ function createCookingGame(words, callbacks) {
     ctx.save();
     ctx.translate(cx,cy); ctx.scale(sx,sy); ctx.rotate(Math.PI/2); ctx.translate(-srcCX,-srcCY);
     ctx.beginPath(); ctx.rect(SCX-LW/2-1,topY,LW+2,pieceH); ctx.clip();
-    for(var i=0;i<NL-1;i++){var gy=STOP+i*LH+LH;ctx.fillStyle='#4a2008';ctx.fillRect(SCX-7,gy-4,14,STOP+(i+1)*LH-gy+8);}
+    for(var i=0;i<NL-1;i++){var gy=STOP+i*LH+LH;ctx.fillStyle=C.sauD;ctx.fillRect(SCX-7,gy-4,14,STOP+(i+1)*LH-gy+8);}
     for(var i=0;i<NL;i++) sSauLink(SCX,STOP+i*LH+LH/2,LW,LH-10);
     ctx.restore();
   }
@@ -291,13 +361,19 @@ function createCookingGame(words, callbacks) {
     }
     ctx.restore();
   }
+  // Coloured to match the red-handled utensils hanging in img/cooking/bg.jpg
+  // (dark-red base, lighter red grip band, silver blade) instead of the
+  // previous grey/brown that didn't relate to the rest of the scene.
   function sKnife(kx,ky,angle){
     ctx.save(); ctx.translate(kx,ky); ctx.rotate(angle);
-    ctx.fillStyle=C.kniH; rr(-10,0,20,52,5); ctx.fill();
-    ctx.fillStyle='#7a8090'; ctx.fillRect(-14,-6,28,10);
+    ctx.shadowColor=C.sh; ctx.shadowBlur=6; ctx.shadowOffsetY=3;
+    ctx.fillStyle=C.kniHD; rr(-10,0,20,52,5); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.fillStyle=C.kniH; rr(-7,3,14,30,4); ctx.fill();
+    ctx.fillStyle=C.kniD; ctx.fillRect(-14,-6,28,10);
     ctx.fillStyle=C.kni;
     ctx.beginPath(); ctx.moveTo(-8,-6); ctx.lineTo(8,-6); ctx.lineTo(5,-76); ctx.lineTo(0,-90); ctx.lineTo(-5,-76); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.3)';
+    ctx.fillStyle='rgba(255,255,255,.35)';
     ctx.beginPath(); ctx.moveTo(-5,-6); ctx.lineTo(-1,-6); ctx.lineTo(0,-76); ctx.lineTo(-4,-76); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
@@ -426,9 +502,14 @@ function createCookingGame(words, callbacks) {
         if(d<30){ctx.fillStyle='rgba(46,196,182,'+(0.14*(1-d/30))+')'; ctx.fillRect(0,ty-14,VW,28);}
       });
       ctx.save(); ctx.translate(KX,G.kY); ctx.rotate(-Math.PI/2);
+      ctx.shadowColor=C.sh; ctx.shadowBlur=5; ctx.shadowOffsetY=2;
       ctx.fillStyle=C.kni;
       ctx.beginPath(); ctx.moveTo(-7,-6); ctx.lineTo(7,-6); ctx.lineTo(4,-74); ctx.lineTo(0,-88); ctx.lineTo(-4,-74); ctx.closePath(); ctx.fill();
-      ctx.fillStyle=C.kniH; rr(-10,-6+74,20,50,5); ctx.fill();
+      ctx.shadowColor='transparent';
+      ctx.fillStyle='rgba(255,255,255,.3)';
+      ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(-1,-6); ctx.lineTo(0,-74); ctx.lineTo(-3,-74); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=C.kniHD; rr(-10,-6+74,20,50,5); ctx.fill();
+      ctx.fillStyle=C.kniH; rr(-7,-3+74,14,28,4); ctx.fill();
       ctx.restore();
     }
     if(G.cutSc.length>0){
