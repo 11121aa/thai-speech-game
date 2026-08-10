@@ -116,12 +116,19 @@ function createDressupGame(words, callbacks) {
     // bag over the shirt, hat last on top). Created once and hidden until
     // its slot is unlocked -- drawAvatar() only toggles visibility, it
     // never recreates these.
+    // Sizes/positions are derived from the plain body's own geometry below
+    // (legs span AX-38..AX+38 / AY-40..AY+50, feet ellipses sit at
+    // AY+49..AY+67, torso spans AY-120..AY-30, head circle is centered at
+    // AY-175 with radius 40) rather than guessed -- the shoes in
+    // particular were previously sized far taller (40px) than the ~18px
+    // foot region they sit over, making them swallow up into the pant
+    // legs instead of sitting at the ankle.
     buildPieceImages: function () {
-      this.pieceImgs.pants = this.add.image(AX, AY - 40,  'ds_pants').setOrigin(0.5, 0).setDisplaySize(92, 96).setVisible(false);
-      this.pieceImgs.shoes = this.add.image(AX, AY + 58,  'ds_shoes').setOrigin(0.5, 0.5).setDisplaySize(104, 40).setVisible(false);
-      this.pieceImgs.shirt = this.add.image(AX, AY - 126, 'ds_shirt').setOrigin(0.5, 0).setDisplaySize(112, 106).setVisible(false);
-      this.pieceImgs.bag   = this.add.image(AX + 46, AY - 88, 'ds_bag').setOrigin(0.5, 0.5).setDisplaySize(56, 80).setVisible(false);
-      this.pieceImgs.hat   = this.add.image(AX, AY - 210, 'ds_hat').setOrigin(0.5, 1).setDisplaySize(96, 90).setVisible(false);
+      this.pieceImgs.pants = this.add.image(AX, AY - 40,  'ds_pants').setOrigin(0.5, 0).setDisplaySize(88, 96).setVisible(false);
+      this.pieceImgs.shoes = this.add.image(AX, AY + 58,  'ds_shoes').setOrigin(0.5, 0.5).setDisplaySize(86, 30).setVisible(false);
+      this.pieceImgs.shirt = this.add.image(AX, AY - 124, 'ds_shirt').setOrigin(0.5, 0).setDisplaySize(112, 100).setVisible(false);
+      this.pieceImgs.bag   = this.add.image(AX + 44, AY - 82, 'ds_bag').setOrigin(0.5, 0.5).setDisplaySize(52, 74).setVisible(false);
+      this.pieceImgs.hat   = this.add.image(AX, AY - 206, 'ds_hat').setOrigin(0.5, 1).setDisplaySize(92, 88).setVisible(false);
     },
 
     // ── Redraws the plain avatar body each time an item unlocks. The
