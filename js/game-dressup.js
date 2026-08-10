@@ -3,10 +3,12 @@
 // ============================================================
 //  POLISH GUIDE (search for the label to find where to edit):
 //    [TUNE]    Points per item, avatar position     (~line 15)
-//    [SLOTS]   Clothing slots + colours              (~SLOTS array)
-//    [AVATAR]  How the avatar is drawn               (~drawAvatar)
+//    [SLOTS]   Clothing slots + labels               (~SLOTS array)
+//    [AVATAR]  Body base + clothing sprite overlays  (~drawAvatar / buildPieceImages)
 //    [CARD]    Item card colours and size            (~buildCard)
 //    [BTN]     Button colours and labels             (~buildButtons)
+//  Clothing art itself lives in img/dressup/*.svg — edit those files
+//  directly to restyle a piece; buildPieceImages() only positions them.
 // ============================================================
 //  How the game works:
 //    - A plain avatar stands on the left; a card on the right shows
@@ -29,14 +31,14 @@ function createDressupGame(words, callbacks) {
   var W = 800, H = 500;   // canvas size in pixels
   var AX = 190, AY = 280; // avatar anchor point (base of the torso)
 
-  // ── [SLOTS] Outfit pieces, in unlock order ─────────────────────
-  // color is a Phaser hex number used to fill that piece on the avatar
+  // ── [SLOTS] Outfit pieces, in unlock order. Each key's illustrated
+  // sprite lives at img/dressup/<key>.svg (see buildPieceImages).
   var SLOTS = [
-    { key:'hat',   label:'หมวก',     emoji:'🎩', color:0xE74C3C },
-    { key:'shirt', label:'เสื้อ',     emoji:'👕', color:0x2EC4B6 },
-    { key:'pants', label:'กางเกง',   emoji:'👖', color:0x3B4A6B },
-    { key:'shoes', label:'รองเท้า',  emoji:'👟', color:0xF0A500 },
-    { key:'bag',   label:'กระเป๋า',  emoji:'👜', color:0xB1568C }
+    { key:'hat',   label:'หมวก',     emoji:'🎩' },
+    { key:'shirt', label:'เสื้อ',     emoji:'👕' },
+    { key:'pants', label:'กางเกง',   emoji:'👖' },
+    { key:'shoes', label:'รองเท้า',  emoji:'👟' },
+    { key:'bag',   label:'กระเป๋า',  emoji:'👜' }
   ];
 
   // ── [CARD] Card visual dimensions ──────────────────────────────
@@ -57,6 +59,18 @@ function createDressupGame(words, callbacks) {
       this.canInteract = true;   // false while the practice modal is open
       this.avatarGfx   = null;
       this.cardCont    = null;
+      this.pieceImgs   = {};     // slotKey -> illustrated clothing sprite, hidden until unlocked
+    },
+
+    // Illustrated clothing art (img/dressup/*.svg) -- each piece is a
+    // hand-drawn sprite overlaid on the plain avatar body drawn in
+    // drawAvatar(), rather than a flat colour fill.
+    preload: function () {
+      this.load.svg('ds_hat',   'img/dressup/hat.svg',   { width: 140, height: 130 });
+      this.load.svg('ds_shirt', 'img/dressup/shirt.svg', { width: 160, height: 150 });
+      this.load.svg('ds_pants', 'img/dressup/pants.svg', { width: 140, height: 150 });
+      this.load.svg('ds_shoes', 'img/dressup/shoes.svg', { width: 200, height: 70  });
+      this.load.svg('ds_bag',   'img/dressup/bag.svg',   { width: 110, height: 150 });
     },
 
     create: function () {
@@ -79,6 +93,7 @@ function createDressupGame(words, callbacks) {
 
       // ── Avatar ──────────────────────────────────────────────────
       this.avatarGfx = this.add.graphics();
+      this.buildPieceImages();
       this.drawAvatar();
 
       // ── Item card ───────────────────────────────────────────────
@@ -90,56 +105,50 @@ function createDressupGame(words, callbacks) {
       this.showItem();
     },
 
-    // ── [AVATAR] Redraws the whole avatar from scratch each time an
-    // item unlocks. Unlocked pieces use their slot colour; everything
-    // still locked falls back to a plain neutral grey/tan base look.
+    // ── [AVATAR] One illustrated sprite per outfit slot, positioned over
+    // the plain body drawn in drawAvatar() and stacked in the order that
+    // looks right on the body (pants/shoes first, shirt over the torso,
+    // bag over the shirt, hat last on top). Created once and hidden until
+    // its slot is unlocked -- drawAvatar() only toggles visibility, it
+    // never recreates these.
+    buildPieceImages: function () {
+      this.pieceImgs.pants = this.add.image(AX, AY - 40,  'ds_pants').setOrigin(0.5, 0).setDisplaySize(92, 96).setVisible(false);
+      this.pieceImgs.shoes = this.add.image(AX, AY + 58,  'ds_shoes').setOrigin(0.5, 0.5).setDisplaySize(104, 40).setVisible(false);
+      this.pieceImgs.shirt = this.add.image(AX, AY - 126, 'ds_shirt').setOrigin(0.5, 0).setDisplaySize(112, 106).setVisible(false);
+      this.pieceImgs.bag   = this.add.image(AX + 46, AY - 88, 'ds_bag').setOrigin(0.5, 0.5).setDisplaySize(56, 80).setVisible(false);
+      this.pieceImgs.hat   = this.add.image(AX, AY - 210, 'ds_hat').setOrigin(0.5, 1).setDisplaySize(96, 90).setVisible(false);
+    },
+
+    // ── Redraws the plain avatar body each time an item unlocks. The
+    // body itself is always a neutral base (bare skin/hair) -- outfit
+    // pieces are the illustrated sprites from buildPieceImages(), just
+    // shown or hidden here rather than colour-filled shapes.
     drawAvatar: function () {
       var g = this.avatarGfx;
       var eq = this.equipped;
       g.clear();
 
-      var pantsCol = eq.pants ? this.slotColor('pants') : 0xE5E7EB;
-      var shoeCol  = eq.shoes ? this.slotColor('shoes') : 0x9CA3AF;
-      var shirtCol = eq.shirt ? this.slotColor('shirt') : 0xE5E7EB;
-
-      // legs (pants)
-      g.fillStyle(pantsCol);
+      // legs (bare base -- covered by the pants sprite once equipped)
+      g.fillStyle(0xE5E7EB);
       g.fillRoundedRect(AX - 38, AY - 40, 30, 90, 8);
       g.fillRoundedRect(AX + 8,  AY - 40, 30, 90, 8);
-      // shoes
-      g.fillStyle(shoeCol);
+      // feet (bare base -- covered by the shoes sprite once equipped)
+      g.fillStyle(0x9CA3AF);
       g.fillEllipse(AX - 23, AY + 58, 34, 18);
       g.fillEllipse(AX + 23, AY + 58, 34, 18);
       // arms (skin)
       g.fillStyle(0xF5C9A0);
       g.fillRoundedRect(AX - 58, AY - 110, 18, 80, 9);
       g.fillRoundedRect(AX + 40, AY - 110, 18, 80, 9);
-      // torso (shirt)
-      g.fillStyle(shirtCol);
+      // torso (bare base -- covered by the shirt sprite once equipped)
+      g.fillStyle(0xE5E7EB);
       g.fillRoundedRect(AX - 40, AY - 120, 80, 90, 16);
-      // bag accessory — hangs off the right hip over the torso
-      if (eq.bag) {
-        var bagCol = this.slotColor('bag');
-        g.lineStyle(4, bagCol, 1);
-        g.beginPath();
-        g.arc(AX + 44, AY - 92, 16, Math.PI, 0, false);
-        g.strokePath();
-        g.fillStyle(bagCol);
-        g.fillRoundedRect(AX + 28, AY - 78, 30, 32, 6);
-      }
       // head (skin)
       g.fillStyle(0xF5C9A0);
       g.fillCircle(AX, AY - 175, 40);
       // hair — rounded band across the top of the head
       g.fillStyle(0x4B3621);
       g.fillRoundedRect(AX - 40, AY - 214, 80, 36, { tl: 20, tr: 20, bl: 0, br: 0 });
-      // hat — sits above the hairline once unlocked
-      if (eq.hat) {
-        var hatCol = this.slotColor('hat');
-        g.fillStyle(hatCol);
-        g.fillRoundedRect(AX - 36, AY - 232, 72, 20, 10);
-        g.fillRoundedRect(AX - 20, AY - 258, 40, 32, 6);
-      }
       // face
       g.fillStyle(0x2b2b2b);
       g.fillCircle(AX - 14, AY - 178, 4);
@@ -148,11 +157,10 @@ function createDressupGame(words, callbacks) {
       g.beginPath();
       g.arc(AX, AY - 168, 14, 0.2, Math.PI - 0.2, false);
       g.strokePath();
-    },
 
-    slotColor: function (key) {
-      for (var i = 0; i < SLOTS.length; i++) if (SLOTS[i].key === key) return SLOTS[i].color;
-      return 0xffffff;
+      for (var key in this.pieceImgs) {
+        this.pieceImgs[key].setVisible(!!eq[key]);
+      }
     },
 
     // ── Build all graphics/text inside the item card container ────
@@ -269,8 +277,10 @@ function createDressupGame(words, callbacks) {
       this.drawAvatar();
 
       // little pop animation to celebrate the new piece
-      this.avatarGfx.setScale(0.9);
-      this.tweens.add({ targets: this.avatarGfx, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.Out' });
+      var pieceImg = this.pieceImgs[this.currentSlot.key];
+      var popTargets = pieceImg ? [this.avatarGfx, pieceImg] : [this.avatarGfx];
+      popTargets.forEach(function (t) { t.setScale(0.9); });
+      this.tweens.add({ targets: popTargets, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.Out' });
 
       this.doneCount++;
       this.idx++;

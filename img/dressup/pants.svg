@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 150">
+  <defs>
+    <linearGradient id="pantsBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4C5D89"/>
+      <stop offset="100%" stop-color="#313F63"/>
+    </linearGradient>
+  </defs>
+  <!-- waistband -->
+  <rect x="6" y="4" width="128" height="20" rx="10" fill="#293256"/>
+  <!-- legs -->
+  <path d="M 10 22 L 66 22 L 66 96 C 66 118 62 134 58 146 L 30 146 C 28 130 26 110 24 96 C 18 72 12 46 10 22 Z" fill="url(#pantsBody)"/>
+  <path d="M 130 22 L 74 22 L 74 96 C 74 118 78 134 82 146 L 110 146 C 112 130 114 110 116 96 C 122 72 128 46 130 22 Z" fill="url(#pantsBody)"/>
+  <!-- center seam -->
+  <rect x="66" y="22" width="8" height="30" fill="#252D4C"/>
+  <!-- side seams -->
+  <path d="M 14 26 C 12 54 18 80 26 100" fill="none" stroke="#252D4C" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 126 26 C 128 54 122 80 114 100" fill="none" stroke="#252D4C" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <!-- cuffs -->
+  <rect x="24" y="136" width="38" height="12" rx="5" fill="#252D4C"/>
+  <rect x="78" y="136" width="38" height="12" rx="5" fill="#252D4C"/>
+  <!-- pocket stitching -->
+  <path d="M 18 30 L 34 30 L 30 44 L 16 44 Z" fill="none" stroke="#5E70A0" stroke-width="2" opacity="0.7"/>
+</svg>

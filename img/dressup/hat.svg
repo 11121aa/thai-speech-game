@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 130">
+  <defs>
+    <linearGradient id="hatDome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F26B5B"/>
+      <stop offset="100%" stop-color="#D63A2B"/>
+    </linearGradient>
+    <linearGradient id="hatBrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C0392B"/>
+      <stop offset="100%" stop-color="#A5301F"/>
+    </linearGradient>
+  </defs>
+  <!-- dome -->
+  <path d="M 70 6 C 30 6 14 46 14 78 L 126 78 C 126 46 110 6 70 6 Z" fill="url(#hatDome)"/>
+  <!-- fold seams for texture -->
+  <path d="M 44 12 C 30 30 24 54 24 78" fill="none" stroke="#B8341F" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+  <path d="M 96 12 C 110 30 116 54 116 78" fill="none" stroke="#B8341F" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+  <!-- soft highlight -->
+  <path d="M 46 16 C 40 30 36 44 35 58" fill="none" stroke="#FFA492" stroke-width="5" stroke-linecap="round" opacity="0.5"/>
+  <!-- folded brim -->
+  <rect x="10" y="76" width="120" height="26" rx="13" fill="url(#hatBrim)"/>
+  <rect x="10" y="76" width="120" height="9" rx="4.5" fill="#E0503C" opacity="0.6"/>
+  <!-- pompom -->
+  <circle cx="70" cy="12" r="12" fill="#FFF7EC"/>
+  <circle cx="65" cy="8" r="3" fill="#ffffff" opacity="0.8"/>
+</svg>
