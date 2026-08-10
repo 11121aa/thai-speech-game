@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 150">
+  <defs>
+    <linearGradient id="poloBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD966"/>
+      <stop offset="100%" stop-color="#F0B000"/>
+    </linearGradient>
+  </defs>
+  <path d="M 34 18 L 4 34 C -2 46 6 62 18 66 L 38 50 Z" fill="url(#poloBody)"/>
+  <path d="M 126 18 L 156 34 C 162 46 154 62 142 66 L 122 50 Z" fill="url(#poloBody)"/>
+  <path d="M 34 18 C 44 8 54 4 80 4 C 106 4 116 8 126 18 L 122 52 L 122 146 L 38 146 L 38 52 Z" fill="url(#poloBody)"/>
+  <rect x="38" y="90" width="84" height="14" fill="#D99A00" opacity="0.7"/>
+  <path d="M 58 6 L 80 34 L 102 6 L 96 26 L 80 44 L 64 26 Z" fill="#FFF7EC"/>
+  <path d="M 58 6 L 80 34 L 102 6" fill="none" stroke="#D99A00" stroke-width="2"/>
+  <rect x="77" y="30" width="6" height="30" fill="#D99A00"/>
+  <circle cx="80" cy="38" r="2.5" fill="#8A6300"/>
+  <circle cx="80" cy="48" r="2.5" fill="#8A6300"/>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 70">
+  <defs>
+    <linearGradient id="bootBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7FC26B"/>
+      <stop offset="100%" stop-color="#438A32"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M 10 2 L 70 2 L 74 30 L 90 40 C 94 43 94 50 86 52 L 8 54 C 4 54 2 50 4 46 L 10 2 Z" fill="url(#bootBody)"/>
+    <path d="M 4 46 L 86 44 C 90 44 92 48 88 52 L 10 56 C 2 56 0 52 4 46 Z" fill="#2E6322"/>
+    <rect x="12" y="4" width="54" height="10" fill="#2E6322" opacity="0.6"/>
+  </g>
+  <g transform="translate(200,0) scale(-1,1)">
+    <path d="M 10 2 L 70 2 L 74 30 L 90 40 C 94 43 94 50 86 52 L 8 54 C 4 54 2 50 4 46 L 10 2 Z" fill="url(#bootBody)"/>
+    <path d="M 4 46 L 86 44 C 90 44 92 48 88 52 L 10 56 C 2 56 0 52 4 46 Z" fill="#2E6322"/>
+    <rect x="12" y="4" width="54" height="10" fill="#2E6322" opacity="0.6"/>
+  </g>
+</svg>

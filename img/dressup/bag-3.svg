@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 150">
+  <defs>
+    <linearGradient id="toteBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD966"/>
+      <stop offset="100%" stop-color="#F0B000"/>
+    </linearGradient>
+  </defs>
+  <path d="M 30 30 C 30 10 44 2 55 2 C 66 2 80 10 80 30" fill="none" stroke="#D99A00" stroke-width="8" stroke-linecap="round"/>
+  <path d="M 18 40 L 92 40 L 86 138 C 86 144 82 148 76 148 L 34 148 C 28 148 24 144 24 138 Z" fill="url(#toteBody)"/>
+  <rect x="18" y="40" width="74" height="14" fill="#D99A00"/>
+  <path d="M 40 70 L 70 70 M 40 90 L 70 90" stroke="#D99A00" stroke-width="3" opacity="0.6" stroke-linecap="round"/>
+</svg>

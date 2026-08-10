@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 150">
+  <defs>
+    <linearGradient id="starPants" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#A88CE0"/>
+      <stop offset="100%" stop-color="#7454B8"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="4" width="128" height="20" rx="10" fill="#5A3D96"/>
+  <path d="M 10 22 L 66 22 L 66 96 C 66 118 62 134 58 146 L 30 146 C 28 130 26 110 24 96 C 18 72 12 46 10 22 Z" fill="url(#starPants)"/>
+  <path d="M 130 22 L 74 22 L 74 96 C 74 118 78 134 82 146 L 110 146 C 112 130 114 110 116 96 C 122 72 128 46 130 22 Z" fill="url(#starPants)"/>
+  <rect x="66" y="22" width="8" height="30" fill="#5A3D96"/>
+  <rect x="24" y="136" width="38" height="12" rx="5" fill="#5A3D96"/>
+  <rect x="78" y="136" width="38" height="12" rx="5" fill="#5A3D96"/>
+  <g fill="#FFF7EC" opacity="0.85">
+    <path d="M 36 46 L 38 52 L 44 52 L 39 56 L 41 62 L 36 58 L 31 62 L 33 56 L 28 52 L 34 52 Z"/>
+    <path d="M 100 46 L 102 52 L 108 52 L 103 56 L 105 62 L 100 58 L 95 62 L 97 56 L 92 52 L 98 52 Z"/>
+    <path d="M 40 90 L 42 96 L 48 96 L 43 100 L 45 106 L 40 102 L 35 106 L 37 100 L 32 96 L 38 96 Z"/>
+    <path d="M 96 90 L 98 96 L 104 96 L 99 100 L 101 106 L 96 102 L 91 106 L 93 100 L 88 96 L 94 96 Z"/>
+  </g>
+</svg>

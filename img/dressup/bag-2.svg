@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 150">
+  <defs>
+    <linearGradient id="backpackBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6FA8DC"/>
+      <stop offset="100%" stop-color="#3D7BB8"/>
+    </linearGradient>
+  </defs>
+  <path d="M 26 10 C 22 24 22 40 26 50" fill="none" stroke="#2F5F91" stroke-width="10" stroke-linecap="round"/>
+  <path d="M 84 10 C 88 24 88 40 84 50" fill="none" stroke="#2F5F91" stroke-width="10" stroke-linecap="round"/>
+  <rect x="16" y="34" width="78" height="100" rx="16" fill="url(#backpackBody)"/>
+  <rect x="34" y="50" width="42" height="34" rx="10" fill="#2F5F91"/>
+  <circle cx="55" cy="67" r="4" fill="#FFF7EC"/>
+  <rect x="24" y="94" width="62" height="8" rx="4" fill="#2F5F91" opacity="0.7"/>
+  <rect x="24" y="112" width="62" height="8" rx="4" fill="#2F5F91" opacity="0.7"/>
+</svg>

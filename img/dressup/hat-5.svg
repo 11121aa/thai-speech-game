@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 130">
+  <defs>
+    <linearGradient id="winterHat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B18CF2"/>
+      <stop offset="100%" stop-color="#7C4FD1"/>
+    </linearGradient>
+  </defs>
+  <path d="M 70 6 C 32 6 16 44 16 76 L 124 76 C 124 44 108 6 70 6 Z" fill="url(#winterHat)"/>
+  <rect x="16" y="30" width="108" height="10" fill="#9E6FE0" opacity="0.7"/>
+  <rect x="16" y="50" width="108" height="10" fill="#9E6FE0" opacity="0.7"/>
+  <rect x="12" y="74" width="116" height="24" rx="12" fill="#5F35A8"/>
+  <circle cx="70" cy="10" r="11" fill="#FFF7EC"/>
+</svg>
