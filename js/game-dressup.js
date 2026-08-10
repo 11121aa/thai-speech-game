@@ -64,13 +64,18 @@ function createDressupGame(words, callbacks) {
 
     // Illustrated clothing art (img/dressup/*.svg) -- each piece is a
     // hand-drawn sprite overlaid on the plain avatar body drawn in
-    // drawAvatar(), rather than a flat colour fill.
+    // drawAvatar(), rather than a flat colour fill. The ?v= query params
+    // are this repo's cache-busting convention (see game.html's script
+    // tags) -- bump them whenever a file at that path is redrawn, since
+    // Phaser's SVG loader has no cache-busting of its own and a browser
+    // that already loaded the old art would otherwise keep serving it
+    // from cache indefinitely.
     preload: function () {
-      this.load.svg('ds_hat',   'img/dressup/hat.svg',   { width: 140, height: 130 });
-      this.load.svg('ds_shirt', 'img/dressup/shirt.svg', { width: 160, height: 150 });
-      this.load.svg('ds_pants', 'img/dressup/pants.svg', { width: 140, height: 150 });
-      this.load.svg('ds_shoes', 'img/dressup/shoes.svg', { width: 200, height: 70  });
-      this.load.svg('ds_bag',   'img/dressup/bag.svg',   { width: 110, height: 150 });
+      this.load.svg('ds_hat',   'img/dressup/hat.svg?v=2',   { width: 140, height: 130 });
+      this.load.svg('ds_shirt', 'img/dressup/shirt.svg?v=2', { width: 160, height: 150 });
+      this.load.svg('ds_pants', 'img/dressup/pants.svg?v=2', { width: 140, height: 150 });
+      this.load.svg('ds_shoes', 'img/dressup/shoes.svg?v=2', { width: 200, height: 70  });
+      this.load.svg('ds_bag',   'img/dressup/bag.svg?v=2',   { width: 110, height: 150 });
     },
 
     create: function () {
