@@ -828,7 +828,7 @@ a {
    event (mobile URL-bar show/hide on scroll fires these repeatedly), so the
    canvas visibly grows a little more each time you scroll. */
 #shootingGame.game-canvas-wrap      { aspect-ratio: 800 / 450; }
-#airplaneGame.game-canvas-wrap      { aspect-ratio: 800 / 480; }
+#airplaneGame.game-canvas-wrap      { aspect-ratio: 480 / 800; max-width: 480px; }
 #cookingGame.game-canvas-wrap       { aspect-ratio: 480 / 800; max-width: 480px; }
 #platformerCanvas.game-canvas-wrap  { aspect-ratio: 800 / 400; }
 #crossyCanvas.game-canvas-wrap      { aspect-ratio: 800 / 400; }
