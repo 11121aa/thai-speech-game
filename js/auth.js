@@ -56,14 +56,17 @@ const Auth = (function () {
     const session = await getSession();
     const navGuest = document.getElementById("navGuest");
     const navSelf = document.getElementById("navSelf");
+    const navShop = document.getElementById("navShop");
 
     if (session) {
       if (navGuest) navGuest.style.display = "none";
       if (navSelf) navSelf.style.display = "list-item";
+      if (navShop) navShop.style.display = "list-item";
       await logActivity("page_view", pageNameFromPath());
     } else {
       if (navGuest) navGuest.style.display = "list-item";
       if (navSelf) navSelf.style.display = "none";
+      if (navShop) navShop.style.display = "none";
     }
     return session;
   }

@@ -1,81 +1,83 @@
 // ============================================================
-//  DRESS-UP GAME — Phaser 3  (Pronounce a word to unlock an outfit piece)
+//  DRESS-UP GAME — Phaser 3  (wear cosmetics bought in the shop)
 // ============================================================
 //  POLISH GUIDE (search for the label to find where to edit):
-//    [TUNE]    Points per item, avatar position     (~line 15)
-//    [SLOTS]   Clothing slots + labels               (~SLOTS array)
-//    [AVATAR]  Body base + clothing sprite overlays  (~drawAvatar / buildPieceImages)
-//    [CARD]    Item card colours and size            (~buildCard)
-//    [BTN]     Button colours and labels             (~buildButtons)
-//  Clothing art itself lives in img/dressup/*.svg — edit those files
-//  directly to restyle a piece; buildPieceImages() only positions them.
+//    [TUNE]    Points per slot, avatar position       (~line 15)
+//    [SLOTS]   Clothing slots + labels                 (~SLOTS array)
+//    [AVATAR]  Body base + clothing sprite overlays    (~drawAvatar / buildPieceImages)
+//    [CLOSET]  Slot-selector row UI                    (~buildClosetPanel)
+//  Clothing art itself lives in img/dressup/*.svg (and img/dressup/doll/)
+//  — edit those files directly to restyle a piece; the shop's cosmetics
+//  catalog (supabase/coin_shop_migration.sql) is what maps each file to
+//  a purchasable item.
 // ============================================================
 //  How the game works:
-//    - A plain avatar stands on the left; a card on the right shows
-//      the next outfit piece to unlock (hat, shirt, pants, shoes, bag)
-//    - "🔊 ฟังตัวอย่าง" button → plays the word's recorded pronunciation
-//      clip if it has one (hidden otherwise — no TTS fallback)
-//    - "🎤 พูดคำนี้!" button → opens the pronunciation practice modal
-//    - After practicing, the piece animates onto the avatar and the
-//      next card slides in
-//    - Game ends once all 5 pieces are equipped
+//    - Cosmetics are no longer unlocked by practicing words in this
+//      mini-game — they're bought in the shop (shop.html) with coins
+//      earned from correct practice recordings anywhere in the app, via
+//      a Blooket-style random box. This screen is just a closet: it
+//      shows whatever you've already bought.
+//    - Every slot (hat/shirt/pants/shoes/bag) you own at least one item
+//      for gets its best-rarity piece equipped automatically, earning a
+//      one-time bonus per slot for the session.
+//    - ‹ / › on each row cycles through everything you own in that slot
+//      — pure browsing after the initial bonus, no extra points.
+//    - Nothing to "finish" here — the round just runs until the shared
+//      HUD countdown timer ends it, like the timer-driven games.
 // ============================================================
 
 // createDressupGame is called with:
-//   words     = array of word objects { word, emoji, reading, ... }
-//   callbacks = { onPoints, onPractice, onFinish, onTime }
-function createDressupGame(words, callbacks) {
+//   words     = array of word objects (kept for signature compatibility
+//               with DressupGame.start(words, cbs); unused now that
+//               cosmetics replace word-practice unlocks)
+//   callbacks = { onPoints, onFinish, onTime }
+//   closet    = { hat:[...], shirt:[...], pants:[...], shoes:[...], bag:[...] }
+//               each entry: { id, name, rarity, style, variant, asset_path },
+//               already sorted best-rarity-first within each slot
+function createDressupGame(words, callbacks, closet) {
 
   // ── [TUNE] Numbers you can change ────────────────────────────
-  var PTS_PER_ITEM = 20;  // points awarded per unlocked outfit piece
+  var PTS_PER_SLOT = 20;  // one-time bonus for equipping anything in a slot this session
   var W = 800, H = 500;   // canvas size in pixels
   var AX = 190, AY = 280; // avatar anchor point (base of the torso)
 
-  // ── [SLOTS] Outfit pieces, in unlock order. Each key's illustrated
-  // sprite lives at img/dressup/<key>.svg (see buildPieceImages).
+  // ── [SLOTS] Outfit pieces + the raster size their SVGs load at
+  // (independent of the on-avatar display size set in buildPieceImages).
   var SLOTS = [
-    { key:'hat',   label:'หมวก',     emoji:'🎩' },
-    { key:'shirt', label:'เสื้อ',     emoji:'👕' },
-    { key:'pants', label:'กางเกง',   emoji:'👖' },
-    { key:'shoes', label:'รองเท้า',  emoji:'👟' },
-    { key:'bag',   label:'กระเป๋า',  emoji:'👜' }
+    { key: 'hat',   label: 'หมวก',    emoji: '🎩', loadW: 140, loadH: 130 },
+    { key: 'shirt', label: 'เสื้อ',    emoji: '👕', loadW: 160, loadH: 150 },
+    { key: 'pants', label: 'กางเกง',  emoji: '👖', loadW: 140, loadH: 150 },
+    { key: 'shoes', label: 'รองเท้า', emoji: '👟', loadW: 200, loadH: 70  },
+    { key: 'bag',   label: 'กระเป๋า', emoji: '👜', loadW: 110, loadH: 150 }
   ];
 
-  // ── [CARD] Card visual dimensions ──────────────────────────────
-  var CARD_W = 340, CARD_H = 260;
-  var CARD_X = 580, CARD_Y = 210;
-  var CARD_R = 20;
+  var RARITY_LABEL = { common: 'ธรรมดา', rare: 'หายาก', epic: 'เอปิก', legendary: 'ในตำนาน' };
+  var RARITY_COLOR = { common: '#9CA3AF', rare: '#3B82F6', epic: '#A855F7', legendary: '#F59E0B' };
+
+  // ── Closet panel layout ─────────────────────────────────────
+  var PANEL_X = 430, PANEL_Y = 60, PANEL_W = 340, ROW_H = 76;
 
   var DsScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
     initialize: function () {
       Phaser.Scene.call(this, { key: 'dressup' });
-      this.idx         = 0;      // index into SLOTS of the item currently being unlocked
-      this.doneCount   = 0;      // how many items have been unlocked so far
-      this.equipped    = {};     // slotKey -> true once unlocked
-      this.currentSlot = null;
-      this.currentWord = null;
-      this.canInteract = true;   // false while the practice modal is open
-      this.avatarGfx   = null;
-      this.cardCont    = null;
-      this.pieceImgs   = {};     // slotKey -> illustrated clothing sprite, hidden until unlocked
+      this.avatarGfx    = null;
+      this.pieceImgs    = {};   // slotKey -> Image (only created for slots you own something in)
+      this.selectedIdx  = {};   // slotKey -> index into closet[slotKey]
+      this.rowLabels    = {};   // slotKey -> Text (name + rarity)
     },
 
-    // Illustrated clothing art (img/dressup/*.svg) -- each piece is a
-    // hand-drawn sprite overlaid on the plain avatar body drawn in
-    // drawAvatar(), rather than a flat colour fill. The ?v= query params
-    // are this repo's cache-busting convention (see game.html's script
-    // tags) -- bump them whenever a file at that path is redrawn, since
-    // Phaser's SVG loader has no cache-busting of its own and a browser
-    // that already loaded the old art would otherwise keep serving it
-    // from cache indefinitely.
+    // Loads one texture per OWNED cosmetic (not the whole catalog) --
+    // the ?v= query param is this repo's cache-busting convention (see
+    // game.html's script tags): bump it whenever art at these paths is
+    // redrawn, since Phaser's SVG loader has no cache-busting of its own.
     preload: function () {
-      this.load.svg('ds_hat',   'img/dressup/hat.svg?v=2',   { width: 140, height: 130 });
-      this.load.svg('ds_shirt', 'img/dressup/shirt.svg?v=2', { width: 160, height: 150 });
-      this.load.svg('ds_pants', 'img/dressup/pants.svg?v=2', { width: 140, height: 150 });
-      this.load.svg('ds_shoes', 'img/dressup/shoes.svg?v=2', { width: 200, height: 70  });
-      this.load.svg('ds_bag',   'img/dressup/bag.svg?v=2',   { width: 110, height: 150 });
+      SLOTS.forEach(function (slot) {
+        (closet[slot.key] || []).forEach(function (item) {
+          this.load.svg(item.id, item.asset_path + '?v=2', { width: slot.loadW, height: slot.loadH });
+        }, this);
+      }, this);
     },
 
     create: function () {
@@ -87,57 +89,67 @@ function createDressupGame(words, callbacks) {
       ground.fillStyle(0xF3E4C8);
       ground.fillRect(0, H - 50, W, 50);
 
-      // ── Progress bar (top) ────────────────────────────────────────
-      var track = this.add.graphics();
-      track.fillStyle(0xd1d5db);
-      track.fillRoundedRect(40, 14, W - 80, 10, 5);
-      this.progFill = this.add.graphics();
-      this.progText = this.add.text(W / 2, 36, '', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '14px', color: '#6b7280'
-      }).setOrigin(0.5);
+      this.add.text(W / 2, 20, '👗 ตู้เสื้อผ้าของคุณ', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '22px', fontStyle: 'bold', color: '#374151'
+      }).setOrigin(0.5, 0);
 
       // ── Avatar ──────────────────────────────────────────────────
       this.avatarGfx = this.add.graphics();
       this.buildPieceImages();
       this.drawAvatar();
 
-      // ── Item card ───────────────────────────────────────────────
-      this.cardCont = this.add.container(W + CARD_W, CARD_Y);
-      this.buildCard(this.cardCont);
-      this.buildButtons();
+      var hasAnything = SLOTS.some(function (s) { return (closet[s.key] || []).length > 0; });
+      if (!hasAnything) {
+        this.add.text(PANEL_X + PANEL_W / 2, H / 2, 'ยังไม่มีของแต่งตัวเลย\nไปที่ร้านค้าเพื่อเปิดกล่องสุ่มกันเถอะ! 🪙', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '18px', color: '#6b7280', align: 'center'
+        }).setOrigin(0.5);
+        return;
+      }
 
-      this.updateProgress();
-      this.showItem();
+      this.buildClosetPanel();
+
+      // Auto-equip the best-owned piece per slot and award the
+      // one-time session bonus for each slot that had anything to equip.
+      var self = this;
+      SLOTS.forEach(function (slot) {
+        if ((closet[slot.key] || []).length > 0) {
+          self.equipSlot(slot.key, 0);
+          callbacks.onPoints(PTS_PER_SLOT);
+        }
+      });
     },
 
     // ── [AVATAR] One illustrated sprite per outfit slot, positioned over
     // the plain body drawn in drawAvatar() and stacked in the order that
     // looks right on the body (pants/shoes first, shirt over the torso,
-    // bag over the shirt, hat last on top). Created once and hidden until
-    // its slot is unlocked -- drawAvatar() only toggles visibility, it
-    // never recreates these.
-    // Sizes/positions are derived from the plain body's own geometry below
-    // (legs span AX-38..AX+38 / AY-40..AY+50, feet ellipses sit at
-    // AY+49..AY+67, torso spans AY-120..AY-30, head circle is centered at
-    // AY-175 with radius 40) rather than guessed -- the shoes in
-    // particular were previously sized far taller (40px) than the ~18px
-    // foot region they sit over, making them swallow up into the pant
-    // legs instead of sitting at the ankle.
+    // bag over the shirt, hat last on top). Only created for slots you
+    // actually own something in -- an empty slot has no Image at all.
+    // Sizes/positions are derived from the plain body's own geometry in
+    // drawAvatar() (legs span AX-38..AX+38 / AY-40..AY+50, feet ellipses
+    // sit at AY+49..AY+67, torso spans AY-120..AY-30, head circle is
+    // centered at AY-175 with radius 40).
     buildPieceImages: function () {
-      this.pieceImgs.pants = this.add.image(AX, AY - 40,  'ds_pants').setOrigin(0.5, 0).setDisplaySize(88, 96).setVisible(false);
-      this.pieceImgs.shoes = this.add.image(AX, AY + 58,  'ds_shoes').setOrigin(0.5, 0.5).setDisplaySize(86, 30).setVisible(false);
-      this.pieceImgs.shirt = this.add.image(AX, AY - 124, 'ds_shirt').setOrigin(0.5, 0).setDisplaySize(112, 100).setVisible(false);
-      this.pieceImgs.bag   = this.add.image(AX + 44, AY - 82, 'ds_bag').setOrigin(0.5, 0.5).setDisplaySize(52, 74).setVisible(false);
-      this.pieceImgs.hat   = this.add.image(AX, AY - 206, 'ds_hat').setOrigin(0.5, 1).setDisplaySize(92, 88).setVisible(false);
+      var specs = {
+        pants: { x: AX,      y: AY - 40,  ox: 0.5, oy: 0,   w: 88,  h: 96 },
+        shoes: { x: AX,      y: AY + 58,  ox: 0.5, oy: 0.5, w: 86,  h: 30 },
+        shirt: { x: AX,      y: AY - 124, ox: 0.5, oy: 0,   w: 112, h: 100 },
+        bag:   { x: AX + 44, y: AY - 82,  ox: 0.5, oy: 0.5, w: 52,  h: 74 },
+        hat:   { x: AX,      y: AY - 206, ox: 0.5, oy: 1,   w: 92,  h: 88 }
+      };
+      SLOTS.forEach(function (slot) {
+        var items = closet[slot.key] || [];
+        if (!items.length) return;
+        var sp = specs[slot.key];
+        this.pieceImgs[slot.key] = this.add.image(sp.x, sp.y, items[0].id)
+          .setOrigin(sp.ox, sp.oy).setDisplaySize(sp.w, sp.h).setVisible(false);
+      }, this);
     },
 
-    // ── Redraws the plain avatar body each time an item unlocks. The
-    // body itself is always a neutral base (bare skin/hair) -- outfit
-    // pieces are the illustrated sprites from buildPieceImages(), just
-    // shown or hidden here rather than colour-filled shapes.
+    // ── Redraws the plain avatar body. The body itself is always a
+    // neutral base (bare skin/hair) -- outfit pieces are the illustrated
+    // sprites from buildPieceImages(), shown once equipSlot() runs.
     drawAvatar: function () {
       var g = this.avatarGfx;
-      var eq = this.equipped;
       g.clear();
 
       // legs (bare base -- covered by the pants sprite once equipped)
@@ -169,163 +181,78 @@ function createDressupGame(words, callbacks) {
       g.beginPath();
       g.arc(AX, AY - 168, 14, 0.2, Math.PI - 0.2, false);
       g.strokePath();
+    },
 
-      for (var key in this.pieceImgs) {
-        this.pieceImgs[key].setVisible(!!eq[key]);
+    // ── [CLOSET] One row per slot: ‹ current item's name+rarity › .
+    // Rows for a slot with nothing owned show a greyed "ยังไม่มี" state
+    // instead of arrows.
+    buildClosetPanel: function () {
+      var self = this;
+      SLOTS.forEach(function (slot, i) {
+        var y = PANEL_Y + i * ROW_H;
+        var items = closet[slot.key] || [];
+
+        var gfx = this.add.graphics();
+        gfx.fillStyle(0xffffff);
+        gfx.fillRoundedRect(PANEL_X, y, PANEL_W, ROW_H - 10, 14);
+        gfx.lineStyle(2, 0xe5e7eb);
+        gfx.strokeRoundedRect(PANEL_X, y, PANEL_W, ROW_H - 10, 14);
+
+        this.add.text(PANEL_X + 16, y + (ROW_H - 10) / 2, slot.emoji + ' ' + slot.label, {
+          fontFamily: 'Prompt, sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#374151'
+        }).setOrigin(0, 0.5);
+
+        var label = this.add.text(PANEL_X + PANEL_W / 2 + 15, y + (ROW_H - 10) / 2, '', {
+          fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#6b7280', align: 'center'
+        }).setOrigin(0.5);
+        this.rowLabels[slot.key] = label;
+
+        if (!items.length) {
+          label.setText('ยังไม่มี — ไปเปิดกล่องที่ร้านค้า');
+          return;
+        }
+
+        function arrowBtn(dx, char, delta) {
+          var t = self.add.text(PANEL_X + PANEL_W - 28 + dx, y + (ROW_H - 10) / 2, char, {
+            fontFamily: 'Prompt, sans-serif', fontSize: '20px', fontStyle: 'bold', color: '#2ec4b6'
+          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+          t.on('pointerdown', function () { self.cycleSlot(slot.key, delta); });
+          return t;
+        }
+        if (items.length > 1) {
+          arrowBtn(-118, '‹', -1);
+          arrowBtn(8, '›', 1);
+        }
+      }, this);
+    },
+
+    // ── Show item index `idx` of a slot's owned list on the avatar +
+    // update that row's label. Used both for the initial auto-equip and
+    // for ‹ / › cycling afterward.
+    equipSlot: function (slotKey, idx) {
+      var items = closet[slotKey] || [];
+      if (!items.length) return;
+      this.selectedIdx[slotKey] = idx;
+      var item = items[idx];
+      var img = this.pieceImgs[slotKey];
+      if (img) img.setTexture(item.id).setVisible(true);
+      var label = this.rowLabels[slotKey];
+      if (label) {
+        label.setText(item.name + '  •  ' + (RARITY_LABEL[item.rarity] || item.rarity));
+        label.setColor(RARITY_COLOR[item.rarity] || '#6b7280');
       }
     },
 
-    // ── Build all graphics/text inside the item card container ────
-    buildCard: function (cont) {
-      var gfx = this.add.graphics();
-      gfx.fillStyle(0xffffff);
-      gfx.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
-      gfx.lineStyle(3, 0x2ec4b6);
-      gfx.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
-      gfx.fillStyle(0xf0fdfa);
-      gfx.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H / 2, CARD_R);
-      gfx.lineStyle(3, 0x2ec4b6);
-      gfx.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
-      cont.add(gfx);
-
-      var itemTxt = this.add.text(0, -CARD_H / 2 + 54, '', { fontSize: '52px' }).setOrigin(0.5);
-      cont.add(itemTxt); cont.itemTxt = itemTxt;
-
-      var labelTxt = this.add.text(0, -CARD_H / 2 + 104, '', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '18px', fontStyle: 'bold', color: '#374151'
-      }).setOrigin(0.5);
-      cont.add(labelTxt); cont.labelTxt = labelTxt;
-
-      var wordTxt = this.add.text(0, 8, '', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '26px', fontStyle: 'bold', color: '#2ec4b6'
-      }).setOrigin(0.5);
-      cont.add(wordTxt); cont.wordTxt = wordTxt;
-
-      var readingTxt = this.add.text(0, 46, '', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '15px', color: '#9ca3af'
-      }).setOrigin(0.5);
-      cont.add(readingTxt); cont.readingTxt = readingTxt;
-
-      var badgeTxt = this.add.text(CARD_W / 2 - 12, -CARD_H / 2 + 12, '', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '12px', color: '#9ca3af',
-        backgroundColor: '#f3f4f6', padding: { x: 6, y: 3 }
-      }).setOrigin(1, 0);
-      cont.add(badgeTxt); cont.badgeTxt = badgeTxt;
-    },
-
-    // ── [BTN] Listen + Practice buttons below the card ─────────────
-    buildButtons: function () {
-      var self = this;
-      var BTN_Y = CARD_Y + CARD_H / 2 + 40;
-
-      function makeBtn(x, w, h, fillColor, strokeColor, label, onClick) {
-        var gfx = self.add.graphics();
-        gfx.fillStyle(fillColor);
-        gfx.fillRoundedRect(x - w / 2, BTN_Y - h / 2, w, h, 10);
-        gfx.lineStyle(2, strokeColor);
-        gfx.strokeRoundedRect(x - w / 2, BTN_Y - h / 2, w, h, 10);
-
-        var txt = self.add.text(x, BTN_Y, label, {
-          fontFamily: 'Prompt, sans-serif', fontSize: '16px', fontStyle: 'bold', color: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-        txt.on('pointerdown', function () { if (self.canInteract) onClick(); });
-        txt.on('pointerover',  function () { gfx.setAlpha(0.85); });
-        txt.on('pointerout',   function () { gfx.setAlpha(1); });
-        return { gfx: gfx, txt: txt };
+    cycleSlot: function (slotKey, delta) {
+      var items = closet[slotKey] || [];
+      if (items.length < 2) return;
+      var idx = ((this.selectedIdx[slotKey] || 0) + delta + items.length) % items.length;
+      this.equipSlot(slotKey, idx);
+      var img = this.pieceImgs[slotKey];
+      if (img) {
+        img.setScale(0.9);
+        this.tweens.add({ targets: img, scaleX: 1, scaleY: 1, duration: 180, ease: 'Back.Out' });
       }
-
-      // No TTS fallback — this button is hidden in showItem() below for any
-      // word with no real recorded sound_url, rather than falling back to
-      // browser text-to-speech.
-      this.listenBtn = makeBtn(CARD_X - 90, 160, 50, 0x64748b, 0x475569, '🔊  ฟังตัวอย่าง', function () {
-        if (self.currentWord && self.currentWord.sound_url) new Audio(self.currentWord.sound_url).play();
-      });
-
-      this.practiceBtn = makeBtn(CARD_X + 90, 160, 50, 0xf59e0b, 0xd97706, '🎤  พูดคำนี้!', function () {
-        if (!self.currentWord) return;
-        self.canInteract = false;
-        callbacks.onPractice(self.currentWord, null, function () {
-          self.canInteract = true;
-          self.onItemUnlocked();
-        });
-      });
-    },
-
-    // ── Populate the card with the next locked item and slide it in
-    showItem: function () {
-      if (this.idx >= SLOTS.length) { this.onAllDone(); return; }
-
-      this.currentSlot = SLOTS[this.idx];
-      this.currentWord = words[this.idx % words.length];
-
-      var cont = this.cardCont;
-      cont.itemTxt.setText(this.currentSlot.emoji);
-      cont.labelTxt.setText('ปลดล็อก: ' + this.currentSlot.label);
-      cont.wordTxt.setText(this.currentWord.word || '');
-      cont.readingTxt.setText(this.currentWord.reading || this.currentWord.level || '');
-
-      var remaining = SLOTS.length - this.idx - 1;
-      cont.badgeTxt.setText(remaining > 0 ? remaining + ' ชิ้น' : 'ชิ้นสุดท้าย!');
-
-      var hasSound = !!this.currentWord.sound_url;
-      this.listenBtn.gfx.setVisible(hasSound);
-      this.listenBtn.txt.setVisible(hasSound);
-      if (hasSound) this.listenBtn.txt.setInteractive({ useHandCursor: true });
-      else this.listenBtn.txt.disableInteractive();
-
-      this.updateProgress();
-      this.canInteract = true;
-
-      cont.x = W + CARD_W;
-      this.tweens.add({ targets: cont, x: CARD_X, duration: 340, ease: 'Power2' });
-    },
-
-    // ── Called after the practice modal closes successfully ───────
-    onItemUnlocked: function () {
-      var self = this;
-      callbacks.onPoints(PTS_PER_ITEM);
-      this.equipped[this.currentSlot.key] = true;
-      this.drawAvatar();
-
-      // little pop animation to celebrate the new piece
-      var pieceImg = this.pieceImgs[this.currentSlot.key];
-      var popTargets = pieceImg ? [this.avatarGfx, pieceImg] : [this.avatarGfx];
-      popTargets.forEach(function (t) { t.setScale(0.9); });
-      this.tweens.add({ targets: popTargets, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.Out' });
-
-      this.doneCount++;
-      this.idx++;
-      this.updateProgress();
-
-      this.time.delayedCall(650, function () { self.advanceCard(); });
-    },
-
-    advanceCard: function () {
-      var self = this;
-      this.tweens.add({
-        targets: this.cardCont, x: -CARD_W, duration: 280, ease: 'Power2',
-        onComplete: function () { self.showItem(); }
-      });
-    },
-
-    updateProgress: function () {
-      var frac  = SLOTS.length > 0 ? this.doneCount / SLOTS.length : 0;
-      var fillW = Math.max(0, (W - 80) * frac);
-      this.progFill.clear();
-      this.progFill.fillStyle(0x2ec4b6);
-      this.progFill.fillRoundedRect(40, 14, fillW, 10, 5);
-      this.progText.setText(this.doneCount + ' / ' + SLOTS.length);
-    },
-
-    // ── All 5 pieces equipped — show the finished outfit, then end ─
-    onAllDone: function () {
-      this.cardCont.setVisible(false);
-      var doneTxt = this.add.text(CARD_X, H / 2, '🎉 แต่งตัวเสร็จแล้ว! 🎉', {
-        fontFamily: 'Prompt, sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#f0a500'
-      }).setOrigin(0.5).setAlpha(0);
-      this.tweens.add({ targets: doneTxt, alpha: 1, duration: 400 });
-      this.time.delayedCall(1600, function () { callbacks.onFinish(); });
     }
   });
 
@@ -342,9 +269,57 @@ function createDressupGame(words, callbacks) {
 // ── Public API (mirrors ShootingGame, FlashcardGame, etc.) ──────────
 var DressupGame = (function () {
   var game = null;
+  var RARITY_RANK = { legendary: 0, epic: 1, rare: 2, common: 3 };
+
+  // Fetches the signed-in user's owned cosmetics (joined with the
+  // catalog for name/rarity/asset_path), grouped by slot and sorted
+  // best-rarity-first, before the Phaser game is created -- preload()
+  // needs to know which asset paths to load up front.
+  async function loadCloset() {
+    var closet = { hat: [], shirt: [], pants: [], shoes: [], bag: [] };
+    if (typeof Auth === 'undefined' || typeof sb === 'undefined' || !sb) return closet;
+    var session = await Auth.getSession();
+    if (!session) return closet;
+
+    var { data: owned, error: ownedErr } = await sb.from('owned_cosmetics').select('cosmetic_id').eq('user_id', session.user.id);
+    if (ownedErr) { console.error('[dressup] failed to load owned_cosmetics:', ownedErr); return closet; }
+    var ownedIds = (owned || []).map(function (o) { return o.cosmetic_id; });
+    if (!ownedIds.length) return closet;
+
+    var { data: rows, error: rowsErr } = await sb.from('cosmetics').select('*').in('id', ownedIds);
+    if (rowsErr) { console.error('[dressup] failed to load cosmetics catalog:', rowsErr); return closet; }
+    (rows || []).forEach(function (item) {
+      if (closet[item.slot]) closet[item.slot].push(item);
+    });
+    Object.keys(closet).forEach(function (slotKey) {
+      closet[slotKey].sort(function (a, b) {
+        return (RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity]) || (b.variant - a.variant);
+      });
+    });
+    return closet;
+  }
+
+  // The closet fetch is a network round-trip in front of Phaser's own
+  // preload() -- every sibling game constructs its Phaser.Game
+  // synchronously, so without this the shared HUD timer (already
+  // running by the time start() is called) would tick down over a
+  // blank canvas on a slow connection. Cleared right before Phaser
+  // takes over the same container.
+  function showLoading() {
+    var el = document.getElementById('dressupGame');
+    if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:300px;font-family:Prompt,sans-serif;color:#6b7280;">กำลังโหลดตู้เสื้อผ้า...</div>';
+  }
+
   function start(words, cbs) {
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
-    setTimeout(function () { game = createDressupGame(words, cbs); }, 60);
+    showLoading();
+    loadCloset().then(function (closet) {
+      setTimeout(function () {
+        var el = document.getElementById('dressupGame');
+        if (el) el.innerHTML = '';
+        game = createDressupGame(words, cbs, closet);
+      }, 60);
+    });
   }
   function stop() {
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
