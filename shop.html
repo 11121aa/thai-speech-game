@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ร้านค้า | แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</title>
-<meta name="description" content="เก็บเหรียญจากการฝึกพูด แล้วเปิดกล่องสุ่มของแต่งตัวตุ๊กตา">
+<meta name="description" content="เก็บเหรียญจากการฝึกพูด แล้วเลือกซื้อของแต่งตัวตุ๊กตาที่ชอบ">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,15 +31,6 @@
     padding: 0.5rem 1.25rem; font-weight: 700; font-size: 1.4rem; color: #8a6300;
     box-shadow: 0 4px 0 rgba(240, 201, 92, 0.35);
   }
-  .box-btn {
-    border: none; border-radius: var(--radius-md); padding: 0.9rem 1.6rem;
-    font-weight: 700; font-size: 1.1rem; color: #fff;
-    background: linear-gradient(135deg, var(--color-accent-purple), var(--color-accent-pink));
-    box-shadow: 0 6px 0 rgba(138, 92, 246, 0.35);
-    transition: transform 0.1s ease;
-  }
-  .box-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(138, 92, 246, 0.35); }
-  .box-btn:disabled { background: #cfcbd8; box-shadow: none; color: #8a8496; cursor: not-allowed; }
 
   .closet-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
   .closet-tab {
@@ -50,21 +41,19 @@
   .closet-tab.active { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-bg-soft); }
 
   .cosmetic-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.9rem;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.9rem;
   }
   .cosmetic-card {
-    background: #fff; border-radius: var(--radius-md); padding: 0.7rem 0.5rem 0.6rem;
+    background: #fff; border-radius: var(--radius-md); padding: 0.7rem 0.6rem 0.7rem;
     text-align: center; border: 3px solid var(--rarity-common);
-    display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+    display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
   }
   .cosmetic-card[data-rarity="rare"]      { border-color: var(--rarity-rare); }
   .cosmetic-card[data-rarity="epic"]      { border-color: var(--rarity-epic); }
   .cosmetic-card[data-rarity="legendary"] { border-color: var(--rarity-legendary); }
-  .cosmetic-card.locked { opacity: 0.42; filter: grayscale(0.6); }
-  .cosmetic-card .art { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+  .cosmetic-card .art { width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; }
   .cosmetic-card .art svg, .cosmetic-card .art img { max-width: 100%; max-height: 100%; }
-  .cosmetic-card .locked-icon { font-size: 1.6rem; color: var(--color-text-soft); }
-  .cosmetic-card .name { font-size: 0.78rem; font-weight: 600; line-height: 1.2; }
+  .cosmetic-card .name { font-size: 0.8rem; font-weight: 600; line-height: 1.2; }
   .cosmetic-card .rarity-tag {
     font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
     padding: 0.1rem 0.5rem; border-radius: 999px; color: #fff; background: var(--rarity-common);
@@ -73,8 +62,19 @@
   .cosmetic-card[data-rarity="epic"]      .rarity-tag { background: var(--rarity-epic); }
   .cosmetic-card[data-rarity="legendary"] .rarity-tag { background: var(--rarity-legendary); }
 
-  #boxRevealArt { width: 140px; height: 140px; margin: 0 auto; display: flex; align-items: center; justify-content: center; }
-  #boxRevealArt svg, #boxRevealArt img { max-width: 100%; max-height: 100%; }
+  .cosmetic-card .owned-badge {
+    font-size: 0.78rem; font-weight: 700; color: var(--color-success);
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .buy-btn {
+    border: none; border-radius: 999px; padding: 0.35rem 0.9rem;
+    font-weight: 700; font-size: 0.8rem; color: #fff; background: var(--color-primary);
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .buy-btn:disabled { background: #cfcbd8; color: #8a8496; cursor: not-allowed; }
+
+  #buyResultArt { width: 140px; height: 140px; margin: 0 auto; display: flex; align-items: center; justify-content: center; }
+  #buyResultArt svg, #buyResultArt img { max-width: 100%; max-height: 100%; }
   .reveal-rarity-badge {
     display: inline-block; padding: 0.25rem 0.9rem; border-radius: 999px; color: #fff;
     font-weight: 700; font-size: 0.85rem; letter-spacing: 0.03em;
@@ -110,8 +110,8 @@
   <section class="hero-section section-pad pb-3">
     <div class="container text-center">
       <div class="section-kicker mb-2">ร้านค้า</div>
-      <h1 class="hero-title">แต่งตัวตุ๊กตาด้วยเหรียญที่หามาได้</h1>
-      <p class="hero-lead">พูดคำฝึกให้ถูกต้อง แล้วผู้ปกครองกดถูก จะได้เหรียญทุกครั้ง — สะสมเหรียญมาเปิดกล่องสุ่มของแต่งตัว!</p>
+      <h1 class="hero-title">เลือกซื้อของแต่งตัวที่คุณชอบ</h1>
+      <p class="hero-lead">พูดคำฝึกให้ถูกต้อง แล้วผู้ปกครองกดถูก จะได้เหรียญทุกครั้ง — เลือกซื้อชิ้นที่ชอบได้เลย ไม่ต้องลุ้น!</p>
     </div>
   </section>
 
@@ -124,18 +124,13 @@
       </div>
 
       <div id="shopContent" style="display:none;">
-        <div class="shop-hero d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-          <div class="d-flex align-items-center gap-3 flex-wrap">
-            <div class="coin-pill"><span>🪙</span><span id="coinBalance">0</span></div>
-            <div class="text-secondary">เหรียญของคุณ</div>
-          </div>
-          <div class="text-center">
-            <button id="btnOpenBox" class="box-btn"><i class="bi bi-gift-fill me-2"></i>เปิดกล่องสุ่ม (30 🪙)</button>
-            <div id="boxError" class="text-danger small mt-2" style="display:none;"></div>
-          </div>
+        <div class="shop-hero d-flex flex-wrap align-items-center gap-3 mb-4">
+          <div class="coin-pill"><span>🪙</span><span id="coinBalance">0</span></div>
+          <div class="text-secondary">เหรียญของคุณ</div>
+          <div id="shopMsg" class="text-danger small ms-auto" style="display:none;"></div>
         </div>
 
-        <h2 class="h4 mb-3">ตู้เสื้อผ้าของคุณ</h2>
+        <h2 class="h4 mb-3">ร้านของแต่งตัว</h2>
         <div class="closet-tabs" id="closetTabs">
           <button class="closet-tab active" data-slot="all">ทั้งหมด</button>
           <button class="closet-tab" data-slot="hat">หมวก</button>
@@ -177,15 +172,14 @@
   </div>
 </footer>
 
-<!-- ── Box-open reveal modal ───────────────────────────────── -->
-<div class="modal fade" id="boxRevealModal" tabindex="-1" aria-hidden="true">
+<!-- ── Purchase confirmation modal ─────────────────────────── -->
+<div class="modal fade" id="buyResultModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content text-center p-3">
       <div class="modal-body">
-        <div id="boxRevealDupe" class="text-secondary small mb-2" style="display:none;">ได้ของซ้ำ — คืนเหรียญบางส่วนให้แล้ว</div>
-        <div id="boxRevealArt"></div>
-        <h3 id="boxRevealName" class="mt-3 mb-1"></h3>
-        <span id="boxRevealRarity" class="reveal-rarity-badge mb-3"></span>
+        <div id="buyResultArt"></div>
+        <h3 id="buyResultName" class="mt-3 mb-1"></h3>
+        <span id="buyResultRarity" class="reveal-rarity-badge mb-3"></span>
         <div class="mt-3">
           <button type="button" class="btn btn-primary btn-bouncy" data-bs-dismiss="modal">เย้! 🎉</button>
         </div>
@@ -209,6 +203,7 @@
   var ownedIds = new Set();
   var activeSlotFilter = 'all';
   var session = null;
+  var coinBalance = 0;
 
   function el(id) { return document.getElementById(id); }
 
@@ -231,7 +226,8 @@
   async function loadShopData() {
     var { data: profile, error: profileErr } = await sb.from('profiles').select('coins').eq('user_id', session.user.id).maybeSingle();
     if (profileErr) console.error('[shop] failed to load coin balance:', profileErr);
-    el('coinBalance').textContent = (profile && profile.coins) || 0;
+    coinBalance = (profile && profile.coins) || 0;
+    el('coinBalance').textContent = coinBalance;
 
     var { data: allCosmetics, error: cosmeticsErr } = await sb.from('cosmetics').select('*').order('slot').order('style').order('variant');
     if (cosmeticsErr) console.error('[shop] failed to load cosmetics catalog:', cosmeticsErr);
@@ -242,14 +238,17 @@
     ownedIds = new Set((owned || []).map(function (o) { return o.cosmetic_id; }));
 
     if (profileErr || cosmeticsErr || ownedErr) {
-      var errEl = el('boxError');
-      errEl.textContent = 'โหลดข้อมูลร้านค้าไม่สำเร็จบางส่วน ลองรีเฟรชหน้าใหม่';
-      errEl.style.display = 'block';
+      var msgEl = el('shopMsg');
+      msgEl.textContent = 'โหลดข้อมูลร้านค้าไม่สำเร็จบางส่วน ลองรีเฟรชหน้าใหม่';
+      msgEl.style.display = 'block';
     }
 
     await renderGrid();
   }
 
+  // Locked items show their real art too (not a silhouette) -- you're
+  // picking exactly what you want here, not opening a surprise box, so
+  // hiding the art would defeat the point.
   async function renderGrid() {
     var grid = el('cosmeticGrid');
     grid.innerHTML = '';
@@ -258,13 +257,17 @@
       var c = list[i];
       var owned = ownedIds.has(c.id);
       var card = document.createElement('div');
-      card.className = 'cosmetic-card' + (owned ? '' : ' locked');
+      card.className = 'cosmetic-card';
       card.setAttribute('data-rarity', c.rarity);
-      var artHtml = owned ? await svgMarkup(c.asset_path) : '<span class="locked-icon"><i class="bi bi-lock-fill"></i></span>';
+      var artHtml = await svgMarkup(c.asset_path);
+      var actionHtml = owned
+        ? '<div class="owned-badge"><i class="bi bi-check-circle-fill"></i>มีแล้ว</div>'
+        : '<button class="buy-btn" data-id="' + c.id + '"' + (coinBalance < c.price ? ' disabled' : '') + '>ซื้อ ' + c.price + ' 🪙</button>';
       card.innerHTML =
         '<div class="art">' + artHtml + '</div>' +
         '<div class="name">' + c.name + '</div>' +
-        '<div class="rarity-tag">' + RARITY_LABEL[c.rarity] + '</div>';
+        '<div class="rarity-tag">' + RARITY_LABEL[c.rarity] + '</div>' +
+        actionHtml;
       grid.appendChild(card);
     }
   }
@@ -278,33 +281,34 @@
     renderGrid();
   });
 
-  el('btnOpenBox').addEventListener('click', async function () {
-    var btn = el('btnOpenBox');
-    var errEl = el('boxError');
-    errEl.style.display = 'none';
+  el('cosmeticGrid').addEventListener('click', async function (e) {
+    var btn = e.target.closest('.buy-btn');
+    if (!btn || btn.disabled) return;
+    var targetId = btn.getAttribute('data-id');
+    var msgEl = el('shopMsg');
+    msgEl.style.display = 'none';
     btn.disabled = true;
     try {
-      var { data, error } = await sb.rpc('open_cosmetic_box');
+      var { data, error } = await sb.rpc('buy_cosmetic', { target_id: targetId });
       if (error) throw error;
       var result = Array.isArray(data) ? data[0] : data;
       if (!result) throw new Error('เกิดข้อผิดพลาด');
 
-      el('coinBalance').textContent = result.coins_left;
-      if (!result.was_duplicate) ownedIds.add(result.cosmetic_id);
+      coinBalance = result.coins_left;
+      el('coinBalance').textContent = coinBalance;
+      ownedIds.add(result.cosmetic_id);
 
-      el('boxRevealDupe').style.display = result.was_duplicate ? 'block' : 'none';
-      el('boxRevealName').textContent = result.name + ' (' + SLOT_LABEL[result.slot] + ')';
-      var badge = el('boxRevealRarity');
+      el('buyResultName').textContent = result.name + ' (' + SLOT_LABEL[result.slot] + ')';
+      var badge = el('buyResultRarity');
       badge.textContent = RARITY_LABEL[result.rarity];
       badge.style.background = getComputedStyle(document.documentElement).getPropertyValue('--rarity-' + result.rarity);
-      el('boxRevealArt').innerHTML = await svgMarkup(result.asset_path);
+      el('buyResultArt').innerHTML = await svgMarkup(result.asset_path);
 
-      new bootstrap.Modal(el('boxRevealModal')).show();
+      new bootstrap.Modal(el('buyResultModal')).show();
       await renderGrid();
     } catch (err) {
-      errEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
-      errEl.style.display = 'block';
-    } finally {
+      msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+      msgEl.style.display = 'block';
       btn.disabled = false;
     }
   });

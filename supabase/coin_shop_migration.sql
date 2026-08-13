@@ -228,72 +228,93 @@ create trigger trg_award_coins_on_correct_practice
   for each row execute function public.award_coins_on_correct_practice();
 
 -- ------------------------------------------------------------
--- 5. Open a cosmetic box: the only way coins can be spent or
---    owned_cosmetics can gain a row. Fixed cost, server-rolled rarity
---    tier, random item within that tier. A duplicate pull refunds part
---    of the cost instead of doing nothing, so opening a box never
---    feels wasted.
+-- 5. Per-item price, by rarity. Centralized here (not hardcoded in the
+--    shop page's JS) so buy_cosmetic() and the UI can never disagree on
+--    what something costs. Re-running this file re-applies current
+--    prices to every row, so tuning them later is just editing here.
 -- ------------------------------------------------------------
 
-create or replace function public.open_cosmetic_box()
+alter table public.cosmetics add column if not exists price integer;
+update public.cosmetics set price = case rarity
+  when 'common'    then 15
+  when 'rare'      then 35
+  when 'epic'      then 70
+  when 'legendary' then 150
+end;
+alter table public.cosmetics alter column price set not null;
+
+-- ------------------------------------------------------------
+-- 6. Buy a specific cosmetic outright -- the only way coins can be
+--    spent or owned_cosmetics can gain a row. Originally this was a
+--    Blooket-style random box; changed to direct pick-and-buy so the
+--    player chooses exactly what they get, priced by rarity instead of
+--    a flat random-pull cost.
+-- ------------------------------------------------------------
+
+create or replace function public.buy_cosmetic(target_id text)
 returns table (
   cosmetic_id text, name text, slot text, style text, rarity text,
-  asset_path text, was_duplicate boolean, refund integer, coins_left integer
+  asset_path text, coins_left integer
 )
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  box_cost constant integer := 30;
-  dup_refund constant integer := 10;
+  item record;
   cur_coins integer;
-  picked_tier text;
-  picked record;
   already_owned boolean;
   new_balance integer;
-  roll double precision := random();
 begin
+  select c.* into item from public.cosmetics c where c.id = target_id;
+  if item.id is null then
+    raise exception 'ไม่พบไอเทมนี้';
+  end if;
+
+  select exists(
+    select 1 from public.owned_cosmetics oc
+     where oc.user_id = auth.uid() and oc.cosmetic_id = target_id
+  ) into already_owned;
+  if already_owned then
+    raise exception 'คุณมีไอเทมนี้อยู่แล้ว';
+  end if;
+
   select coins into cur_coins from public.profiles where user_id = auth.uid() for update;
   if cur_coins is null then
     raise exception 'ไม่พบโปรไฟล์ผู้ใช้';
   end if;
-  if cur_coins < box_cost then
+  if cur_coins < item.price then
     raise exception 'เหรียญไม่พอ';
   end if;
 
-  picked_tier := case
-    when roll < 0.55 then 'common'
-    when roll < 0.80 then 'rare'
-    when roll < 0.95 then 'epic'
-    else 'legendary'
+  update public.profiles set coins = coins - item.price
+   where user_id = auth.uid()
+   returning profiles.coins into new_balance;
+
+  -- The already_owned check above runs before the coins row is locked,
+  -- so two concurrent calls for the same item can both pass it -- the
+  -- owned_cosmetics primary key (user_id, cosmetic_id) still catches the
+  -- loser here and rolls its whole transaction back (no coins lost, no
+  -- item granted), but without this catch it'd surface as a raw
+  -- Postgres constraint-violation message instead of a friendly one.
+  begin
+    insert into public.owned_cosmetics (user_id, cosmetic_id) values (auth.uid(), target_id);
+  exception when unique_violation then
+    raise exception 'คุณมีไอเทมนี้อยู่แล้ว';
   end;
 
-  select c.* into picked from public.cosmetics c
-   where c.rarity = picked_tier
-   order by random() limit 1;
-
-  select exists(
-    select 1 from public.owned_cosmetics oc
-     where oc.user_id = auth.uid() and oc.cosmetic_id = picked.id
-  ) into already_owned;
-
-  if already_owned then
-    update public.profiles set coins = coins - box_cost + dup_refund
-     where user_id = auth.uid()
-     returning profiles.coins into new_balance;
-  else
-    update public.profiles set coins = coins - box_cost
-     where user_id = auth.uid()
-     returning profiles.coins into new_balance;
-    insert into public.owned_cosmetics (user_id, cosmetic_id) values (auth.uid(), picked.id);
-  end if;
-
   return query select
-    picked.id, picked.name, picked.slot, picked.style, picked.rarity, picked.asset_path,
-    already_owned, (case when already_owned then dup_refund else 0 end), new_balance;
+    item.id, item.name, item.slot, item.style, item.rarity, item.asset_path, new_balance;
 end;
 $$;
+
+grant execute on function public.buy_cosmetic(text) to authenticated;
+
+-- open_cosmetic_box() (the earlier random-box function) is intentionally
+-- left defined rather than dropped -- it's unreachable from the app now
+-- that shop.html only calls buy_cosmetic(), and leaving it costs
+-- nothing (it still requires real, spendable coins like everything
+-- else here, so it isn't a reintroduced exploit surface).
 
 grant execute on function public.open_cosmetic_box() to authenticated;
 
