@@ -38,19 +38,23 @@ function createCookingGame(words, callbacks) {
   var BLX=80, BTY=315, BRX=400, BUN_BBY=465;
   var BCX=VW/2, BW=BRX-BLX, BH=BUN_BBY-BTY;
   var CHOP_DUR=9000, ICX=185, ICY=380, IR=90;
-  // Chopping reveals the vegetable one region at a time (2x3 grid) instead
-  // of the whole thing flipping between 3 fixed looks -- each tap chops
-  // the next region, so progress is visible piece by piece across the
-  // whole vegetable, matching how chopping actually looks.
+  // Chopping reveals the vegetable progressively (2x3 grid of regions)
+  // instead of the whole thing flipping between 3 fixed looks. Taps
+  // needed to fully chop (CHOPS_NEEDED) is deliberately decoupled from
+  // how many visual regions there are (VEG_CELLS) -- sTomato/sCabbage
+  // take a continuous 0..1 "how much is chopped" fraction, so a much
+  // higher tap count still animates smoothly across the same 6 regions
+  // instead of needing a cluttered 40-cell grid.
   var VEG_COLS=3, VEG_ROWS=2, VEG_CELLS=VEG_COLS*VEG_ROWS;
+  var CHOPS_NEEDED=40;
   function vegCellRect(cx,cy,r,idx){
     var col=idx%VEG_COLS, row=Math.floor(idx/VEG_COLS);
     var cw=(r*1.9)/VEG_COLS, ch=(r*1.6)/VEG_ROWS;
     var x0=cx-cw*VEG_COLS/2+col*cw, y0=cy-ch*VEG_ROWS/2+row*ch;
     return {x:x0,y:y0,w:cw,h:ch,cx:x0+cw/2,cy:y0+ch/2};
   }
-  var SCX=168, STOP=148, LH=64, LW=52, NL=5;
-  var CUT_TY=[282,370], KX=SCX+90;
+  var SCX=168, STOP=148, LH=64, LW=52, NL=7;
+  var CUT_TY=[276,468], KX=SCX+90;
   var CMB_BBY=630, CTW=155, DROP_DUR=480;
   var ING_LABELS={tom:'มะเขือเทศ', cab:'กะหล่ำปลี', sau:'ไส้กรอก'};
   var STEPS=[
@@ -65,9 +69,14 @@ function createCookingGame(words, callbacks) {
 
   /* ── Game state ────────────────────────────────────────── */
   var G;
+  // Every screen change goes through this (instead of assigning G.st
+  // directly) so update() knows when the current screen was entered --
+  // that's what drives the pop-in transition below, and the animated
+  // score counters (see animateScore).
+  function setState(s){ G.st=s; G.stAt=sc?sc.time.now:0; }
   function resetG(){
     G={
-      st:S.SEL, scores:{bun:0,tom:0,cab:0,sau:0,cmb:0}, total:0,
+      st:S.SEL, stAt:0, scores:{bun:0,tom:0,cab:0,sau:0,cmb:0}, total:0,
       cutting:false, pts:[], split:false, leftPiece:[], rightPiece:[],
       ing:'tom', taps:0, choppedCount:0,
       chopRun:false, chopDone:false, chopStart:0,
@@ -75,9 +84,28 @@ function createCookingGame(words, callbacks) {
       kY:260, kDir:1, kSpd:2.8, cuts:0, cutSc:[], cutY:[],
       cList:['tom','cab','sau'], cIdx:0,
       sX:240, sDir:1, sSpd:3.2, dropped:[], allDone:false,
+      scoreAnim:{},  // scoreKey -> {from, to, startedAt}, see animateScore/drawScoreVal
+      tapFx:null,    // {x, y, startedAt} -- ripple drawn at the last successful button tap
     };
   }
   resetG();
+
+  // Ripple feedback for a successful button tap -- drawBtn() itself has
+  // no press state (buttons are hit-tested once in onDown, not held),
+  // so this is a separate, position-only effect layered on top instead
+  // of threading pressed-state through every button.
+  function pressFx(x,y){ G.tapFx={x:x,y:y,startedAt:sc.time.now}; }
+  function drawTapFx(time){
+    var fx=G.tapFx; if(!fx)return;
+    var t=(time-fx.startedAt)/260;
+    if(t>=1){G.tapFx=null;return;}
+    var e=1-Math.pow(1-t,2);
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,'+(0.55*(1-e))+')';
+    ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(fx.x,fx.y,10+e*26,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
 
   /* ── Canvas 2D context — set in create() ───────────────── */
   var ctx;
@@ -428,14 +456,24 @@ function createCookingGame(words, callbacks) {
 
   /* ── Step bar ──────────────────────────────────────────────── */
   function curStep(){for(var i=0;i<STEPS.length;i++)if(STEPS[i].states.indexOf(G.st)>=0)return i;return -1;}
-  function drawStepBar(){
+  function drawStepBar(time){
     ctx.fillStyle=C.ui; ctx.fillRect(0,0,VW,SH);
     var cs=curStep(), sw=(VW-106)/4;
     STEPS.forEach(function(si,i){
       var sx=4+i*sw, bg=i<cs?C.sDone:i===cs?C.sAct:C.sOff;
       fillRR(sx,8,sw-5,SH-16,9,bg);
+      var icx=sx+(sw-5)/2, icy=8+(SH-16)/2-7;
       ctx.font='20px sans-serif'; ctx.textBaseline='middle';
-      T(si.icon,sx+(sw-5)/2,8+(SH-16)/2-7,'center');
+      if(i===cs&&time!==undefined){
+        // subtle breathing pulse on the current step's icon -- the only
+        // visual life the step bar has otherwise is a flat colour swap
+        var pulse=1+0.1*Math.sin(time*0.005);
+        ctx.save(); ctx.translate(icx,icy); ctx.scale(pulse,pulse); ctx.translate(-icx,-icy);
+        T(si.icon,icx,icy,'center');
+        ctx.restore();
+      }else{
+        T(si.icon,icx,icy,'center');
+      }
       ctx.font='bold 9px Prompt,sans-serif'; ctx.fillStyle=C.w;
       T(si.lbl,sx+(sw-5)/2,SH-13,'center'); ctx.textBaseline='alphabetic';
     });
@@ -468,13 +506,13 @@ function createCookingGame(words, callbacks) {
   }
 
   function drawBunCut(ts){
-    drawBg(); drawStepBar();
+    drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
     T('ลากตัดขนมปังเป็น 2 ชิ้น',VW/2,SH+28,'center');
     if(G.split){
       drawBunPiece(G.leftPiece,-8); drawBunPiece(G.rightPiece,8);
       ctx.font='bold 26px Prompt'; ctx.fillStyle=C.gold;
-      T('ตัดได้ '+G.scores.bun+' คะแนน! '+(G.scores.bun>=80?'🎉':G.scores.bun>=50?'👍':'💪'),VW/2,BUN_BBY+52,'center');
+      T('ตัดได้ '+scoreVal('bun',G.scores.bun,ts)+' คะแนน! '+(G.scores.bun>=80?'🎉':G.scores.bun>=50?'👍':'💪'),VW/2,BUN_BBY+52,'center');
       ctx.font='14px Prompt'; ctx.fillStyle='rgba(255,255,255,.55)';
       T(G.scores.bun>=80?'ตัดตรงมาก!':G.scores.bun>=50?'ดีพอใช้':'ลองใหม่นะ',VW/2,BUN_BBY+78,'center');
       drawBtn(VW/2-85,BUN_BBY+98,170,52,'ต่อไป →',C.acc);
@@ -496,7 +534,7 @@ function createCookingGame(words, callbacks) {
   }
 
   function drawChop(ts){
-    drawBg(); drawStepBar();
+    drawBg(); drawStepBar(ts);
     var isTom=G.ing==='tom';
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะสับ'+(isTom?'มะเขือเทศ':'กะหล่ำปลี')+'!',VW/2,SH+30,'center');
@@ -507,7 +545,7 @@ function createCookingGame(words, callbacks) {
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
     ctx.font='bold 11px Prompt'; ctx.fillStyle=C.w;
     T(Math.max(0,Math.ceil((CHOP_DUR-elapsed)/1000))+'วิ',VW/2,SH+60,'center');
-    var chopPct=(G.choppedCount||0)/VEG_CELLS;
+    var chopPct=(G.choppedCount||0)/CHOPS_NEEDED;
     if(isTom) sTomato(ICX,ICY,IR,chopPct); else sCabbage(ICX,ICY,IR,chopPct);
     var kA=0;
     if(G.kAnim){
@@ -525,14 +563,14 @@ function createCookingGame(words, callbacks) {
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
       T('เสร็จแล้ว!',VW/2,320,'center');
-      var sc=isTom?G.scores.tom:G.scores.cab;
-      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(sc+' คะแนน',VW/2,372,'center');
+      var chopKey=isTom?'tom':'cab';
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal(chopKey,G.scores[chopKey],ts)+' คะแนน',VW/2,372,'center');
       drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc);
     }
   }
 
   function drawSau(ts){
-    drawBg(); drawStepBar();
+    drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
     T('แตะตอนมีดผ่านรอยตัด! (2 ครั้ง)',VW/2,SH+26,'center');
     if(G.cuts<2){G.kY+=G.kDir*G.kSpd; if(G.kY>STOP+NL*LH-12)G.kDir=-1; if(G.kY<STOP+12)G.kDir=1;}
@@ -577,13 +615,13 @@ function createCookingGame(words, callbacks) {
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
       T('ตัดเสร็จ! ✂️',VW/2,310,'center');
-      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(G.scores.sau+' คะแนน',VW/2,362,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('sau',G.scores.sau,ts)+' คะแนน',VW/2,362,'center');
       drawBtn(VW/2-80,402,160,50,'ต่อไป →',C.acc);
     }
   }
 
   function drawCmb(ts){
-    drawBg(); drawStepBar();
+    drawBg(); drawStepBar(ts);
     var cur=G.cList[G.cIdx];
     if(G.cIdx<G.cList.length){
       ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
@@ -614,17 +652,21 @@ function createCookingGame(words, callbacks) {
       G.allDone=true;
       var acc=G.dropped.reduce(function(s,d){return s+d.acc;},0)/G.dropped.length;
       G.scores.cmb=Math.round(acc*100); G.total+=G.scores.cmb;
-      sc.time.delayedCall(700,function(){G.st=S.CMB_R;});
+      // animateScore fires when CMB_R actually appears, not here -- this
+      // screen never displays the cmb score itself (only drawResult
+      // does, after the delay below), so starting the 600ms count-up
+      // now would let it finish before the player ever sees it.
+      sc.time.delayedCall(700,function(){animateScore('cmb',G.scores.cmb);setState(S.CMB_R);});
     }
   }
 
-  function drawResult(key){
-    drawBg(); drawStepBar();
+  function drawResult(key,ts){
+    drawBg(); drawStepBar(ts);
     fillRR(45,SH+28,VW-90,205,18,C.ui);
     ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
     T('เสร็จสิ้น! 🎉',VW/2,SH+76,'center');
     var score=G.scores[key];
-    ctx.font='bold 46px Prompt'; ctx.fillStyle=C.w; T(score,VW/2,SH+142,'center');
+    ctx.font='bold 46px Prompt'; ctx.fillStyle=C.w; T(scoreVal(key,score,ts),VW/2,SH+142,'center');
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.45)'; T('คะแนน',VW/2,SH+166,'center');
     ctx.font='16px Prompt';
     ctx.fillStyle=score>=80?C.sDone:score>=50?C.gold:C.red;
@@ -656,6 +698,21 @@ function createCookingGame(words, callbacks) {
     drawBtn(VW/2-94,614,188,52,'🔄 เล่นอีกครั้ง',C.acc);
   }
 
+  // Score count-up: call animateScore() the instant a score becomes
+  // final, then read it back through scoreVal() wherever it's drawn --
+  // counts up from 0 over 600ms instead of the number just appearing,
+  // the same easeOutCubic curve as the screen pop-in transform above.
+  function animateScore(key,toVal){
+    G.scoreAnim[key]={from:0,to:toVal,startedAt:sc.time.now};
+  }
+  function scoreVal(key,finalVal,time){
+    var a=G.scoreAnim[key];
+    if(!a)return finalVal;
+    var t=Math.min(1,(time-a.startedAt)/600);
+    var e=1-Math.pow(1-t,3);
+    return Math.round(a.from+(a.to-a.from)*e);
+  }
+
   /* ── Game logic ────────────────────────────────────────────── */
   function bestFit(pts){
     var n=pts.length; if(n<2)return 90;
@@ -667,9 +724,10 @@ function createCookingGame(words, callbacks) {
   function finishChop(){
     G.chopDone=true;
     var key=G.ing==='tom'?'tom':'cab';
-    var pct=(G.choppedCount||0)/VEG_CELLS;
+    var pct=(G.choppedCount||0)/CHOPS_NEEDED;
     G.scores[key]=Math.round(pct*100);
     G.total+=G.scores[key];
+    animateScore(key,G.scores[key]);
     if(G.ing==='tom')G.tomFinalPct=pct; else G.cabFinalPct=pct;
   }
   function initSt(s){
@@ -685,9 +743,9 @@ function createCookingGame(words, callbacks) {
   }
   function showPopup(fromSt,toSt){
     var w=getWord(fromSt);
-    if(!w){initSt(toSt);G.st=toSt;return;}
-    G.st=-1;
-    callbacks.onPractice(w,null,function(){initSt(toSt);G.st=toSt;});
+    if(!w){initSt(toSt);setState(toSt);return;}
+    setState(-1);
+    callbacks.onPractice(w,null,function(){initSt(toSt);setState(toSt);});
   }
 
   /* ══ Phaser Scene ══════════════════════════════════════════ */
@@ -727,54 +785,70 @@ function createCookingGame(words, callbacks) {
     update:function(time){
       if(G.st<0)return;
       ctx.clearRect(0,0,VW,VH);
+
+      // Every screen pops/fades in over its first ~220ms (see setState) --
+      // purely a rendering transform around the draw calls, so it never
+      // touches input hit-testing (which uses the untransformed logical
+      // layout coordinates) and settles to a no-op well before a player
+      // could react to it.
+      var since=time-(G.stAt||0), pop=Math.min(1,since/220);
+      var ease=1-Math.pow(1-pop,3);
+      var scale=0.94+0.06*ease;
+      ctx.save();
+      ctx.globalAlpha=ease;
+      ctx.translate(VW/2,VH/2); ctx.scale(scale,scale); ctx.translate(-VW/2,-VH/2);
+
       switch(G.st){
         case S.SEL:   drawSel();break;
         case S.BUN:   drawBunCut(time);break;
-        case S.BUN_R: drawResult('bun');break;
+        case S.BUN_R: drawResult('bun',time);break;
         case S.TOM:   drawChop(time);break;
-        case S.TOM_R: drawResult('tom');break;
+        case S.TOM_R: drawResult('tom',time);break;
         case S.CAB:   drawChop(time);break;
-        case S.CAB_R: drawResult('cab');break;
+        case S.CAB_R: drawResult('cab',time);break;
         case S.SAU:   drawSau(time);break;
-        case S.SAU_R: drawResult('sau');break;
+        case S.SAU_R: drawResult('sau',time);break;
         case S.CMB:   drawCmb(time);break;
-        case S.CMB_R: drawResult('cmb');break;
+        case S.CMB_R: drawResult('cmb',time);break;
         case S.FIN:   drawFinal();break;
       }
+
+      ctx.restore();
+      drawTapFx(time); // drawn after restore so the ripple sits at the exact tap position, unaffected by the pop-in scale
     },
 
     onDown:function(x,y,now){
-      if(G.st===S.SEL){if(hit(x,y,30,160,130,162))G.st=S.BUN;return;}
+      if(G.st===S.SEL){if(hit(x,y,30,160,130,162)){pressFx(x,y);setState(S.BUN);}return;}
       if(G.st===S.BUN){
         if(!G.split){G.cutting=true;G.pts=[{x:x,y:y}];this.sfxBread.play(undefined,{seek:1});}
-        else if(hit(x,y,VW/2-85,BUN_BBY+98,170,52))G.st=S.BUN_R;
+        else if(hit(x,y,VW/2-85,BUN_BBY+98,170,52)){pressFx(x,y);setState(S.BUN_R);}
         return;
       }
-      if(G.st===S.BUN_R){if(hit(x,y,VW/2-100,SH+258,200,54))showPopup(S.BUN_R,S.TOM);return;}
+      if(G.st===S.BUN_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(S.BUN_R,S.TOM);}return;}
       if(G.st===S.TOM||G.st===S.CAB){
-        if(G.chopDone){if(hit(x,y,VW/2-80,412,160,50))G.st=(G.ing==='tom'?S.TOM_R:S.CAB_R);return;}
+        if(G.chopDone){if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(G.ing==='tom'?S.TOM_R:S.CAB_R);}return;}
         var dx=x-ICX,dy=y-ICY;
         if(dx*dx+dy*dy<(IR+22)*(IR+22)){
           if(!G.chopRun){G.chopRun=true;G.chopStart=now;}
           G.taps++;
-          if(G.choppedCount<VEG_CELLS)G.choppedCount++;
+          if(G.choppedCount<CHOPS_NEEDED)G.choppedCount++;
           G.kAnim=1;G.kAnimStart=now;
           this.sfxChop.play();
           sc.time.delayedCall((this.sfxChop.duration||0.15)*1000,function(){sc.sfxCut.play();});
-          if(G.choppedCount>=VEG_CELLS&&!G.chopDone)finishChop();
+          if(G.choppedCount>=CHOPS_NEEDED&&!G.chopDone)finishChop();
         }
         return;
       }
-      if(G.st===S.TOM_R){if(hit(x,y,VW/2-100,SH+258,200,54))showPopup(S.TOM_R,S.CAB);return;}
-      if(G.st===S.CAB_R){if(hit(x,y,VW/2-100,SH+258,200,54))showPopup(S.CAB_R,S.SAU);return;}
+      if(G.st===S.TOM_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(S.TOM_R,S.CAB);}return;}
+      if(G.st===S.CAB_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(S.CAB_R,S.SAU);}return;}
       if(G.st===S.SAU){
-        if(G.cuts>=2){if(hit(x,y,VW/2-80,402,160,50))G.st=S.SAU_R;return;}
+        if(G.cuts>=2){if(hit(x,y,VW/2-80,402,160,50)){pressFx(x,y);setState(S.SAU_R);}return;}
         var cs=Math.round(Math.max(10,100-Math.abs(G.kY-CUT_TY[G.cuts])*2));
         G.cutSc.push(cs);G.cutY.push(G.kY);G.cuts++;
-        if(G.cuts>=2){G.scores.sau=Math.round((G.cutSc[0]+G.cutSc[1])/2);G.total+=G.scores.sau;}
+        if(G.cuts>=2){G.scores.sau=Math.round((G.cutSc[0]+G.cutSc[1])/2);G.total+=G.scores.sau;animateScore('sau',G.scores.sau);}
         return;
       }
-      if(G.st===S.SAU_R){if(hit(x,y,VW/2-100,SH+258,200,54))showPopup(S.SAU_R,S.CMB);return;}
+      if(G.st===S.SAU_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(S.SAU_R,S.CMB);}return;}
       if(G.st===S.CMB){
         if(G.cIdx<G.cList.length){
           var acc=Math.max(0,1-Math.abs(G.sX-VW/2)/(CTW/2));
@@ -784,9 +858,12 @@ function createCookingGame(words, callbacks) {
         }
         return;
       }
-      if(G.st===S.CMB_R){if(hit(x,y,VW/2-100,SH+258,200,54))showPopup(S.CMB_R,S.FIN);return;}
+      if(G.st===S.CMB_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(S.CMB_R,S.FIN);}return;}
       if(G.st===S.FIN){
         if(hit(x,y,VW/2-94,614,188,52)){
+          // no pressFx here -- resetG() below immediately wipes tapFx
+          // along with the rest of G, so a ripple would never get a
+          // frame to render before the screen's already back at select.
           callbacks.onPoints&&callbacks.onPoints(G.total);
           resetG();
         }
@@ -830,6 +907,7 @@ function createCookingGame(words, callbacks) {
       var fromVert=Math.abs(Math.abs(bestFit(clip))-90);
       G.scores.bun=Math.round(Math.max(0,100-fromVert*2.2));
       G.total+=G.scores.bun; G.split=true;
+      animateScore('bun',G.scores.bun);
     }
   });
 
