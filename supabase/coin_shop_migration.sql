@@ -20,6 +20,12 @@
 --     PostgREST call (bypassing the app's own JS entirely) can't set
 --     an arbitrary balance -- only the trigger/function above can,
 --     since they run as the (privileged) function owner.
+--   - What's actually WORN on the persistent profile avatar (shown on
+--     the "ของฉัน" page) is separate from ownership: equip_cosmetic()/
+--     unequip_cosmetic() set profiles.equipped_<slot>, only for items
+--     you own. The dress-up mini-game itself is unrelated to any of
+--     this -- it's free play across the whole catalog for fun/practice,
+--     not gated by ownership.
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -308,6 +314,81 @@ end;
 $$;
 
 grant execute on function public.buy_cosmetic(text) to authenticated;
+
+-- ------------------------------------------------------------
+-- 7. What's currently worn on the profile's own persistent avatar (shown
+--    on the "ของฉัน" profile page), as opposed to what's merely owned.
+--    One column per slot on profiles, each referencing a cosmetic --
+--    simplest possible model since a user can only wear one thing per
+--    slot at a time. Client write access is revoked the same way as
+--    coins: only equip_cosmetic()/unequip_cosmetic() below (SECURITY
+--    DEFINER) can change these, so a client can't equip something it
+--    doesn't own, or put a 'hat' cosmetic in the 'shirt' slot, by
+--    issuing a raw PATCH against profiles directly.
+--
+--    The dress-up MINI-GAME (js/game-dressup.js) is unrelated to this --
+--    it's free play across the whole catalog regardless of ownership,
+--    just for fun/practice. This equipped_* state is specifically what
+--    coins bought in the shop actually dress: your persistent avatar.
+-- ------------------------------------------------------------
+
+alter table public.profiles add column if not exists equipped_hat   text references public.cosmetics (id);
+alter table public.profiles add column if not exists equipped_shirt text references public.cosmetics (id);
+alter table public.profiles add column if not exists equipped_pants text references public.cosmetics (id);
+alter table public.profiles add column if not exists equipped_shoes text references public.cosmetics (id);
+alter table public.profiles add column if not exists equipped_bag   text references public.cosmetics (id);
+
+revoke update (equipped_hat, equipped_shirt, equipped_pants, equipped_shoes, equipped_bag)
+  on public.profiles from authenticated, anon;
+
+create or replace function public.equip_cosmetic(target_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  item record;
+  owns boolean;
+begin
+  select c.* into item from public.cosmetics c where c.id = target_id;
+  if item.id is null then
+    raise exception 'ไม่พบไอเทมนี้';
+  end if;
+
+  select exists(
+    select 1 from public.owned_cosmetics oc
+     where oc.user_id = auth.uid() and oc.cosmetic_id = target_id
+  ) into owns;
+  if not owns then
+    raise exception 'คุณยังไม่ได้ซื้อไอเทมนี้';
+  end if;
+
+  -- item.slot is constrained to a fixed set by cosmetics' own check
+  -- constraint, and format(%I) quotes it as an identifier regardless --
+  -- not string-built SQL from arbitrary client input.
+  execute format('update public.profiles set equipped_%I = $1 where user_id = $2', item.slot)
+    using target_id, auth.uid();
+end;
+$$;
+
+create or replace function public.unequip_cosmetic(target_slot text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if target_slot not in ('hat', 'shirt', 'pants', 'shoes', 'bag') then
+    raise exception 'ตำแหน่งไม่ถูกต้อง';
+  end if;
+  execute format('update public.profiles set equipped_%I = null where user_id = $1', target_slot)
+    using auth.uid();
+end;
+$$;
+
+grant execute on function public.equip_cosmetic(text) to authenticated;
+grant execute on function public.unequip_cosmetic(text) to authenticated;
 
 -- ------------------------------------------------------------
 -- Done. Existing accounts start at 0 coins and an empty closet --

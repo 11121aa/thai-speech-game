@@ -73,6 +73,21 @@
   }
   .buy-btn:disabled { background: #cfcbd8; color: #8a8496; cursor: not-allowed; }
 
+  .wear-section { margin-top: 2.5rem; padding-top: 2rem; border-top: 2px dashed var(--color-bg-soft); }
+  .cosmetic-card.equipped { border-width: 3px; box-shadow: 0 0 0 3px rgba(46, 196, 182, 0.25); }
+  .equipped-badge {
+    font-size: 0.78rem; font-weight: 700; color: var(--color-primary);
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .wear-btn {
+    border: none; border-radius: 999px; padding: 0.35rem 0.9rem;
+    font-weight: 700; font-size: 0.8rem; color: #fff; background: var(--color-primary);
+  }
+  .unwear-btn {
+    border: 2px solid #e5e7eb; border-radius: 999px; padding: 0.3rem 0.85rem;
+    font-weight: 600; font-size: 0.78rem; color: var(--color-text-soft); background: #fff;
+  }
+
   #buyResultArt { width: 140px; height: 140px; margin: 0 auto; display: flex; align-items: center; justify-content: center; }
   #buyResultArt svg, #buyResultArt img { max-width: 100%; max-height: 100%; }
   .reveal-rarity-badge {
@@ -140,6 +155,21 @@
           <button class="closet-tab" data-slot="bag">กระเป๋า</button>
         </div>
         <div class="cosmetic-grid" id="cosmeticGrid"></div>
+
+        <div class="wear-section">
+          <h2 class="h4 mb-1">แต่งตัวอวตารของคุณ</h2>
+          <p class="text-secondary mb-3">เลือกของที่ซื้อแล้วมาสวมใส่บนอวตารของคุณ — คนอื่นที่เห็นโปรไฟล์คุณจะเห็นชุดนี้</p>
+          <div class="closet-tabs" id="wearTabs">
+            <button class="closet-tab active" data-slot="all">ทั้งหมด</button>
+            <button class="closet-tab" data-slot="hat">หมวก</button>
+            <button class="closet-tab" data-slot="shirt">เสื้อ</button>
+            <button class="closet-tab" data-slot="pants">กางเกง</button>
+            <button class="closet-tab" data-slot="shoes">รองเท้า</button>
+            <button class="closet-tab" data-slot="bag">กระเป๋า</button>
+          </div>
+          <div id="wearEmpty" class="text-secondary" style="display:none;">คุณยังไม่มีของที่ซื้อเลย เลือกซื้อของด้านบนก่อนนะ</div>
+          <div class="cosmetic-grid" id="wearGrid"></div>
+        </div>
       </div>
 
     </div>
@@ -200,10 +230,14 @@
   var SLOT_LABEL = { hat: 'หมวก', shirt: 'เสื้อ', pants: 'กางเกง', shoes: 'รองเท้า', bag: 'กระเป๋า' };
   var svgCache = {};
   var cosmetics = [];
+  var cosmeticsById = {};
   var ownedIds = new Set();
   var activeSlotFilter = 'all';
+  var activeWearSlotFilter = 'all';
   var session = null;
   var coinBalance = 0;
+  // slot -> currently-equipped cosmetic id (or null), from profiles.equipped_*
+  var equipped = { hat: null, shirt: null, pants: null, shoes: null, bag: null };
 
   function el(id) { return document.getElementById(id); }
 
@@ -224,14 +258,25 @@
   }
 
   async function loadShopData() {
-    var { data: profile, error: profileErr } = await sb.from('profiles').select('coins').eq('user_id', session.user.id).maybeSingle();
+    var { data: profile, error: profileErr } = await sb.from('profiles')
+      .select('coins, equipped_hat, equipped_shirt, equipped_pants, equipped_shoes, equipped_bag')
+      .eq('user_id', session.user.id).maybeSingle();
     if (profileErr) console.error('[shop] failed to load coin balance:', profileErr);
     coinBalance = (profile && profile.coins) || 0;
     el('coinBalance').textContent = coinBalance;
+    equipped = {
+      hat:   (profile && profile.equipped_hat)   || null,
+      shirt: (profile && profile.equipped_shirt) || null,
+      pants: (profile && profile.equipped_pants) || null,
+      shoes: (profile && profile.equipped_shoes) || null,
+      bag:   (profile && profile.equipped_bag)   || null
+    };
 
     var { data: allCosmetics, error: cosmeticsErr } = await sb.from('cosmetics').select('*').order('slot').order('style').order('variant');
     if (cosmeticsErr) console.error('[shop] failed to load cosmetics catalog:', cosmeticsErr);
     cosmetics = allCosmetics || [];
+    cosmeticsById = {};
+    cosmetics.forEach(function (c) { cosmeticsById[c.id] = c; });
 
     var { data: owned, error: ownedErr } = await sb.from('owned_cosmetics').select('cosmetic_id').eq('user_id', session.user.id);
     if (ownedErr) console.error('[shop] failed to load owned cosmetics:', ownedErr);
@@ -244,6 +289,7 @@
     }
 
     await renderGrid();
+    renderWearGrid();
   }
 
   // Locked items show their real art too (not a silhouette) -- you're
@@ -272,13 +318,82 @@
     }
   }
 
+  // Only OWNED items show up here -- this is the separate "wear" step
+  // that decides which owned piece per slot is equipped on the
+  // persistent avatar (profiles.equipped_*), independent of the buy
+  // grid above and independent of the free-play dress-up mini-game.
+  function renderWearGrid() {
+    var grid = el('wearGrid');
+    grid.innerHTML = '';
+    var ownedList = cosmetics.filter(function (c) { return ownedIds.has(c.id); });
+    var list = ownedList.filter(function (c) { return activeWearSlotFilter === 'all' || c.slot === activeWearSlotFilter; });
+
+    el('wearEmpty').style.display = ownedList.length ? 'none' : 'block';
+    grid.style.display = ownedList.length ? '' : 'none';
+
+    list.forEach(function (c) {
+      var isEquipped = equipped[c.slot] === c.id;
+      var card = document.createElement('div');
+      card.className = 'cosmetic-card' + (isEquipped ? ' equipped' : '');
+      card.setAttribute('data-rarity', c.rarity);
+      var actionHtml = isEquipped
+        ? '<div class="equipped-badge"><i class="bi bi-check-circle-fill"></i>สวมอยู่</div><button class="unwear-btn" data-slot="' + c.slot + '">ถอดออก</button>'
+        : '<button class="wear-btn" data-id="' + c.id + '">สวมใส่</button>';
+      card.innerHTML =
+        '<div class="art"></div>' +
+        '<div class="name">' + c.name + '</div>' +
+        '<div class="rarity-tag">' + RARITY_LABEL[c.rarity] + '</div>' +
+        actionHtml;
+      grid.appendChild(card);
+      svgMarkup(c.asset_path).then(function (markup) { card.querySelector('.art').innerHTML = markup; });
+    });
+  }
+
   el('closetTabs').addEventListener('click', function (e) {
     var btn = e.target.closest('.closet-tab');
     if (!btn) return;
-    document.querySelectorAll('.closet-tab').forEach(function (b) { b.classList.remove('active'); });
+    document.querySelectorAll('#closetTabs .closet-tab').forEach(function (b) { b.classList.remove('active'); });
     btn.classList.add('active');
     activeSlotFilter = btn.getAttribute('data-slot');
     renderGrid();
+  });
+
+  el('wearTabs').addEventListener('click', function (e) {
+    var btn = e.target.closest('.closet-tab');
+    if (!btn) return;
+    document.querySelectorAll('#wearTabs .closet-tab').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    activeWearSlotFilter = btn.getAttribute('data-slot');
+    renderWearGrid();
+  });
+
+  el('wearGrid').addEventListener('click', async function (e) {
+    var wearBtn = e.target.closest('.wear-btn');
+    var unwearBtn = e.target.closest('.unwear-btn');
+    if (!wearBtn && !unwearBtn) return;
+    var msgEl = el('shopMsg');
+    msgEl.style.display = 'none';
+    var btn = wearBtn || unwearBtn;
+    btn.disabled = true;
+    try {
+      if (wearBtn) {
+        var targetId = wearBtn.getAttribute('data-id');
+        var { error } = await sb.rpc('equip_cosmetic', { target_id: targetId });
+        if (error) throw error;
+        var item = cosmeticsById[targetId];
+        if (item) equipped[item.slot] = targetId;
+      } else {
+        var targetSlot = unwearBtn.getAttribute('data-slot');
+        var { error: unequipErr } = await sb.rpc('unequip_cosmetic', { target_slot: targetSlot });
+        if (unequipErr) throw unequipErr;
+        equipped[targetSlot] = null;
+      }
+      renderWearGrid();
+    } catch (err) {
+      msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+      msgEl.style.display = 'block';
+      btn.disabled = false;
+    }
   });
 
   el('cosmeticGrid').addEventListener('click', async function (e) {
@@ -306,6 +421,7 @@
 
       new bootstrap.Modal(el('buyResultModal')).show();
       await renderGrid();
+      renderWearGrid();
     } catch (err) {
       msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
       msgEl.style.display = 'block';

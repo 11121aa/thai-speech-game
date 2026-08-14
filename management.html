@@ -62,6 +62,7 @@
             <span id="profileAvatarInitial">?</span>
             <div id="profileAvatarPreset" style="display:none;position:absolute;inset:0;border-radius:50%;align-items:center;justify-content:center;font-size:2.2rem;"></div>
             <img id="profileAvatarImg" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="">
+            <div id="profileAvatarDressed" style="display:none;position:absolute;inset:0;border-radius:50%;overflow:hidden;"></div>
             <span style="position:absolute;bottom:-2px;right:-2px;background:var(--color-primary-dark);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;border:2px solid #fff;"><i class="bi bi-camera-fill"></i></span>
           </div>
           <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
@@ -722,12 +723,13 @@ function ageGenderLabel(person) {
 
 async function initUserProfile(session) {
   console.log('[profile load] logged-in user_id:', session.user.id, 'email:', session.user.email);
-  var { data: profile, error: profileErr } = await sb.from('profiles').select('username, gender, age, avatar_url, avatar_emoji, avatar_color, avatar_color2, patient_code, record_reps_together').eq('user_id', session.user.id).maybeSingle();
+  var { data: profile, error: profileErr } = await sb.from('profiles').select('username, gender, age, avatar_url, avatar_emoji, avatar_color, avatar_color2, patient_code, record_reps_together, equipped_hat, equipped_shirt, equipped_pants, equipped_shoes, equipped_bag').eq('user_id', session.user.id).maybeSingle();
   console.log('[profile load] query result — data:', profile, 'error:', profileErr);
   var displayName = (profile && profile.username) || session.user.email;
   var initial = displayName ? displayName[0].toUpperCase() : '?';
   document.getElementById('profileAvatarInitial').textContent = initial;
   document.getElementById('profileEmail').textContent = displayName;
+  await loadEquippedCosmetics(profile);
   renderAvatar(profile);
 
   if (profile && profile.gender) {
@@ -804,18 +806,103 @@ var AVATAR_PRESETS = [
   { emoji: '🐸', c1: '#a8e063', c2: '#56ab2f' }
 ];
 
-// Shows whichever of the 3 mutually-exclusive avatar states this profile
-// has: a real uploaded photo, a preset emoji, or (neither) the username
-// initial fallback.
+// The persistent "digital avatar" -- cosmetics equipped in the shop
+// (shop.html's wear section, profiles.equipped_hat/shirt/pants/shoes/bag),
+// independent of the free-play dress-up mini-game. Module-level so every
+// renderAvatar() call (initial load, and the avatar-picker's live preview
+// calls further down) sees the same equipped state without threading it
+// through every call site.
+var equippedCosmetics = null;      // {hat,shirt,pants,shoes,bag} cosmetic ids/nulls, or null if never fetched
+var equippedAssetById  = {};       // cosmetic id -> asset_path, for whatever's currently equipped
+
+async function loadEquippedCosmetics(profile) {
+  equippedCosmetics = profile ? {
+    hat:   profile.equipped_hat   || null,
+    shirt: profile.equipped_shirt || null,
+    pants: profile.equipped_pants || null,
+    shoes: profile.equipped_shoes || null,
+    bag:   profile.equipped_bag   || null
+  } : null;
+  equippedAssetById = {};
+  var ids = equippedCosmetics ? Object.keys(equippedCosmetics).map(function (k) { return equippedCosmetics[k]; }).filter(Boolean) : [];
+  if (!ids.length) return;
+  var { data: rows, error } = await sb.from('cosmetics').select('id, asset_path').in('id', ids);
+  if (error) { console.error('[avatar] failed to load equipped cosmetics art:', error); return; }
+  (rows || []).forEach(function (c) { equippedAssetById[c.id] = c.asset_path; });
+}
+
+// Body proportions/coordinate space match the dress-up mini-game's
+// drawAvatar()/buildPieceImages() (js/game-dressup.js) exactly, so piece
+// art lines up the same way -- just cropped to a head+shoulders bust
+// (pants/shoes never show at this icon size, same as a real profile
+// photo wouldn't show your shoes).
+var DRESSED_AX = 190, DRESSED_AY = 280;
+var DRESSED_PIECE_SPECS = {
+  hat:   { x: DRESSED_AX,      y: DRESSED_AY - 206, ox: 0.5, oy: 1,   w: 92,  h: 88 },
+  shirt: { x: DRESSED_AX,      y: DRESSED_AY - 124, ox: 0.5, oy: 0,   w: 112, h: 100 },
+  bag:   { x: DRESSED_AX + 44, y: DRESSED_AY - 82,  ox: 0.5, oy: 0.5, w: 52,  h: 74 }
+};
+
+function dressedPieceImageTag(spec, href) {
+  var x = spec.x - spec.ox * spec.w;
+  var y = spec.y - spec.oy * spec.h;
+  return '<image href="' + href + '" x="' + x + '" y="' + y + '" width="' + spec.w + '" height="' + spec.h + '" preserveAspectRatio="xMidYMid meet"></image>';
+}
+
+function buildDressedAvatarSVG() {
+  var AX = DRESSED_AX, AY = DRESSED_AY;
+  var eq = equippedCosmetics || {};
+  var parts = [];
+  parts.push('<rect x="85" y="-20" width="210" height="210" fill="#FFF7EC"></rect>');
+  // arms (skin)
+  parts.push('<rect x="' + (AX - 58) + '" y="' + (AY - 110) + '" width="18" height="80" rx="9" fill="#F5C9A0"></rect>');
+  parts.push('<rect x="' + (AX + 40) + '" y="' + (AY - 110) + '" width="18" height="80" rx="9" fill="#F5C9A0"></rect>');
+  // torso (bare base -- covered by the shirt piece once equipped)
+  parts.push('<rect x="' + (AX - 40) + '" y="' + (AY - 120) + '" width="80" height="90" rx="16" fill="#E5E7EB"></rect>');
+  if (eq.shirt && equippedAssetById[eq.shirt]) parts.push(dressedPieceImageTag(DRESSED_PIECE_SPECS.shirt, equippedAssetById[eq.shirt]));
+  if (eq.bag && equippedAssetById[eq.bag]) parts.push(dressedPieceImageTag(DRESSED_PIECE_SPECS.bag, equippedAssetById[eq.bag]));
+  // head (skin)
+  parts.push('<circle cx="' + AX + '" cy="' + (AY - 175) + '" r="40" fill="#F5C9A0"></circle>');
+  // hair -- rounded band across the top of the head (top corners only)
+  var hx0 = AX - 40, hx1 = AX + 40, hy0 = AY - 214, hy1 = AY - 178, hr = 20;
+  parts.push('<path d="M ' + hx0 + ' ' + (hy0 + hr) + ' A ' + hr + ' ' + hr + ' 0 0 1 ' + (hx0 + hr) + ' ' + hy0 +
+    ' L ' + (hx1 - hr) + ' ' + hy0 + ' A ' + hr + ' ' + hr + ' 0 0 1 ' + hx1 + ' ' + (hy0 + hr) +
+    ' L ' + hx1 + ' ' + hy1 + ' L ' + hx0 + ' ' + hy1 + ' Z" fill="#4B3621"></path>');
+  // face
+  parts.push('<circle cx="' + (AX - 14) + '" cy="' + (AY - 178) + '" r="4" fill="#2b2b2b"></circle>');
+  parts.push('<circle cx="' + (AX + 14) + '" cy="' + (AY - 178) + '" r="4" fill="#2b2b2b"></circle>');
+  parts.push('<path d="M ' + (AX - 13.7) + ' ' + (AY - 165) + ' Q ' + AX + ' ' + (AY - 154) + ' ' + (AX + 13.7) + ' ' + (AY - 165) +
+    '" stroke="#2b2b2b" stroke-width="3" fill="none" stroke-linecap="round"></path>');
+  if (eq.hat && equippedAssetById[eq.hat]) parts.push(dressedPieceImageTag(DRESSED_PIECE_SPECS.hat, equippedAssetById[eq.hat]));
+  return '<svg viewBox="85 -20 210 210" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">' + parts.join('') + '</svg>';
+}
+
+// Shows whichever avatar state applies, most-specific first: the
+// composited "digital avatar" (any cosmetic equipped in the shop) takes
+// priority, then a real uploaded photo, then a preset emoji, then
+// (neither) the username initial fallback.
 function renderAvatar(profile) {
-  var img    = document.getElementById('profileAvatarImg');
-  var preset = document.getElementById('profileAvatarPreset');
+  var img     = document.getElementById('profileAvatarImg');
+  var preset  = document.getElementById('profileAvatarPreset');
   var initial = document.getElementById('profileAvatarInitial');
+  var dressed = document.getElementById('profileAvatarDressed');
   img.style.display = 'none';
   preset.style.display = 'none';
   initial.style.display = 'none';
+  dressed.style.display = 'none';
 
-  if (profile && profile.avatar_url) {
+  // Only hat/shirt/bag actually render in the bust-crop SVG (pants/shoes
+  // fall outside it) -- gate on equippedAssetById, not equippedCosmetics
+  // directly, so equipping only pants/shoes (or a cosmetics-fetch
+  // failure) doesn't switch to a dressed avatar with nothing visible on
+  // it, silently blanking out a perfectly good photo/emoji.
+  var hasEquipped = ['hat', 'shirt', 'bag'].some(function (slot) {
+    return equippedCosmetics && equippedCosmetics[slot] && equippedAssetById[equippedCosmetics[slot]];
+  });
+  if (hasEquipped) {
+    dressed.innerHTML = buildDressedAvatarSVG();
+    dressed.style.display = 'block';
+  } else if (profile && profile.avatar_url) {
     img.src = profile.avatar_url;
     img.style.display = 'block';
   } else if (profile && profile.avatar_emoji) {

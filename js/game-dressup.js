@@ -1,5 +1,5 @@
 // ============================================================
-//  DRESS-UP GAME — Phaser 3  (wear cosmetics bought in the shop)
+//  DRESS-UP GAME — Phaser 3  (free-play closet, try on anything)
 // ============================================================
 //  POLISH GUIDE (search for the label to find where to edit):
 //    [TUNE]    Points per slot, avatar position       (~line 15)
@@ -9,32 +9,34 @@
 //  Clothing art itself lives in img/dressup/*.svg (and img/dressup/doll/)
 //  — edit those files directly to restyle a piece; the shop's cosmetics
 //  catalog (supabase/coin_shop_migration.sql) is what maps each file to
-//  a purchasable item.
+//  a purchasable item there.
 // ============================================================
 //  How the game works:
-//    - Cosmetics are no longer unlocked by practicing words in this
-//      mini-game — they're bought outright in the shop (shop.html) with
-//      coins earned from correct practice recordings anywhere in the
-//      app. This screen is just a closet: it shows whatever you've
-//      already bought.
-//    - Every slot (hat/shirt/pants/shoes/bag) you own at least one item
-//      for gets its best-rarity piece equipped automatically, earning a
-//      one-time bonus per slot for the session.
-//    - Tap a slot's tab (hat/shirt/pants/shoes/bag) to see every item you
-//      own for it as real thumbnail art, then tap any card to wear it —
-//      pure browsing after the initial bonus, no extra points.
+//    - This mini-game is independent of the shop and coin ownership --
+//      every cosmetic in the whole catalog (both art styles, 10 designs
+//      per slot) is free to try on here, for fun/practice. It has
+//      nothing to do with what's actually bought or worn on your
+//      persistent profile avatar (that's shop.html + management.html).
+//    - Every slot (hat/shirt/pants/shoes/bag) auto-equips a starting
+//      piece, earning a one-time bonus per slot for the session.
+//    - Tap a slot's tab (hat/shirt/pants/shoes/bag) to see every design
+//      for it as real thumbnail art (sticker style top row, doll style
+//      bottom row), then tap any card to wear it — pure browsing after
+//      the initial bonus, no extra points.
 //    - Nothing to "finish" here — the round just runs until the shared
 //      HUD countdown timer ends it, like the timer-driven games.
 // ============================================================
 
 // createDressupGame is called with:
 //   words     = array of word objects (kept for signature compatibility
-//               with DressupGame.start(words, cbs); unused now that
-//               cosmetics replace word-practice unlocks)
+//               with DressupGame.start(words, cbs); unused now that this
+//               is free play rather than practice-gated unlocks)
 //   callbacks = { onPoints, onFinish, onTime }
 //   closet    = { hat:[...], shirt:[...], pants:[...], shoes:[...], bag:[...] }
-//               each entry: { id, name, rarity, style, variant, asset_path },
-//               already sorted best-rarity-first within each slot
+//               every cosmetic for that slot (both styles) -- the whole
+//               catalog, not just what's owned -- each entry
+//               { id, name, rarity, style, variant, asset_path },
+//               sorted sticker-style-first then by variant
 function createDressupGame(words, callbacks, closet) {
 
   // ── [TUNE] Numbers you can change ────────────────────────────
@@ -57,10 +59,11 @@ function createDressupGame(words, callbacks, closet) {
 
   // ── Closet panel layout: a row of slot tabs (hat/shirt/pants/shoes/bag)
   // above a grid of tappable item cards for whichever slot is active --
-  // tap a card to wear it. Replaces an earlier version that hid the
-  // choice behind tiny ‹/› cycle arrows with no visible art.
+  // tap a card to wear it. 10 designs per slot (5 sticker + 5 doll) wrap
+  // into 2 rows of 5.
   var PANEL_X = 400, PANEL_Y = 56, PANEL_W = 380;
-  var TAB_H = 48, CARD_W = 68, CARD_H = 108, CARD_GAP = 10, CARD_CY = PANEL_Y + TAB_H + 92;
+  var TAB_H = 48, CARD_W = 68, CARD_H = 100, CARD_GAP = 10, ROW_GAP = 12, PER_ROW = 5;
+  var CARD_CY = [PANEL_Y + TAB_H + 76, PANEL_Y + TAB_H + 76 + CARD_H + ROW_GAP];
 
   var DsScene = new Phaser.Class({
     Extends: Phaser.Scene,
@@ -75,10 +78,11 @@ function createDressupGame(words, callbacks, closet) {
       this.gridCards    = [];   // GameObjects for the current grid -- destroyed/rebuilt on slot switch
     },
 
-    // Loads one texture per OWNED cosmetic (not the whole catalog) --
-    // the ?v= query param is this repo's cache-busting convention (see
-    // game.html's script tags): bump it whenever art at these paths is
-    // redrawn, since Phaser's SVG loader has no cache-busting of its own.
+    // Loads one texture per catalog cosmetic (every design, regardless of
+    // ownership) -- the ?v= query param is this repo's cache-busting
+    // convention (see game.html's script tags): bump it whenever art at
+    // these paths is redrawn, since Phaser's SVG loader has no
+    // cache-busting of its own.
     preload: function () {
       SLOTS.forEach(function (slot) {
         (closet[slot.key] || []).forEach(function (item) {
@@ -105,9 +109,11 @@ function createDressupGame(words, callbacks, closet) {
       this.buildPieceImages();
       this.drawAvatar();
 
+      // Every slot always has the full catalog now -- this only fires if
+      // the catalog fetch itself genuinely failed (e.g. offline).
       var hasAnything = SLOTS.some(function (s) { return (closet[s.key] || []).length > 0; });
       if (!hasAnything) {
-        this.add.text(PANEL_X + PANEL_W / 2, H / 2, 'ยังไม่มีของแต่งตัวเลย\nไปที่ร้านค้าเพื่อเปิดกล่องสุ่มกันเถอะ! 🪙', {
+        this.add.text(PANEL_X + PANEL_W / 2, H / 2, 'โหลดตู้เสื้อผ้าไม่สำเร็จ\nลองเปิดหน้านี้ใหม่อีกครั้ง', {
           fontFamily: 'Prompt, sans-serif', fontSize: '18px', color: '#6b7280', align: 'center'
         }).setOrigin(0.5);
         return;
@@ -130,8 +136,9 @@ function createDressupGame(words, callbacks, closet) {
     // ── [AVATAR] One illustrated sprite per outfit slot, positioned over
     // the plain body drawn in drawAvatar() and stacked in the order that
     // looks right on the body (pants/shoes first, shirt over the torso,
-    // bag over the shirt, hat last on top). Only created for slots you
-    // actually own something in -- an empty slot has no Image at all.
+    // bag over the shirt, hat last on top). Every slot always has a full
+    // catalog now, so every slot gets an Image (starting on its first
+    // design, per the auto-equip in create()).
     // Sizes/positions are derived from the plain body's own geometry in
     // drawAvatar() (legs span AX-38..AX+38 / AY-40..AY+50, feet ellipses
     // sit at AY+49..AY+67, torso spans AY-120..AY-30, head circle is
@@ -213,7 +220,7 @@ function createDressupGame(words, callbacks, closet) {
         this.tabIcons[slot.key] = { x: tx, w: tabW };
       }, this);
 
-      this.emptyMsg = this.add.text(PANEL_X + PANEL_W / 2, CARD_CY, '', {
+      this.emptyMsg = this.add.text(PANEL_X + PANEL_W / 2, CARD_CY[0], '', {
         fontFamily: 'Prompt, sans-serif', fontSize: '15px', color: '#9ca3af',
         align: 'center', wordWrap: { width: PANEL_W - 30 }
       }).setOrigin(0.5).setVisible(false);
@@ -251,45 +258,55 @@ function createDressupGame(words, callbacks, closet) {
       var items = closet[this.activeSlot] || [];
       if (!items.length) {
         var slotInfo = SLOTS.filter(function (s) { return s.key === self.activeSlot; })[0];
-        this.emptyMsg.setText('ยังไม่มี' + (slotInfo ? slotInfo.label : '') + 'เลย\nไปเปิดกล่องที่ร้านค้ากันเถอะ! 🪙').setVisible(true);
+        this.emptyMsg.setText('โหลด' + (slotInfo ? slotInfo.label : '') + 'ไม่สำเร็จ ลองใหม่อีกครั้ง').setVisible(true);
         return;
       }
       this.emptyMsg.setVisible(false);
 
-      var totalW = items.length * CARD_W + (items.length - 1) * CARD_GAP;
-      var startX = PANEL_X + (PANEL_W - totalW) / 2 + CARD_W / 2;
+      // Up to 10 designs per slot (5 sticker + 5 doll) wrap into 2 rows
+      // of up to PER_ROW=5, each row centered independently.
+      var rowCount = Math.ceil(items.length / PER_ROW);
+      var rows = [];
+      for (var r = 0; r < rowCount; r++) rows.push(items.slice(r * PER_ROW, r * PER_ROW + PER_ROW));
 
-      items.forEach(function (item, idx) {
-        var cx = startX + idx * (CARD_W + CARD_GAP);
-        var selected = self.selectedIdx[self.activeSlot] === idx;
+      rows.forEach(function (rowItems, rowIdx) {
+        var cy = CARD_CY[rowIdx] || CARD_CY[CARD_CY.length - 1];
+        var totalW = rowItems.length * CARD_W + (rowItems.length - 1) * CARD_GAP;
+        var startX = PANEL_X + (PANEL_W - totalW) / 2 + CARD_W / 2;
 
-        var bg = self.add.graphics();
-        bg.fillStyle(0xffffff);
-        bg.fillRoundedRect(cx - CARD_W / 2, CARD_CY - CARD_H / 2, CARD_W, CARD_H, 12);
-        bg.lineStyle(selected ? 3 : 2, selected ? 0x2ec4b6 : 0xe5e7eb);
-        bg.strokeRoundedRect(cx - CARD_W / 2, CARD_CY - CARD_H / 2, CARD_W, CARD_H, 12);
+        rowItems.forEach(function (item, colIdx) {
+          var idx = rowIdx * PER_ROW + colIdx;
+          var cx = startX + colIdx * (CARD_W + CARD_GAP);
+          var selected = self.selectedIdx[self.activeSlot] === idx;
 
-        var thumb = self.add.image(cx, CARD_CY - 30, item.id).setDisplaySize(48, 48);
+          var bg = self.add.graphics();
+          bg.fillStyle(0xffffff);
+          bg.fillRoundedRect(cx - CARD_W / 2, cy - CARD_H / 2, CARD_W, CARD_H, 12);
+          bg.lineStyle(selected ? 3 : 2, selected ? 0x2ec4b6 : 0xe5e7eb);
+          bg.strokeRoundedRect(cx - CARD_W / 2, cy - CARD_H / 2, CARD_W, CARD_H, 12);
 
-        var name = self.add.text(cx, CARD_CY + 2, item.name, {
-          fontFamily: 'Prompt, sans-serif', fontSize: '10px', color: '#374151',
-          align: 'center', wordWrap: { width: CARD_W - 6 }
-        }).setOrigin(0.5, 0);
+          var thumb = self.add.image(cx, cy - 26, item.id).setDisplaySize(40, 40);
 
-        var rarity = self.add.text(cx, CARD_CY + 40, RARITY_LABEL[item.rarity] || item.rarity, {
-          fontFamily: 'Prompt, sans-serif', fontSize: '9px', fontStyle: 'bold',
-          color: RARITY_COLOR[item.rarity] || '#6b7280'
-        }).setOrigin(0.5, 0);
+          var name = self.add.text(cx, cy, item.name, {
+            fontFamily: 'Prompt, sans-serif', fontSize: '9px', color: '#374151',
+            align: 'center', wordWrap: { width: CARD_W - 6 }
+          }).setOrigin(0.5, 0);
 
-        var hit = self.add.rectangle(cx, CARD_CY, CARD_W, CARD_H, 0x000000, 0)
-          .setInteractive({ useHandCursor: true });
-        hit.on('pointerdown', function () {
-          if (self.selectedIdx[self.activeSlot] === idx) return; // already worn
-          self.equipSlot(self.activeSlot, idx);
-          self.renderItemGrid();
+          var rarity = self.add.text(cx, cy + 34, RARITY_LABEL[item.rarity] || item.rarity, {
+            fontFamily: 'Prompt, sans-serif', fontSize: '8px', fontStyle: 'bold',
+            color: RARITY_COLOR[item.rarity] || '#6b7280'
+          }).setOrigin(0.5, 0);
+
+          var hit = self.add.rectangle(cx, cy, CARD_W, CARD_H, 0x000000, 0)
+            .setInteractive({ useHandCursor: true });
+          hit.on('pointerdown', function () {
+            if (self.selectedIdx[self.activeSlot] === idx) return; // already worn
+            self.equipSlot(self.activeSlot, idx);
+            self.renderItemGrid();
+          });
+
+          self.gridCards.push(bg, thumb, name, rarity, hit);
         });
-
-        self.gridCards.push(bg, thumb, name, rarity, hit);
       });
     },
 
@@ -321,31 +338,27 @@ function createDressupGame(words, callbacks, closet) {
 // ── Public API (mirrors ShootingGame, FlashcardGame, etc.) ──────────
 var DressupGame = (function () {
   var game = null;
-  var RARITY_RANK = { legendary: 0, epic: 1, rare: 2, common: 3 };
+  var STYLE_RANK = { sticker: 0, doll: 1 };
 
-  // Fetches the signed-in user's owned cosmetics (joined with the
-  // catalog for name/rarity/asset_path), grouped by slot and sorted
-  // best-rarity-first, before the Phaser game is created -- preload()
-  // needs to know which asset paths to load up front.
+  // Fetches the WHOLE cosmetics catalog (every design, both art styles,
+  // regardless of who owns what -- this game is free play, independent
+  // of the shop) grouped by slot, sorted sticker-style row first then
+  // doll-style row, each ordered by variant -- so renderItemGrid()'s
+  // 2-row wrap lines up with "row 1 = sticker, row 2 = doll". Public
+  // read-only data (cosmetics_select_all RLS policy), so no login is
+  // required to browse or try things on.
   async function loadCloset() {
     var closet = { hat: [], shirt: [], pants: [], shoes: [], bag: [] };
-    if (typeof Auth === 'undefined' || typeof sb === 'undefined' || !sb) return closet;
-    var session = await Auth.getSession();
-    if (!session) return closet;
+    if (typeof sb === 'undefined' || !sb) return closet;
 
-    var { data: owned, error: ownedErr } = await sb.from('owned_cosmetics').select('cosmetic_id').eq('user_id', session.user.id);
-    if (ownedErr) { console.error('[dressup] failed to load owned_cosmetics:', ownedErr); return closet; }
-    var ownedIds = (owned || []).map(function (o) { return o.cosmetic_id; });
-    if (!ownedIds.length) return closet;
-
-    var { data: rows, error: rowsErr } = await sb.from('cosmetics').select('*').in('id', ownedIds);
+    var { data: rows, error: rowsErr } = await sb.from('cosmetics').select('*');
     if (rowsErr) { console.error('[dressup] failed to load cosmetics catalog:', rowsErr); return closet; }
     (rows || []).forEach(function (item) {
       if (closet[item.slot]) closet[item.slot].push(item);
     });
     Object.keys(closet).forEach(function (slotKey) {
       closet[slotKey].sort(function (a, b) {
-        return (RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity]) || (b.variant - a.variant);
+        return (STYLE_RANK[a.style] - STYLE_RANK[b.style]) || (a.variant - b.variant);
       });
     });
     return closet;
