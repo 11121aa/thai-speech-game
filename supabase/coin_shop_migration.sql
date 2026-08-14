@@ -3,18 +3,18 @@
 -- Run in Supabase SQL Editor (Project > SQL Editor > New query)
 -- ============================================================
 -- Adds a persistent coin balance, a catalog of dress-up cosmetics (both
--- art styles already in img/dressup/), and a Blooket-style "open a box
--- for a random item" shop:
+-- art styles already in img/dressup/), and a shop where coins buy a
+-- specific cosmetic outright (priced by rarity):
 --   - Every time a practice recording gets marked correct (parent OR
 --     multi-rep flow), a database trigger awards a fixed number of
 --     coins -- no client code calls this directly, so it can't be
 --     forged by editing the page's JS.
---   - Coins can only be spent through open_cosmetic_box(), a
+--   - Coins can only be spent through buy_cosmetic(target_id), a
 --     SECURITY DEFINER function that atomically checks the balance,
---     deducts the cost, rolls a rarity tier, picks a random unowned-
---     weighted... actually just a random item in that tier, and
---     records ownership. The client never gets to pick which item it
---     receives or write to profiles.coins / owned_cosmetics directly.
+--     deducts that item's price, and records ownership. The client
+--     picks which item it wants but never writes to profiles.coins /
+--     owned_cosmetics directly, and can't influence the price (it's
+--     looked up server-side from the cosmetics table).
 --   - profiles.coins has its UPDATE privilege revoked from the
 --     authenticated/anon roles at the column level, so even a direct
 --     PostgREST call (bypassing the app's own JS entirely) can't set
@@ -45,9 +45,8 @@ revoke update (coins) on public.profiles from authenticated, anon;
 --    (img/dressup/*.svg = 'sticker' style, img/dressup/doll/*.svg =
 --    'doll' style). Rarity is derived from which of the 5 designs per
 --    slot/style it is: the first two are common, then rare/epic/
---    legendary -- open_cosmetic_box() rolls a rarity tier first (see
---    below) so rarer tiers are drawn much less often even though every
---    tier here has an equal number of items.
+--    legendary -- rarity drives that item's price (see buy_cosmetic()
+--    below), not a random draw -- the player picks exactly what they buy.
 -- ------------------------------------------------------------
 
 create table if not exists public.cosmetics (
@@ -124,10 +123,10 @@ create policy "cosmetics_select_all" on public.cosmetics for select using (true)
 -- 3. What each user has actually unlocked. No insert/update/delete
 --    policy is defined for authenticated/anon on purpose -- RLS
 --    default-denies anything without an explicit permissive policy, so
---    the only way a row can ever appear here is through
---    open_cosmetic_box() below (a SECURITY DEFINER function, which
---    bypasses RLS the same way is_specialist()/username_to_email()
---    already do elsewhere in this schema).
+--    the only way a row can ever appear here is through buy_cosmetic()
+--    below (a SECURITY DEFINER function, which bypasses RLS the same
+--    way is_specialist()/username_to_email() already do elsewhere in
+--    this schema).
 -- ------------------------------------------------------------
 
 create table if not exists public.owned_cosmetics (
@@ -204,7 +203,7 @@ begin
     -- from the same user (parallel tabs, a scripted burst) serialize
     -- here one at a time instead of each reading the same pre-burst
     -- count and all passing the cap check together -- same reasoning as
-    -- open_cosmetic_box()'s own "for update" lock below.
+    -- buy_cosmetic()'s own "for update" lock below.
     perform 1 from public.profiles where user_id = new.user_id for update;
 
     select count(*) into awarded_today
@@ -309,14 +308,6 @@ end;
 $$;
 
 grant execute on function public.buy_cosmetic(text) to authenticated;
-
--- open_cosmetic_box() (the earlier random-box function) is intentionally
--- left defined rather than dropped -- it's unreachable from the app now
--- that shop.html only calls buy_cosmetic(), and leaving it costs
--- nothing (it still requires real, spendable coins like everything
--- else here, so it isn't a reintroduced exploit surface).
-
-grant execute on function public.open_cosmetic_box() to authenticated;
 
 -- ------------------------------------------------------------
 -- Done. Existing accounts start at 0 coins and an empty closet --
