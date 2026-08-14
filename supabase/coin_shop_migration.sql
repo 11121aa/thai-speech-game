@@ -62,10 +62,24 @@ create table if not exists public.cosmetics (
   variant smallint not null check (variant between 1 and 5),
   name text not null,
   rarity text not null check (rarity in ('common', 'rare', 'epic', 'legendary')),
-  asset_path text not null
+  asset_path text not null,
+  price integer
 );
 
-insert into public.cosmetics (id, slot, style, variant, name, rarity, asset_path) values
+-- price is computed inline here (not left to section 5's backfill alone)
+-- so this insert stays valid on every re-run, not just a fresh install --
+-- once section 5 below has run once and made price NOT NULL, re-running
+-- this insert without a price would fail that constraint immediately,
+-- before ON CONFLICT ever gets a chance to just update the other columns.
+insert into public.cosmetics (id, slot, style, variant, name, rarity, asset_path, price)
+select v.id, v.slot, v.style, v.variant, v.name, v.rarity, v.asset_path,
+  case v.rarity
+    when 'common'    then 15
+    when 'rare'      then 35
+    when 'epic'      then 70
+    when 'legendary' then 150
+  end
+from (values
 ('sticker-hat-1', 'hat', 'sticker', 1, 'Pompom beanie', 'common', 'img/dressup/hat.svg'),
 ('sticker-hat-2', 'hat', 'sticker', 2, 'Baseball cap', 'common', 'img/dressup/hat-2.svg'),
 ('sticker-hat-3', 'hat', 'sticker', 3, 'Sun hat', 'rare', 'img/dressup/hat-3.svg'),
@@ -116,9 +130,10 @@ insert into public.cosmetics (id, slot, style, variant, name, rarity, asset_path
 ('doll-bag-3', 'bag', 'doll', 3, 'Tote bag', 'rare', 'img/dressup/doll/bag-3.svg'),
 ('doll-bag-4', 'bag', 'doll', 4, 'Fanny pack', 'epic', 'img/dressup/doll/bag-4.svg'),
 ('doll-bag-5', 'bag', 'doll', 5, 'Messenger bag', 'legendary', 'img/dressup/doll/bag-5.svg')
+) as v(id, slot, style, variant, name, rarity, asset_path)
 on conflict (id) do update set
   slot = excluded.slot, style = excluded.style, variant = excluded.variant,
-  name = excluded.name, rarity = excluded.rarity, asset_path = excluded.asset_path;
+  name = excluded.name, rarity = excluded.rarity, asset_path = excluded.asset_path, price = excluded.price;
 
 alter table public.cosmetics enable row level security;
 
@@ -235,11 +250,14 @@ create trigger trg_award_coins_on_correct_practice
 -- ------------------------------------------------------------
 -- 5. Per-item price, by rarity. Centralized here (not hardcoded in the
 --    shop page's JS) so buy_cosmetic() and the UI can never disagree on
---    what something costs. Re-running this file re-applies current
---    prices to every row, so tuning them later is just editing here.
+--    what something costs. The insert above already sets price the same
+--    way for bootstrapping (so it stays NOT NULL-safe on every re-run);
+--    this backfill+constraint step is what makes re-running this file
+--    also re-apply a changed price formula to every existing row, so
+--    tuning prices later is just editing here (and the matching case in
+--    the insert above, to keep both in sync).
 -- ------------------------------------------------------------
 
-alter table public.cosmetics add column if not exists price integer;
 update public.cosmetics set price = case rarity
   when 'common'    then 15
   when 'rare'      then 35
