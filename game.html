@@ -371,7 +371,7 @@
 <script src="js/game-matching.js?v=6"></script>
 <script src="js/game-flashcard.js?v=6"></script>
 <script src="js/game-crossy.js?v=4"></script>
-<script src="js/game-cooking.js?v=9"></script>
+<script src="js/game-cooking.js?v=10"></script>
 <script src="js/game-dressup.js?v=10"></script>
 <script src="js/game-towerdefense.js?v=1"></script>
 <script src="js/config.js"></script>
@@ -573,7 +573,7 @@ function finishGame(matchElapsedMs) {
     scoreToSave = G.pts;
   }
 
-  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹' };
+  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', cooking:'ทำอาหาร 🌭', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
   document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
 
@@ -586,7 +586,7 @@ function finishGame(matchElapsedMs) {
 }
 
 /* ── Leaderboard helpers ── */
-var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน' };
+var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', cooking:'ทำอาหาร', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน' };
 
 async function saveGameScore(gameKey, score) {
   try {

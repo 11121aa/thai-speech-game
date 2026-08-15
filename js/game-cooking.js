@@ -67,6 +67,13 @@ function createCookingGame(words, callbacks) {
   var SCX=168, STOP=148, SAU_BOT=620, LW=58;
   var CUT_TY=[310,470], KX=SCX+90;
   var CMB_BBY=630, CTW=155, DROP_DUR=480;
+  // Shared "play again / exit" button pair on every dish's finished
+  // screen (drawFinal/drawPizzaFinal/drawBreakfastFinal) -- side by side
+  // instead of a single centered button, so leaving the cooking game
+  // entirely doesn't require hunting for the small always-there "← ออก"
+  // button up in the shared HUD bar above the canvas.
+  var FIN_BTN_W=160, FIN_BTN_GAP=8;
+  var FIN_BTN_X0=(VW-(FIN_BTN_W*2+FIN_BTN_GAP))/2, FIN_BTN_X1=FIN_BTN_X0+FIN_BTN_W+FIN_BTN_GAP;
   var ING_LABELS={tom:'มะเขือเทศ', cab:'กะหล่ำปลี', sau:'ไส้กรอก'};
   var STEPS=[
     {icon:'🍞',lbl:'1.ปัง',  states:[S.BUN,S.BUN_R]},
@@ -1060,7 +1067,8 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,558,VW-56,1);
     ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
     T('คะแนนรวม: '+G.total+' คะแนน',VW/2,584,'center');
-    drawBtn(VW/2-94,614,188,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X0,614,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X1,614,FIN_BTN_W,52,'← ออก',C.gray,ts);
   }
 
   /* ── Pizza screens ─────────────────────────────────────────── */
@@ -1258,7 +1266,8 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,608,VW-56,1);
     ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
     T('คะแนนรวม: '+G.total+' คะแนน',VW/2,634,'center');
-    drawBtn(VW/2-94,664,188,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X0,664,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X1,664,FIN_BTN_W,52,'← ออก',C.gray,ts);
   }
 
   /* ── Breakfast screens ────────────────────────────────────────── */
@@ -1412,7 +1421,8 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,528,VW-56,1);
     ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
     T('คะแนนรวม: '+G.total+' คะแนน',VW/2,554,'center');
-    drawBtn(VW/2-94,584,188,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X0,584,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X1,584,FIN_BTN_W,52,'← ออก',C.gray,ts);
   }
 
   // A one-time celebration for the single "you finished the whole dish"
@@ -1700,12 +1710,21 @@ function createCookingGame(words, callbacks) {
       }
       if(G.st===S.CMB_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(S.CMB_R,S.FIN);}return;}
       if(G.st===S.FIN){
-        if(hit(x,y,VW/2-94,614,188,52)){
-          // no pressFx here -- resetG() below immediately wipes tapFx
-          // along with the rest of G, so a ripple would never get a
-          // frame to render before the screen's already back at select.
+        // no pressFx on either button -- resetG()/onFinish() both tear
+        // this screen down immediately, so a ripple would never get a
+        // frame to render before it's gone.
+        if(hit(x,y,FIN_BTN_X0,614,FIN_BTN_W,52)){
           callbacks.onPoints&&callbacks.onPoints(G.total);
           resetG();
+          return;
+        }
+        if(hit(x,y,FIN_BTN_X1,614,FIN_BTN_W,52)){
+          // Bank this dish's points into the shared running total before
+          // leaving -- same as the retry path -- so the shared finish
+          // screen's total/leaderboard save isn't missing the dish that
+          // was just completed.
+          callbacks.onPoints&&callbacks.onPoints(G.total);
+          callbacks.onFinish&&callbacks.onFinish();
         }
         return;
       }
@@ -1757,7 +1776,8 @@ function createCookingGame(words, callbacks) {
       }
       if(G.st===SP.BAKE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.BAKE_R,SP.FIN);}return;}
       if(G.st===SP.FIN){
-        if(hit(x,y,VW/2-94,664,188,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();}
+        if(hit(x,y,FIN_BTN_X0,664,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();return;}
+        if(hit(x,y,FIN_BTN_X1,664,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);callbacks.onFinish&&callbacks.onFinish();}
         return;
       }
 
@@ -1802,7 +1822,8 @@ function createCookingGame(words, callbacks) {
       }
       if(G.st===SB.PLATE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.PLATE_R,SB.FIN);}return;}
       if(G.st===SB.FIN){
-        if(hit(x,y,VW/2-94,584,188,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();}
+        if(hit(x,y,FIN_BTN_X0,584,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();return;}
+        if(hit(x,y,FIN_BTN_X1,584,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);callbacks.onFinish&&callbacks.onFinish();}
         return;
       }
     },
