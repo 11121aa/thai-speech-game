@@ -42,7 +42,15 @@ function createDressupGame(words, callbacks, closet) {
   // ── [TUNE] Numbers you can change ────────────────────────────
   var PTS_PER_SLOT = 20;  // one-time bonus for equipping anything in a slot this session
   var W = 800, H = 500;   // canvas size in pixels
-  var AX = 190, AY = 280; // avatar anchor point (base of the torso)
+  // Avatar anchor point (base of the torso). AY needs enough headroom
+  // above it that the hat -- anchored bottom-up at AY-206 with a fixed
+  // display height of 88 (see buildPieceImages' specs.hat below) -- never
+  // extends above y=0 and gets clipped by the canvas's own top edge.
+  // Every hat design gets stretched to that same 88px height regardless
+  // of its own art, so this headroom requirement is universal, not
+  // specific to any one hat. With AY=280 the hat's top sat at y=-14
+  // (clipped ~16% of its height); AY=302 clears it with an 8px margin.
+  var AX = 190, AY = 302;
 
   // ── [SLOTS] Outfit pieces + the raster size their SVGs load at
   // (independent of the on-avatar display size set in buildPieceImages).

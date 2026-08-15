@@ -1605,3 +1605,69 @@ body.kid-page {
   .kid-deco { font-size: 1.5rem !important; opacity: 0.4; }
   .kid-cloud { font-size: 2rem !important; }
 }
+
+/* ============ Practice modal: short-viewport fit ============
+   The 148px mouth-diagram/camera shrink above only triggers under
+   576px WIDTH, so a landscape phone/tablet or a laptop with real
+   browser chrome eating into its window (neither of which is narrow,
+   just short) still got the full 220px box -- tall enough on its own
+   to push the record button below the fold, forcing a scroll to reach
+   it. This is a HEIGHT breakpoint instead, so it kicks in for any
+   short viewport regardless of width, layered on top of (not
+   replacing) the width-based mobile rules above. 850px covers a
+   maximized laptop window's typical USABLE height once tabs/address
+   bar/bookmarks bar are subtracted from the display resolution, not
+   just literal small screens. */
+@media (max-height: 900px) {
+  #practiceModal .modal-body { padding: 0.85rem 0.85rem; }
+  #practiceModal .modal-body > p:first-of-type { margin-bottom: 0.2rem; font-size: 0.85rem; }
+  #ppEmoji { font-size: 1.7rem !important; }
+  .challenge-word { font-size: 2rem; margin: 0.25rem 0; }
+  .practice-stage { margin: 0.5rem 0; gap: 0.6rem; }
+  .mouth-animation-box,
+  .mouth-diagram-box,
+  .camera-mirror {
+    width: 120px;
+    height: 120px;
+  }
+  .mouth-diagram-box { font-size: 0.68rem; padding: 0.3rem; }
+  .mouth-diagram-box .mouth-diagram-icon { font-size: 1.5rem; margin-bottom: 0.1rem; }
+  #ppBtnListen { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+  /* !important needed on margin-top here: the canvas has an inline
+     margin-top (beats any non-!important external rule regardless of
+     specificity) and .mic-btn's actual buttons carry Bootstrap's mt-3
+     utility class, which Bootstrap itself compiles with !important. */
+  #ppWaveCanvas { height: 44px; margin-top: 0.5rem !important; }
+  .mic-btn { width: 68px; height: 68px; font-size: 1.5rem; margin: 0.4rem auto !important; }
+  #ppRecordHint { font-size: 0.72rem; margin-top: 0.3rem; margin-bottom: 0; }
+}
+/* Landscape phones (~≤480px tall) -- the 120px box tier above still
+   doesn't leave room for everything, so this tier shrinks further and
+   drops the practice-stage aid box down to a small corner-of-the-eye
+   size rather than hiding it outright (it's still a real teaching aid,
+   just not worth the vertical cost of 120px in a viewport this short). */
+@media (max-height: 480px) {
+  #practiceModal .modal-dialog { margin: 0.25rem auto; }
+  #practiceModal .modal-body { padding: 0.4rem 0.75rem; }
+  #practiceModal .modal-body > p:first-of-type { display: none; }
+  #ppEmoji { font-size: 1.2rem !important; }
+  #ppReading { margin: 0; font-size: 0.7rem; }
+  .challenge-word { font-size: 1.3rem; margin: 0.05rem 0; }
+  .practice-stage { margin: 0.2rem 0; gap: 0.4rem; }
+  /* The mouth/camera aid boxes cost more vertical space than this
+     viewport has to give -- collapsed to a small pinned corner note
+     instead of removed outright, so the teaching aid is still one tap
+     away (via ppBtnListen) rather than gone. */
+  .mouth-animation-box,
+  .mouth-diagram-box,
+  .camera-mirror {
+    width: 46px;
+    height: 46px;
+  }
+  .mouth-diagram-box { font-size: 0.56rem; padding: 0.1rem; }
+  .mouth-diagram-box .mouth-diagram-icon { font-size: 0.75rem; margin-bottom: 0; }
+  #ppBtnListen { padding: 0.1rem 0.45rem; font-size: 0.68rem; }
+  #ppWaveCanvas { height: 24px; margin-top: 0.2rem !important; }
+  .mic-btn { width: 46px; height: 46px; font-size: 1.05rem; margin: 0.25rem auto !important; }
+  #ppRecordHint { font-size: 0.6rem; margin-top: 0.15rem; margin-bottom: 0; }
+}
