@@ -110,6 +110,11 @@
           <span class="mode-title">แต่งตัวตุ๊กตา</span>
           <span class="mode-desc">แต่งตัวตุ๊กตาด้วยของที่ซื้อจากร้านค้า</span>
         </div>
+        <div class="game-mode-card" id="cardTowerdefense">
+          <span class="mode-icon">🏹</span>
+          <span class="mode-title">ป้องกันฐาน</span>
+          <span class="mode-desc">วางทหารป้องกันเส้นทาง ฝึกพูดคำก่อนแต่ละด่าน</span>
+        </div>
       </div>
     </div>
 
@@ -143,6 +148,8 @@
       <div id="cookingGame" class="game-canvas-wrap" style="display:none;"></div>
       <!-- Dress-Up Game — Phaser canvas -->
       <div id="dressupGame" class="game-canvas-wrap" style="display:none;"></div>
+      <!-- Tower Defense — Phaser canvas (troop palette + everything else is drawn in-canvas, no DOM controls) -->
+      <div id="towerdefenseGame" class="game-canvas-wrap" style="display:none;"></div>
       <!-- Crossy Road: Phaser canvas + 4-directional DOM buttons -->
       <div id="crossyGame" style="display:none;">
         <div class="platformer-wrap">
@@ -366,6 +373,7 @@
 <script src="js/game-crossy.js?v=4"></script>
 <script src="js/game-cooking.js?v=7"></script>
 <script src="js/game-dressup.js?v=8"></script>
+<script src="js/game-towerdefense.js?v=1"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -391,7 +399,7 @@ var G = {
    inside those containers to avoid doubling up). A single preloaded
    Audio element is reused (instead of `new Audio()` per click) so
    playback starts instantly instead of re-fetching/decoding every time. */
-var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame';
+var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame, #towerdefenseGame';
 var clickAudio = new Audio('soundeffect/Click.mp3');
 clickAudio.preload = 'auto';
 document.addEventListener('click', function (e) {
@@ -535,6 +543,7 @@ function finishGame(matchElapsedMs) {
   CrossyGame.stop();
   CookingGame.stop();
   DressupGame.stop();
+  TowerDefenseGame.stop();
 
   // Matching game is timed, not scored — lower is better, so it's tracked
   // and displayed separately from every other game's point-based scoring.
@@ -564,7 +573,7 @@ function finishGame(matchElapsedMs) {
     scoreToSave = G.pts;
   }
 
-  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', dressup:'แต่งตัวตุ๊กตา 👗' };
+  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
   document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
 
@@ -577,7 +586,7 @@ function finishGame(matchElapsedMs) {
 }
 
 /* ── Leaderboard helpers ── */
-var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', dressup:'แต่งตัวตุ๊กตา' };
+var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน' };
 
 async function saveGameScore(gameKey, score) {
   try {
@@ -978,11 +987,12 @@ async function launchGame() {
     platformer: 'วิ่งเก็บเหรียญ 🍄',
     crossy:     'ข้ามถนน 🚗',
     cooking:    'ทำอาหาร 🌭',
-    dressup:    'แต่งตัวตุ๊กตา 👗'
+    dressup:    'แต่งตัวตุ๊กตา 👗',
+    towerdefense: 'ป้องกันฐาน 🏹'
   };
   document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
 
-  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame'].forEach(function (id) {
+  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame','towerdefenseGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
@@ -1006,9 +1016,9 @@ async function launchGame() {
     if (timerPill) timerPill.style.visibility = '';
     clearInterval(G.timerHandle);
     document.getElementById('hudTimer').textContent = '0';
-  } else if (G.mode === 'platformer') {
-    // No countdown — platformer ends on death (survival scoring + speed
-    // ramp are handled inside the game itself)
+  } else if (G.mode === 'platformer' || G.mode === 'towerdefense') {
+    // No countdown — platformer ends on death, tower defense ends on
+    // win/lose (both handled inside the game itself via onFinish)
     if (timerPill) timerPill.style.visibility = 'hidden';
     clearInterval(G.timerHandle);
     G.timeLeft = 9999;
@@ -1039,6 +1049,9 @@ async function launchGame() {
   } else if (G.mode === 'dressup') {
     document.getElementById('dressupGame').style.display = 'block';
     DressupGame.start(pool, GAME_CBS);    // Phaser game (dress-up avatar)
+  } else if (G.mode === 'towerdefense') {
+    document.getElementById('towerdefenseGame').style.display = 'block';
+    TowerDefenseGame.start(pool, GAME_CBS); // Phaser game (place troops, defend the base)
   } else {
     document.getElementById('airplaneGame').style.display = 'block';
     AirplaneGame.start(pool, GAME_CBS);   // Phaser game
@@ -1060,6 +1073,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
   document.getElementById('cardCooking').addEventListener('click', function () { openSetup('cooking'); });
   document.getElementById('cardDressup').addEventListener('click', function () { openSetup('dressup'); });
+  document.getElementById('cardTowerdefense').addEventListener('click', function () { openSetup('towerdefense'); });
 
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1108,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
     restoreTimerPill();
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop(); DressupGame.stop();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop(); DressupGame.stop(); TowerDefenseGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });

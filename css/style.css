@@ -833,6 +833,7 @@ a {
 #platformerCanvas.game-canvas-wrap  { aspect-ratio: 800 / 400; }
 #crossyCanvas.game-canvas-wrap      { aspect-ratio: 800 / 400; }
 #dressupGame.game-canvas-wrap       { aspect-ratio: 800 / 500; }
+#towerdefenseGame.game-canvas-wrap  { aspect-ratio: 800 / 500; cursor: pointer; }
 
 /* ============ Finish screen ============ */
 .finish-screen {
