@@ -138,6 +138,8 @@ function createTetrisGame(words, callbacks) {
       wire(bRight, this._rightFn);
       wire(bDrop, this._dropFn);
 
+      this.events.on('shutdown', this.shutdown, this);
+
       this.nextKey = this.drawFromBag();
       this.spawnPiece();
     },

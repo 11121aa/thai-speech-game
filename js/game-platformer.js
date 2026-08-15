@@ -260,6 +260,8 @@ function createPlatformerGame(words, callbacks, difficulty) {
         bs.addEventListener('touchcancel', this._slideUpFn);
       }
 
+      this.events.on('shutdown', this.shutdown, this);
+
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
       this.sfxSwoosh = this.sound.add('Swoosh',       { volume: 0.6 });

@@ -151,6 +151,8 @@ function createCrossyGame(words, callbacks) {
       wire(bRight, this._rightFn);
       wire(bDown, this._downFn);
 
+      this.events.on('shutdown', this.shutdown, this);
+
       var hint = this.add.text(W / 2, H - 14,
         '↑ เดินหน้า   ← → หลบซ้าย/ขวา   หลีกรถ 🚗', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px',
