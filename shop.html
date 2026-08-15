@@ -170,6 +170,28 @@
           <div id="wearEmpty" class="text-secondary" style="display:none;">คุณยังไม่มีของที่ซื้อเลย เลือกซื้อของด้านบนก่อนนะ</div>
           <div class="cosmetic-grid" id="wearGrid"></div>
         </div>
+
+        <!-- ── RPG shop: weapons/armor/skills for the dungeon crawler
+             game (js/game-rpg.js) -- a second catalog spending from the
+             SAME coin balance above, independent of the dress-up
+             cosmetics shop/avatar. Reuses the exact same card/grid/tab
+             styling as the cosmetics shop for visual consistency. ── -->
+        <div class="wear-section">
+          <h2 class="h4 mb-1">⚔️ ร้านอุปกรณ์ผจญภัย</h2>
+          <p class="text-secondary mb-3">อาวุธ เกราะ และสกิล สำหรับเกมผจญภัยดันเจี้ยน — ใช้เหรียญเดียวกับด้านบน</p>
+          <div class="closet-tabs" id="rpgTabs">
+            <button class="closet-tab active" data-cat="all">ทั้งหมด</button>
+            <button class="closet-tab" data-cat="weapon">🗡️ อาวุธ</button>
+            <button class="closet-tab" data-cat="armor">🛡️ เกราะ</button>
+            <button class="closet-tab" data-cat="skill">✨ สกิล</button>
+          </div>
+          <div class="cosmetic-grid" id="rpgGrid"></div>
+
+          <h2 class="h4 mb-1 mt-4">ชุดอุปกรณ์ที่สวมอยู่</h2>
+          <p class="text-secondary mb-3">เลือกอุปกรณ์ที่ซื้อแล้วมาใช้ในเกมผจญภัยดันเจี้ยน — สวมได้อย่างละ 1 ชิ้นต่อประเภท</p>
+          <div id="rpgWearEmpty" class="text-secondary" style="display:none;">คุณยังไม่มีอุปกรณ์ที่ซื้อเลย เลือกซื้อด้านบนก่อนนะ</div>
+          <div class="cosmetic-grid" id="rpgWearGrid"></div>
+        </div>
       </div>
 
     </div>
@@ -239,6 +261,17 @@
   // slot -> currently-equipped cosmetic id (or null), from profiles.equipped_*
   var equipped = { hat: null, shirt: null, pants: null, shoes: null, bag: null };
 
+  // ── RPG shop (js/game-rpg.js's equipment) -- a second catalog on the
+  // same coin balance, completely independent of the cosmetics closet
+  // above. Mirrors its variable/function shape 1:1.
+  var CATEGORY_LABEL = { weapon: 'อาวุธ', armor: 'เกราะ', skill: 'สกิล' };
+  var CATEGORY_ICON = { weapon: '🗡️', armor: '🛡️', skill: '✨' };
+  var rpgItems = [];
+  var rpgItemsById = {};
+  var ownedRpgIds = new Set();
+  var activeRpgCatFilter = 'all';
+  var rpgEquipped = { weapon: null, armor: null, skill: null };
+
   function el(id) { return document.getElementById(id); }
 
   // SVGs are loaded as text and inlined directly (not <img src=...>) so
@@ -265,7 +298,7 @@
 
   async function loadShopData() {
     var { data: profile, error: profileErr } = await sb.from('profiles')
-      .select('coins, equipped_hat, equipped_shirt, equipped_pants, equipped_shoes, equipped_bag')
+      .select('coins, equipped_hat, equipped_shirt, equipped_pants, equipped_shoes, equipped_bag, equipped_weapon, equipped_armor, equipped_skill')
       .eq('user_id', session.user.id).maybeSingle();
     if (profileErr) console.error('[shop] failed to load coin balance:', profileErr);
     coinBalance = (profile && profile.coins) || 0;
@@ -276,6 +309,11 @@
       pants: (profile && profile.equipped_pants) || null,
       shoes: (profile && profile.equipped_shoes) || null,
       bag:   (profile && profile.equipped_bag)   || null
+    };
+    rpgEquipped = {
+      weapon: (profile && profile.equipped_weapon) || null,
+      armor:  (profile && profile.equipped_armor)  || null,
+      skill:  (profile && profile.equipped_skill)  || null
     };
 
     var { data: allCosmetics, error: cosmeticsErr } = await sb.from('cosmetics').select('*').order('slot').order('style').order('variant');
@@ -288,7 +326,17 @@
     if (ownedErr) console.error('[shop] failed to load owned cosmetics:', ownedErr);
     ownedIds = new Set((owned || []).map(function (o) { return o.cosmetic_id; }));
 
-    if (profileErr || cosmeticsErr || ownedErr) {
+    var { data: allRpgItems, error: rpgItemsErr } = await sb.from('rpg_items').select('*').order('category').order('price');
+    if (rpgItemsErr) console.error('[shop] failed to load rpg_items catalog:', rpgItemsErr);
+    rpgItems = allRpgItems || [];
+    rpgItemsById = {};
+    rpgItems.forEach(function (it) { rpgItemsById[it.id] = it; });
+
+    var { data: ownedRpg, error: ownedRpgErr } = await sb.from('owned_rpg_items').select('item_id').eq('user_id', session.user.id);
+    if (ownedRpgErr) console.error('[shop] failed to load owned rpg items:', ownedRpgErr);
+    ownedRpgIds = new Set((ownedRpg || []).map(function (o) { return o.item_id; }));
+
+    if (profileErr || cosmeticsErr || ownedErr || rpgItemsErr || ownedRpgErr) {
       var msgEl = el('shopMsg');
       msgEl.textContent = 'โหลดข้อมูลร้านค้าไม่สำเร็จบางส่วน ลองรีเฟรชหน้าใหม่';
       msgEl.style.display = 'block';
@@ -296,6 +344,8 @@
 
     await renderGrid();
     renderWearGrid();
+    renderRpgGrid();
+    renderRpgWearGrid();
   }
 
   // Locked items show their real art too (not a silhouette) -- you're
@@ -354,6 +404,125 @@
       svgMarkup(c.asset_path).then(function (markup) { card.querySelector('.art').innerHTML = markup; });
     });
   }
+
+  // RPG items have no SVG art (no asset_path) -- the "art" slot just
+  // shows a big category emoji instead, styled via the same .art div.
+  function renderRpgGrid() {
+    var grid = el('rpgGrid');
+    grid.innerHTML = '';
+    var list = rpgItems.filter(function (it) { return activeRpgCatFilter === 'all' || it.category === activeRpgCatFilter; });
+    list.forEach(function (it) {
+      var owned = ownedRpgIds.has(it.id);
+      var card = document.createElement('div');
+      card.className = 'cosmetic-card';
+      card.setAttribute('data-rarity', it.rarity);
+      var actionHtml = owned
+        ? '<div class="owned-badge"><i class="bi bi-check-circle-fill"></i>มีแล้ว</div>'
+        : '<button class="rpg-buy-btn" data-id="' + it.id + '"' + (coinBalance < it.price ? ' disabled' : '') + '>ซื้อ ' + it.price + ' 🪙</button>';
+      card.innerHTML =
+        '<div class="art" style="font-size:2.5rem;display:flex;align-items:center;justify-content:center;">' + CATEGORY_ICON[it.category] + '</div>' +
+        '<div class="name">' + it.name + '</div>' +
+        '<div class="rarity-tag">' + RARITY_LABEL[it.rarity] + '</div>' +
+        actionHtml;
+      grid.appendChild(card);
+    });
+  }
+
+  function renderRpgWearGrid() {
+    var grid = el('rpgWearGrid');
+    grid.innerHTML = '';
+    var ownedList = rpgItems.filter(function (it) { return ownedRpgIds.has(it.id); });
+
+    el('rpgWearEmpty').style.display = ownedList.length ? 'none' : 'block';
+    grid.style.display = ownedList.length ? '' : 'none';
+
+    ownedList.forEach(function (it) {
+      var isEquipped = rpgEquipped[it.category] === it.id;
+      var card = document.createElement('div');
+      card.className = 'cosmetic-card' + (isEquipped ? ' equipped' : '');
+      card.setAttribute('data-rarity', it.rarity);
+      var actionHtml = isEquipped
+        ? '<div class="equipped-badge"><i class="bi bi-check-circle-fill"></i>สวมอยู่</div><button class="rpg-unwear-btn" data-cat="' + it.category + '">ถอดออก</button>'
+        : '<button class="rpg-wear-btn" data-id="' + it.id + '">สวมใส่</button>';
+      card.innerHTML =
+        '<div class="art" style="font-size:2.5rem;display:flex;align-items:center;justify-content:center;">' + CATEGORY_ICON[it.category] + '</div>' +
+        '<div class="name">' + it.name + '</div>' +
+        '<div class="rarity-tag">' + RARITY_LABEL[it.rarity] + '</div>' +
+        actionHtml;
+      grid.appendChild(card);
+    });
+  }
+
+  el('rpgTabs').addEventListener('click', function (e) {
+    var btn = e.target.closest('.closet-tab');
+    if (!btn) return;
+    document.querySelectorAll('#rpgTabs .closet-tab').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    activeRpgCatFilter = btn.getAttribute('data-cat');
+    renderRpgGrid();
+  });
+
+  el('rpgWearGrid').addEventListener('click', async function (e) {
+    var wearBtn = e.target.closest('.rpg-wear-btn');
+    var unwearBtn = e.target.closest('.rpg-unwear-btn');
+    if (!wearBtn && !unwearBtn) return;
+    var msgEl = el('shopMsg');
+    msgEl.style.display = 'none';
+    var btn = wearBtn || unwearBtn;
+    btn.disabled = true;
+    try {
+      if (wearBtn) {
+        var targetId = wearBtn.getAttribute('data-id');
+        var { error } = await sb.rpc('equip_rpg_item', { target_id: targetId });
+        if (error) throw error;
+        var item = rpgItemsById[targetId];
+        if (item) rpgEquipped[item.category] = targetId;
+      } else {
+        var targetCat = unwearBtn.getAttribute('data-cat');
+        var { error: unequipErr } = await sb.rpc('unequip_rpg_item', { target_category: targetCat });
+        if (unequipErr) throw unequipErr;
+        rpgEquipped[targetCat] = null;
+      }
+      renderRpgWearGrid();
+    } catch (err) {
+      msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+      msgEl.style.display = 'block';
+      btn.disabled = false;
+    }
+  });
+
+  el('rpgGrid').addEventListener('click', async function (e) {
+    var btn = e.target.closest('.rpg-buy-btn');
+    if (!btn || btn.disabled) return;
+    var targetId = btn.getAttribute('data-id');
+    var msgEl = el('shopMsg');
+    msgEl.style.display = 'none';
+    btn.disabled = true;
+    try {
+      var { data, error } = await sb.rpc('buy_rpg_item', { target_id: targetId });
+      if (error) throw error;
+      var result = Array.isArray(data) ? data[0] : data;
+      if (!result) throw new Error('เกิดข้อผิดพลาด');
+
+      coinBalance = result.coins_left;
+      el('coinBalance').textContent = coinBalance;
+      ownedRpgIds.add(result.item_id);
+
+      el('buyResultName').textContent = result.name + ' (' + CATEGORY_LABEL[result.category] + ')';
+      var badge = el('buyResultRarity');
+      badge.textContent = RARITY_LABEL[result.rarity];
+      badge.style.background = getComputedStyle(document.documentElement).getPropertyValue('--rarity-' + result.rarity);
+      el('buyResultArt').innerHTML = '<div style="font-size:3rem;">' + CATEGORY_ICON[result.category] + '</div>';
+
+      new bootstrap.Modal(el('buyResultModal')).show();
+      renderRpgGrid();
+      renderRpgWearGrid();
+    } catch (err) {
+      msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+      msgEl.style.display = 'block';
+      btn.disabled = false;
+    }
+  });
 
   el('closetTabs').addEventListener('click', function (e) {
     var btn = e.target.closest('.closet-tab');
