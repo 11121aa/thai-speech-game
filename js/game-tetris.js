@@ -128,10 +128,18 @@ function createTetrisGame(words, callbacks) {
       this._leftFn  = function () { self.moveLeft(); };
       this._rightFn = function () { self.moveRight(); };
       this._dropFn  = function () { self.hardDrop(); };
+      // touchstart AND mousedown both firing fn() per tap would double-count
+      // every button press on touch devices (a real touch fires touchstart,
+      // then the browser follows up with a synthesized mousedown/click for
+      // the same tap unless something suppresses it). preventDefault() on
+      // touchstart suppresses that synthetic follow-up, so exactly one of
+      // the two listeners fires per interaction -- touchstart on touch
+      // devices, mousedown on mouse-only ones. Requires passive:false since
+      // a passive listener can't call preventDefault().
       function wire(el, fn) {
         if (!el) return;
         el.addEventListener('mousedown',  fn);
-        el.addEventListener('touchstart', fn, { passive: true });
+        el.addEventListener('touchstart', function (e) { e.preventDefault(); fn(); }, { passive: false });
       }
       wire(bRot, this._rotFn);
       wire(bLeft, this._leftFn);

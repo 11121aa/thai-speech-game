@@ -247,13 +247,17 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this._jumpFn      = function () { self.doJump(); };
       this._slideDownFn = function () { self.slideHeld = true; };
       this._slideUpFn   = function () { self.slideHeld = false; };
+      // preventDefault() on touchstart suppresses the synthetic mousedown
+      // the browser would otherwise follow up with for the same tap, so
+      // exactly one of the two listeners fires per interaction instead of
+      // both firing back-to-back for one real touch.
       if (bj) {
         bj.addEventListener('mousedown',  this._jumpFn);
-        bj.addEventListener('touchstart', this._jumpFn, { passive: true });
+        bj.addEventListener('touchstart', function (e) { e.preventDefault(); self._jumpFn(); }, { passive: false });
       }
       if (bs) {
         bs.addEventListener('mousedown',   this._slideDownFn);
-        bs.addEventListener('touchstart',  this._slideDownFn, { passive: true });
+        bs.addEventListener('touchstart',  function (e) { e.preventDefault(); self._slideDownFn(); }, { passive: false });
         bs.addEventListener('mouseup',     this._slideUpFn);
         bs.addEventListener('mouseleave',  this._slideUpFn);
         bs.addEventListener('touchend',    this._slideUpFn);

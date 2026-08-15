@@ -35,10 +35,10 @@ function createCrossyGame(words, callbacks) {
   // ── [ROWS] Endless row generation ───────────────────────────────
   // Row type is a pure function of worldRow: every GOAL_SPACING rows is a
   // safe 'goal' checkpoint (triggers word practice); the rows between two
-  // checkpoints cycle through the same hand-tuned filler rhythm the
-  // original fixed board used (road, road, grass, road, road) so the
-  // moment-to-moment feel is unchanged -- only "does it reset" changed.
-  var GOAL_SPACING       = 6;
+  // checkpoints cycle through FILLER_TEMPLATE. GOAL_SPACING must always
+  // equal FILLER_TEMPLATE.length + 1 (offset 0 is the goal row itself;
+  // offsets 1..GOAL_SPACING-1 map to FILLER_TEMPLATE[offset-1]).
+  var GOAL_SPACING       = 10;  // longer stretch between checkpoints (was 6)
   var KNOCKBACK_ROWS     = 2;   // rows knocked back on a car hit
   var ANCHOR_ROW_SLOT    = 6;   // frog's fixed screen row-slot (matches the old start row's position)
   var GEN_BUFFER_ROWS    = 2;   // rows generated beyond each visible edge so scrolling never reveals a gap
@@ -51,12 +51,20 @@ function createCrossyGame(words, callbacks) {
   // is a real, monotonically-improving reference point.
   var MAX_BACKWARD_SLACK = 4;
 
+  // Longer, faster, and mostly-road now (only 2 grass breathers across 9
+  // rows instead of 1-in-5) -- significantly harder than the original
+  // road/road/grass/road/road rhythm, and stretched to match the longer
+  // GOAL_SPACING above.
   var FILLER_TEMPLATE = [
-    { type: 'road',  dir:  1, speed: 2.2 },
-    { type: 'road',  dir: -1, speed: 1.7 },
+    { type: 'road',  dir:  1, speed: 3.2 },
+    { type: 'road',  dir: -1, speed: 2.8 },
+    { type: 'road',  dir:  1, speed: 3.6 },
     { type: 'grass', dir:  0, speed: 0   },
-    { type: 'road',  dir: -1, speed: 2.5 },
-    { type: 'road',  dir:  1, speed: 1.5 }
+    { type: 'road',  dir: -1, speed: 3.0 },
+    { type: 'road',  dir:  1, speed: 3.9 },
+    { type: 'road',  dir: -1, speed: 2.6 },
+    { type: 'grass', dir:  0, speed: 0   },
+    { type: 'road',  dir:  1, speed: 4.2 }
   ];
 
   // ── [COLORS] Background colour for each row type ─────────────
@@ -141,10 +149,16 @@ function createCrossyGame(words, callbacks) {
       this._rightFn = function () { self.tryMove(1,   0); };
       this._downFn  = function () { self.tryMove(0,   1); };
 
+      // touchstart AND mousedown both firing fn() per tap would double-count
+      // every button press on touch devices (a real touch fires touchstart,
+      // then the browser follows up with a synthesized mousedown/click for
+      // the same tap unless something suppresses it). preventDefault() on
+      // touchstart suppresses that synthetic follow-up, so exactly one of
+      // the two listeners fires per interaction.
       function wire(el, fn) {
         if (!el) return;
         el.addEventListener('mousedown',  fn);
-        el.addEventListener('touchstart', fn, { passive: true });
+        el.addEventListener('touchstart', function (e) { e.preventDefault(); fn(); }, { passive: false });
       }
       wire(bUp, this._upFn);
       wire(bLeft, this._leftFn);
@@ -183,7 +197,7 @@ function createCrossyGame(words, callbacks) {
     generateCarsForRow: function (def) {
       var CAR_COLORS = [0xff5252, 0xffb300, 0x2196f3, 0x9c27b0, 0x00bcd4, 0xff9800];
       var cars = [];
-      var nCars = 2 + Math.floor(Math.random() * 2); // [TUNE] 2 or 3 cars per lane
+      var nCars = 3 + Math.floor(Math.random() * 2); // [TUNE] 3 or 4 cars per lane (tighter gaps, was 2-3)
       for (var i = 0; i < nCars; i++) {
         var gap    = W / nCars;
         var startX = i * gap + Math.random() * gap * 0.5;
