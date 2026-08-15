@@ -4,6 +4,7 @@
 //  [TUNE]      Scroll speed, spawn rates, lane geometry   (~constants)
 //  [COINS]     Coin-string shape/points                   (~spawnCoinString)
 //  [WORDS]     Word bubble spawn + appearance              (~spawnWordItem, drawBubble)
+//  [ISLAND]    Tropical-island score-boost pickup          (~spawnIsland, drawIslands)
 //  [OBSTACLE]  Hazard spawn/appearance/collision           (~spawnObstacle, drawObstacles, hitObstacle)
 //  [PLANE]     Plane colours & shape                       (~drawPlane)
 // ============================================================
@@ -11,14 +12,17 @@
 //    - Tap the left/right half of the screen to swap the plane into the
 //      lane on that side (3 fixed lanes) — same instant, forgiving
 //      left/right control as Subway Surfers, just top-down instead of
-//      third-person
+//      third-person, flying low over open ocean.
 //    - Everything scrolls toward the player from the top of the screen:
 //      coin strings (+2 ⭐ each), golden word bubbles (pronunciation
 //      practice → +5 ⭐ bonus, on top of the shared +20 for a correct
 //      recording, and ramps the scroll speed up a notch on resume so it
-//      reads as "next leg is faster" rather than a mid-run jolt), and
-//      spiky hazards (hit = game over immediately). An obstacle spawn
-//      always leaves at least one lane open.
+//      reads as "next leg is faster" rather than a mid-run jolt), rare
+//      tropical islands (an instant +15 ⭐ score-boost pickup, no
+//      practice gate -- just a bonus for grabbing it), and three hazard
+//      types -- jagged reef rocks, diving birds, and rising tentacles --
+//      any of which ends the run immediately on contact. An obstacle
+//      spawn always leaves at least one lane open.
 //    - Otherwise the round ends when the shared HUD countdown timer runs out
 // ============================================================
 
@@ -39,12 +43,14 @@ function createAirplaneGame(words, callbacks) {
   var COIN_INTERVAL = 750;                    // ms between coin-string spawns
   var COIN_STRING_LEN = 5, COIN_GAP = 62;     // coins per string, vertical spacing within a string
   var WORD_INTERVAL_MIN = 3500, WORD_INTERVAL_MAX = 6000; // ms range between word bubbles
+  var ISLAND_INTERVAL_MIN = 9000, ISLAND_INTERVAL_MAX = 15000; // ms range between tropical-island pickups (rare)
   var OBSTACLE_INTERVAL_MIN = 1600, OBSTACLE_INTERVAL_MAX = 2600; // ms range between hazard rows
   var DOUBLE_BLOCK_CHANCE = 0.3;              // chance a hazard row blocks 2 lanes instead of 1 (always leaves >=1 open)
-  var COIN_PTS = 2, WORD_BONUS_PTS = 5;
+  var COIN_PTS = 2, WORD_BONUS_PTS = 5, ISLAND_BONUS_PTS = 15;
   var PLANE_Y = H - 190;    // fixed vertical position of the plane
   var PLANE_R = 22;         // plane hitbox radius
-  var COIN_R = 14;
+  var COIN_R = 11;          // smaller + styled with a two-tone rim (see drawCoinsAndWords) to read as an actual coin
+  var ISLAND_R = 34;        // island pickup hitbox radius
   var OBSTACLE_R = 22;
   var SPAWN_Y = -50;        // items spawn just above the visible area
   var TOP_FADE = 90;        // items fade in over this many px of travel after spawning
@@ -59,14 +65,17 @@ function createAirplaneGame(words, callbacks) {
       this.planeVX          = 0; // purely cosmetic (drives the bank tilt in drawPlane)
       this.coins          = [];
       this.wordItems      = [];
+      this.islands        = [];
       this.obstacles      = [];
       this.clouds        = [];
       this.score         = 0;
       this.scrollOff      = 0;
       this.coinTimer      = 0;
       this.wordTimer      = 0;
+      this.islandTimer    = 0;
       this.obstacleTimer  = 0;
       this.nextWordDelay  = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
+      this.nextIslandDelay = ISLAND_INTERVAL_MIN + Math.random() * (ISLAND_INTERVAL_MAX - ISLAND_INTERVAL_MIN);
       this.nextObstacleDelay = OBSTACLE_INTERVAL_MIN + Math.random() * (OBSTACLE_INTERVAL_MAX - OBSTACLE_INTERVAL_MIN);
       this.speedLevel     = 0;    // +1 per word collected — ramps curSpeed()
       this.isPaused       = false; // true while the practice modal is open
@@ -114,7 +123,7 @@ function createAirplaneGame(words, callbacks) {
 
       // Fading instructional hint
       this.hint = this.add.text(W / 2, H - 16,
-        '👈👉 แตะซ้าย-ขวาเพื่อสลับเลน — เก็บเหรียญ 🪙 และคำ 💬 หลบหนาม 💥', {
+        '👈👉 แตะซ้าย-ขวาเพื่อสลับเลน — เก็บเหรียญ 🪙 คำ 💬 และเกาะโบนัส 🏝️ หลบหิน/นก/หนวดปลาหมึก 💥', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
           backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }, align: 'center',
           wordWrap: { width: W - 24 }
@@ -139,19 +148,36 @@ function createAirplaneGame(words, callbacks) {
       });
     },
 
-    // ── [SKY] Static background — a top-down view, so it's mostly an
-    // even sky/cloud tone rather than a horizon; lane dividers are drawn
-    // per-frame in drawLanes() since they need to scroll. ────────────
+    // ── [SKY] Static background — a top-down view over open ocean, so
+    // it's a deep-to-lighter blue depth gradient rather than a horizon;
+    // lane dividers + scrolling wave streaks are drawn per-frame since
+    // they need to scroll (see drawLanes/drawWaves). ────────────────
     drawBg: function () {
       var g = this.bgGfx;
       var bands = 24;
       for (var i = 0; i < bands; i++) {
         var t  = i / bands;
-        var r  = Math.round(Phaser.Math.Linear(120, 176, t));
-        var gv = Math.round(Phaser.Math.Linear(188, 222, t));
-        var b  = Math.round(Phaser.Math.Linear(236, 248, t));
+        var r  = Math.round(Phaser.Math.Linear(11, 79, t));
+        var gv = Math.round(Phaser.Math.Linear(85, 173, t));
+        var b  = Math.round(Phaser.Math.Linear(133, 196, t));
         g.fillStyle(Phaser.Display.Color.GetColor(r, gv, b));
         g.fillRect(0, i * (H / bands), W, H / bands + 1);
+      }
+    },
+
+    // Short scrolling wave-crest streaks, offset from the lane dividers'
+    // own scroll cadence so the two don't line up into a rigid grid —
+    // purely decorative "this is moving water" texture.
+    drawWaves: function (g) {
+      var off = (this.scrollOff * 1.3 % 60 + 60) % 60;
+      g.lineStyle(2, 0xffffff, 0.14);
+      for (var y = -60 + off; y < H + 60; y += 60) {
+        for (var wx = -20; wx < W; wx += 95) {
+          g.beginPath();
+          g.moveTo(wx, y);
+          g.lineTo(wx + 42, y);
+          g.strokePath();
+        }
       }
     },
 
@@ -174,8 +200,18 @@ function createAirplaneGame(words, callbacks) {
       });
     },
 
-    // ── [OBSTACLE] A row of 1-2 hazard mines — always leaves at least
-    // one lane open so every row has a safe path through. ──────────
+    // ── [ISLAND] A rare tropical-island score-boost pickup in a random
+    // lane -- unlike a word bubble, grabbing it is an instant bonus with
+    // no practice popup gating it. ──────────────────────────────────
+    spawnIsland: function () {
+      this.islands.push({ lane: Math.floor(Math.random() * LANE_COUNT), y: SPAWN_Y, collected: false });
+    },
+
+    // ── [OBSTACLE] A row of 1-2 hazards — always leaves at least one
+    // lane open so every row has a safe path through. Three visual/flavor
+    // kinds (jagged reef rock, diving bird, rising tentacle) share the
+    // exact same spawn/move/collision handling below -- only drawObstacles
+    // branches on `kind` to render them differently. ──────────────────
     spawnObstacle: function () {
       var self = this;
       var blockLanes;
@@ -186,7 +222,9 @@ function createAirplaneGame(words, callbacks) {
         blockLanes = [Math.floor(Math.random() * LANE_COUNT)];
       }
       blockLanes.forEach(function (lane) {
-        self.obstacles.push({ lane: lane, y: SPAWN_Y, hit: false });
+        var roll = Math.random();
+        var kind = roll < 0.6 ? 'rock' : roll < 0.85 ? 'bird' : 'tentacle';
+        self.obstacles.push({ lane: lane, y: SPAWN_Y, hit: false, kind: kind, seed: Math.random() * 1000 });
       });
     },
 
@@ -218,9 +256,11 @@ function createAirplaneGame(words, callbacks) {
       });
 
       if (this.dead || this.isPaused) {
+        this.drawWaves(g);
         this.drawLanes(g);
+        this.drawIslands(g);
         this.drawCoinsAndWords(g);
-        this.drawObstacles(g);
+        this.drawObstacles(g, time);
         this.drawPlane(g, time);
         return;
       }
@@ -245,6 +285,12 @@ function createAirplaneGame(words, callbacks) {
         this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
         this.spawnWordItem();
       }
+      this.islandTimer += delta;
+      if (this.islandTimer >= this.nextIslandDelay) {
+        this.islandTimer -= this.nextIslandDelay;
+        this.nextIslandDelay = ISLAND_INTERVAL_MIN + Math.random() * (ISLAND_INTERVAL_MAX - ISLAND_INTERVAL_MIN);
+        this.spawnIsland();
+      }
       this.obstacleTimer += delta;
       if (this.obstacleTimer >= this.nextObstacleDelay) {
         this.obstacleTimer -= this.nextObstacleDelay;
@@ -259,6 +305,10 @@ function createAirplaneGame(words, callbacks) {
       // Move + cull word bubbles
       this.wordItems.forEach(function (w) { w.y += speed * dt; });
       this.wordItems = this.wordItems.filter(function (w) { return w.y < H + 80; });
+
+      // Move + cull islands
+      this.islands.forEach(function (isl) { isl.y += speed * dt; });
+      this.islands = this.islands.filter(function (isl) { return isl.y < H + 60; });
 
       // Move + cull obstacles
       this.obstacles.forEach(function (o) { o.y += speed * dt; });
@@ -278,6 +328,22 @@ function createAirplaneGame(words, callbacks) {
         }
       });
       this.coins = this.coins.filter(function (c) { return !c.collected; });
+
+      // Island collection — instant score boost, no practice gate (that's
+      // what the word bubbles are for).
+      this.islands.forEach(function (isl) {
+        if (isl.collected || isl.lane !== self.laneIdx) return;
+        var idy = PLANE_Y - isl.y;
+        if (idy * idy < (PLANE_R + ISLAND_R) * (PLANE_R + ISLAND_R)) {
+          isl.collected = true;
+          self.score += ISLAND_BONUS_PTS;
+          self.scoreTxt.setText('' + self.score);
+          callbacks.onPoints(ISLAND_BONUS_PTS);
+          if (self.sfxCoin) self.sfxCoin.play();
+          self.showPop(LANE_X[isl.lane], isl.y - 24, '+' + ISLAND_BONUS_PTS + ' 🏝️ โบนัสเกาะ!');
+        }
+      });
+      this.islands = this.islands.filter(function (isl) { return !isl.collected; });
 
       // Word bubble collection → pronunciation practice. The speed ramp is
       // applied only once paused/resumed here, not mid-run, so it reads
@@ -315,9 +381,11 @@ function createAirplaneGame(words, callbacks) {
         }
       }
 
+      this.drawWaves(g);
       this.drawLanes(g);
+      this.drawIslands(g);
       this.drawCoinsAndWords(g);
-      this.drawObstacles(g);
+      this.drawObstacles(g, time);
       this.drawPlane(g, time);
     },
 
@@ -366,13 +434,19 @@ function createAirplaneGame(words, callbacks) {
         if (c.y < -30 || c.y > H + 30) return;
         var cx = LANE_X[c.lane];
         var bob = Math.sin(now * 0.004 + c.y * 0.02) * 3;
+        var cy = c.y + bob;
         var a = self.fadeFor(c.y);
-        g.fillStyle(0xffd700, a);
-        g.lineStyle(2, 0xb8860b, a);
-        g.fillCircle(cx, c.y + bob, COIN_R);
-        g.strokeCircle(cx, c.y + bob, COIN_R);
-        g.fillStyle(0xfff2a8, a);
-        g.fillCircle(cx - 3, c.y + bob - 3, COIN_R * 0.35);
+        // Two-tone rim (darker outer edge + brighter inner face) plus a
+        // small highlight, so a small circle actually reads as a coin
+        // instead of a flat dot.
+        g.fillStyle(0xB8860B, a);
+        g.fillCircle(cx, cy, COIN_R);
+        g.fillStyle(0xFFD700, a);
+        g.fillCircle(cx, cy, COIN_R - 2.5);
+        g.lineStyle(1, 0xE8A400, a);
+        g.strokeCircle(cx, cy, COIN_R - 2.5);
+        g.fillStyle(0xfff2a8, 0.9 * a);
+        g.fillCircle(cx - COIN_R * 0.25, cy - COIN_R * 0.25, COIN_R * 0.28);
       });
 
       this.wordItems.forEach(function (w) {
@@ -393,30 +467,105 @@ function createAirplaneGame(words, callbacks) {
       });
     },
 
-    // ── [OBSTACLE] Spiky dark mine — clearly distinct from coins/words
-    drawObstacles: function (g) {
+    // ── [ISLAND] Small palm-tree-on-sand pickup, drawn like the coins/
+    // words above (fade-in near spawn, culled off both edges). ───────
+    drawIslands: function (g) {
+      var self = this;
+      this.islands.forEach(function (isl) {
+        if (isl.collected || isl.y < -60 || isl.y > H + 60) return;
+        var ix0 = LANE_X[isl.lane];
+        var a = self.fadeFor(isl.y);
+        // water ripple ring
+        g.fillStyle(0xffffff, 0.2 * a);
+        g.fillEllipse(ix0, isl.y + 20, 62, 20);
+        // sand mound
+        g.fillStyle(0xE9C46A, a);
+        g.fillEllipse(ix0, isl.y + 8, 48, 28);
+        g.fillStyle(0xD4A94A, 0.6 * a);
+        g.fillEllipse(ix0, isl.y + 14, 48, 15);
+        // palm trunk
+        g.lineStyle(4, 0x8B5A2B, a);
+        g.beginPath();
+        g.moveTo(ix0, isl.y + 2);
+        g.lineTo(ix0 + 4, isl.y - 20);
+        g.strokePath();
+        // palm leaves
+        g.fillStyle(0x2E9E5B, a);
+        [[-1, -0.3], [1, -0.3], [-0.6, -1], [0.6, -1], [0, -0.7]].forEach(function (d) {
+          g.fillEllipse(ix0 + 4 + d[0] * 14, isl.y - 20 + d[1] * 10, 18, 7);
+        });
+      });
+    },
+
+    // ── [OBSTACLE] Dispatches to one of three hazard visuals by kind --
+    // collision/spawn/movement is identical for all three (see spawnObstacle
+    // and the update() collision loop), only the drawing differs. ───────
+    drawObstacles: function (g, time) {
       var self = this;
       this.obstacles.forEach(function (o) {
-        if (o.hit || o.y < -30 || o.y > H + 30) return;
+        if (o.hit || o.y < -40 || o.y > H + 40) return;
         var ox0 = LANE_X[o.lane];
         var a = self.fadeFor(o.y);
-        g.fillStyle(0xe74c3c, 0.25 * a);
-        g.fillCircle(ox0, o.y, OBSTACLE_R + 6);
-        g.fillStyle(0x2b2438, a);
-        g.fillCircle(ox0, o.y, OBSTACLE_R);
-        g.lineStyle(3, 0xe74c3c, a);
-        for (var s = 0; s < 8; s++) {
-          var ang = (s / 8) * Math.PI * 2;
-          var ix = ox0 + Math.cos(ang) * OBSTACLE_R;
-          var iy = o.y + Math.sin(ang) * OBSTACLE_R;
-          var ox = ox0 + Math.cos(ang) * (OBSTACLE_R + 8);
-          var oy = o.y + Math.sin(ang) * (OBSTACLE_R + 8);
-          g.beginPath();
-          g.moveTo(ix, iy);
-          g.lineTo(ox, oy);
-          g.strokePath();
-        }
+        if (o.kind === 'bird') self.drawBird(g, ox0, o.y, a, time, o.seed);
+        else if (o.kind === 'tentacle') self.drawTentacle(g, ox0, o.y, a, time, o.seed);
+        else self.drawRock(g, ox0, o.y, a);
       });
+    },
+
+    // Jagged reef rock jutting out of the water, with a foam ring at its base.
+    drawRock: function (g, x, y, a) {
+      g.fillStyle(0xffffff, 0.3 * a);
+      g.fillEllipse(x, y + 10, 46, 16);
+      var n = 7, pts = [];
+      for (var i = 0; i < n; i++) {
+        var ang = (i / n) * Math.PI * 2;
+        var rad = OBSTACLE_R * (0.7 + (i % 2) * 0.4);
+        pts.push({ x: x + Math.cos(ang) * rad, y: y + Math.sin(ang) * rad * 0.85 });
+      }
+      g.fillStyle(0x6b5847, a);
+      g.fillPoints(pts, true);
+      g.lineStyle(2, 0x4a3c2f, a);
+      g.strokePoints(pts, true, true);
+      g.fillStyle(0x8a7460, 0.6 * a);
+      g.fillCircle(x - 6, y - 6, 8);
+    },
+
+    // Diving bird, wings flapping (angle animated per-instance via `seed`
+    // so a row of birds doesn't flap in lockstep).
+    drawBird: function (g, x, y, a, time, seed) {
+      var flap = Math.abs(Math.sin(time * 0.01 + seed)) * 14;
+      g.fillStyle(0x2b2438, a);
+      g.fillEllipse(x, y, 10, 18);
+      g.fillTriangle(x, y - 4, x - 22, y - flap, x - 2, y + 6);
+      g.fillTriangle(x, y - 4, x + 22, y - flap, x + 2, y + 6);
+      g.fillStyle(0xF0A500, a);
+      g.fillTriangle(x - 3, y - 10, x + 3, y - 10, x, y - 16);
+    },
+
+    // Rising tentacle, swaying toward its tip -- built from short straight
+    // segments (Phaser Graphics has no quadratic-curve primitive) rather
+    // than a single smooth curve.
+    drawTentacle: function (g, x, y, a, time, seed) {
+      var sway = Math.sin(time * 0.004 + seed) * 16;
+      var segs = 4, baseY = y + 30;
+      g.lineStyle(11, 0x5B2C6F, a);
+      g.beginPath();
+      g.moveTo(x, baseY);
+      var px = x, py = baseY;
+      for (var i = 1; i <= segs; i++) {
+        var t = i / segs;
+        var sx = x + sway * t * t, sy = baseY - t * 36;
+        g.lineTo(sx, sy);
+        px = sx; py = sy;
+      }
+      g.strokePath();
+      g.fillStyle(0x8E44AD, a);
+      for (var s = 1; s < segs; s++) {
+        var t2 = s / segs;
+        g.fillCircle(x + sway * t2 * t2, baseY - t2 * 36, 3);
+      }
+      g.fillStyle(0x5B2C6F, a);
+      g.fillCircle(px, py, 7);
     },
 
     // ── [WORDS] Word bubble ─────────────────────────────────────
