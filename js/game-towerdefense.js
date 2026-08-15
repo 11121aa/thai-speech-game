@@ -128,6 +128,7 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   var GRID_Y0 = FIELD_Y0 + 32, GRID_Y1 = FIELD_Y1 - 32;
   var GRID_STEP_X = (GRID_X1 - GRID_X0) / (GRID_COLS - 1);
   var GRID_STEP_Y = (GRID_Y1 - GRID_Y0) / (GRID_ROWS - 1);
+  var CELL_BOX_W = GRID_STEP_X - 6, CELL_BOX_H = GRID_STEP_Y - 6; // drawn box size per grid cell (leaves a gap between cells)
   var ROAD_CLEARANCE = 36; // min distance from road centerline a tower can be placed
   var PORTAL_CLEARANCE = 42, BASE_CLEARANCE = 48;
 
@@ -550,6 +551,22 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
     drawField: function (g, time) {
       g.fillStyle(0xEFE6D8); g.fillRect(0, FIELD_Y0, W, FIELD_Y1 - FIELD_Y0);
 
+      // [Grid] A real lattice of cell-boundary lines (not lines through
+      // cell centers -- these sit HALFWAY between centers, so each
+      // resulting box actually outlines one placeable cell), drawn faint
+      // and permanent so placement visibly reads as "a grid" even before
+      // a troop is selected. Drawn before the road/portal/base so those
+      // still paint over it cleanly wherever they cross a line.
+      g.lineStyle(1, 0x8a7355, 0.14);
+      for (var gx = 0; gx <= GRID_COLS; gx++) {
+        var lineX = GRID_X0 - GRID_STEP_X / 2 + gx * GRID_STEP_X;
+        g.lineBetween(lineX, GRID_Y0 - GRID_STEP_Y / 2, lineX, GRID_Y1 + GRID_STEP_Y / 2);
+      }
+      for (var gy = 0; gy <= GRID_ROWS; gy++) {
+        var lineY = GRID_Y0 - GRID_STEP_Y / 2 + gy * GRID_STEP_Y;
+        g.lineBetween(GRID_X0 - GRID_STEP_X / 2, lineY, GRID_X1 + GRID_STEP_X / 2, lineY);
+      }
+
       // Road
       g.lineStyle(34, 0xD8C7A6);
       this.strokePath(g);
@@ -562,9 +579,11 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       g.fillStyle(0x5D4037); g.fillRect(BASE_X - 22, BASE_Y - 30, 44, 44);
       g.fillStyle(0x8D6E63); g.fillTriangle(BASE_X - 26, BASE_Y - 30, BASE_X + 26, BASE_Y - 30, BASE_X, BASE_Y - 54);
 
-      // [Grid] Only highlighted while a troop is selected, so the field
-      // stays clean otherwise -- every open, buildable cell pulses;
-      // cells too close to the road/portal/base are simply skipped
+      // [Grid] Placeable-cell squares, only highlighted while a troop is
+      // selected so the field stays clean otherwise -- filled boxes
+      // (matching the lattice above) rather than circles, so a selected
+      // cell reads as "this square of the grid" instead of a floating
+      // dot. Cells too close to the road/portal/base are simply skipped
       // rather than marked, so 150+ cells don't turn into visual noise.
       var self = this;
       if (self.selected) {
@@ -574,9 +593,12 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
             if (self.towerAt(col, row)) continue;
             var c = cellCenter(col, row);
             if (!isCellBuildable(c.x, c.y)) continue;
-            var pulse = affordable ? 2.5 * Math.sin(time * 0.006 + col * 0.7 + row) : 0;
-            g.lineStyle(2, affordable ? 0x2EC4B6 : 0xBBAA88, affordable ? 0.85 : 0.5);
-            g.strokeCircle(c.x, c.y, 13 + pulse);
+            var pulse = affordable ? 1.5 * Math.sin(time * 0.006 + col * 0.7 + row) : 0;
+            var bw = CELL_BOX_W + pulse * 2, bh = CELL_BOX_H + pulse * 2;
+            g.fillStyle(affordable ? 0x2EC4B6 : 0xBBAA88, 0.14);
+            g.fillRoundedRect(c.x - bw / 2, c.y - bh / 2, bw, bh, 6);
+            g.lineStyle(2, affordable ? 0x2EC4B6 : 0xBBAA88, affordable ? 0.9 : 0.55);
+            g.strokeRoundedRect(c.x - bw / 2, c.y - bh / 2, bw, bh, 6);
           }
         }
       }
