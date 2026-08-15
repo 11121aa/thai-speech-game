@@ -19,7 +19,13 @@ function createCookingGame(words, callbacks) {
 
   /* ── Colours ───────────────────────────────────────────── */
   var C = {
-    bg:'#111827', ui:'#1e2a40', panel:'#0f3460',
+    /* bg/ui/panel/sOff used to be a cold dark navy (#111827/#1e2a40/
+       #0f3460) that clashed with img/cooking/bg.jpg's warm wood-board +
+       blue-tile kitchen illustration underneath it -- switched to a warm
+       dark-brown family (matching the wood board and the outline colour
+       below) so the UI chrome reads as part of the same warm kitchen
+       scene instead of a mismatched blue-black overlay pasted on top. */
+    bg:'#2B1B10', ui:'#4A2E1B', panel:'#7B3F10',
     /* Food colours sampled/matched from img/cooking/bg.jpg's flat-vector
        kitchen illustration (golden board, blue tile, warm reds/greens) so
        the drawn food reads as part of the same illustration, not a
@@ -37,7 +43,10 @@ function createCookingGame(words, callbacks) {
        every food shape -- a polished, appetizing "cooking game" look
        (crisp outline + shine) rather than plain flat fills. */
     outline:'#3D2010',
-    sDone:'#27AE60', sAct:'#2EC4B6', sOff:'#1e2a40',
+    // sOff deliberately lighter than `ui` (the step bar's own background)
+    // -- they were identical before this pass, making not-yet-reached
+    // step pills fill-invisible against the bar itself.
+    sDone:'#27AE60', sAct:'#2EC4B6', sOff:'#6B4226',
   };
 
   /* ── Layout constants ──────────────────────────────────── */
@@ -834,10 +843,12 @@ function createCookingGame(words, callbacks) {
     ctx.font='16px Prompt'; ctx.fillStyle=C.acc; T('เลือกอาหารที่จะทำ',VW/2,124,'center');
     SEL_FOODS.forEach(function(f,i){
       var r=selCardRect(i);
-      fillRR(r.x,r.y,r.w,r.h,16,f.ok?'#7B3F10':'#1e2440');
+      // Locked-card colour warmed to match the new brown UI chrome (was a
+      // cold navy #1e2440/#3a3d62 that clashed with everything else here).
+      fillRR(r.x,r.y,r.w,r.h,16,f.ok?C.panel:'#3A2A20');
       ctx.font='52px sans-serif'; ctx.textBaseline='middle';
       ctx.globalAlpha=f.ok?1:0.32; T(f.e,r.x+r.w/2,r.y+r.h/2-14,'center'); ctx.globalAlpha=1;
-      ctx.font=(f.ok?'bold ':'')+'14px Prompt'; ctx.fillStyle=f.ok?C.w:'#3a3d62'; ctx.textBaseline='alphabetic';
+      ctx.font=(f.ok?'bold ':'')+'14px Prompt'; ctx.fillStyle=f.ok?C.w:'#8a7566'; ctx.textBaseline='alphabetic';
       T(f.l,r.x+r.w/2,r.y+r.h-18,'center');
     });
   }
@@ -879,7 +890,7 @@ function createCookingGame(words, callbacks) {
     var elapsed=G.chopRun?Math.min(CHOP_DUR,ts-G.chopStart):0;
     var pct=Math.max(0,1-elapsed/CHOP_DUR);
     if(G.chopRun&&!G.chopDone&&elapsed>=CHOP_DUR) finishChop();
-    fillRR(40,SH+48,VW-80,18,9,'#1a2035');
+    fillRR(40,SH+48,VW-80,18,9,'#2A1D14');
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
     ctx.font='bold 11px Prompt'; ctx.fillStyle=C.w;
     T(Math.max(0,Math.ceil((CHOP_DUR-elapsed)/1000))+'วิ',VW/2,SH+60,'center');
@@ -1119,7 +1130,7 @@ function createCookingGame(words, callbacks) {
     var elapsed=G.sauceRun?Math.min(SAUCE_DUR,ts-G.sauceStart):0;
     var pct=Math.max(0,1-elapsed/SAUCE_DUR);
     if(G.sauceRun&&!G.sauceDone&&elapsed>=SAUCE_DUR) finishSauce();
-    fillRR(40,SH+48,VW-80,18,9,'#1a2035');
+    fillRR(40,SH+48,VW-80,18,9,'#2A1D14');
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
     sDoughDisc(PZ_CX,PZ_CY,PZ_DISPLAY_R,false);
     sSauceLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.sauceCells,G.sauceCellAt,ts);
@@ -1141,7 +1152,7 @@ function createCookingGame(words, callbacks) {
     var elapsed=G.cheeseRun?Math.min(CHOP_DUR,ts-G.cheeseStart):0;
     var pct=Math.max(0,1-elapsed/CHOP_DUR);
     if(G.cheeseRun&&!G.cheeseDone&&elapsed>=CHOP_DUR) finishCheese();
-    fillRR(40,SH+48,VW-80,18,9,'#1a2035');
+    fillRR(40,SH+48,VW-80,18,9,'#2A1D14');
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
     ctx.font='bold 11px Prompt'; ctx.fillStyle=C.w;
     T(Math.max(0,Math.ceil((CHOP_DUR-elapsed)/1000))+'วิ',VW/2,SH+60,'center');
@@ -1228,7 +1239,7 @@ function createCookingGame(words, callbacks) {
       ctx.strokeStyle='rgba(240,165,0,'+pulse+')'; ctx.lineWidth=6;
       ctx.beginPath(); ctx.arc(PZ_CX,PZ_CY,PZ_DISPLAY_R+8,0,Math.PI*2); ctx.stroke();
     }
-    fillRR(40,570,VW-80,20,10,'#1a2035');
+    fillRR(40,570,VW-80,20,10,'#2A1D14');
     var goodX0=40+(VW-80)*BAKE_GOOD[0], goodX1=40+(VW-80)*BAKE_GOOD[1];
     ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(goodX0,570,goodX1-goodX0,20);
     fillRR(40,570,(VW-80)*frac,20,10, frac<BAKE_GOOD[0]?C.acc: frac<=BAKE_GOOD[1]?C.gold:C.red);
@@ -1278,7 +1289,7 @@ function createCookingGame(words, callbacks) {
     var elapsed=G.eggRun?Math.min(EGG_DUR,ts-G.eggStart):0;
     var pct=Math.max(0,1-elapsed/EGG_DUR);
     if(G.eggRun&&!G.eggDone&&elapsed>=EGG_DUR) finishEgg();
-    fillRR(40,SH+48,VW-80,18,9,'#1a2035');
+    fillRR(40,SH+48,VW-80,18,9,'#2A1D14');
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
     var punchT=G.eggPunch?(ts-G.eggPunch)/140:1, sq=1;
     if(punchT<1){ var pe=1-Math.pow(1-punchT,2); sq=1-0.05*(1-pe); }
@@ -1352,7 +1363,7 @@ function createCookingGame(words, callbacks) {
     G.toastVal=frac;
     if(!G.toastDone&&frac>=1) finishToast(1);
     sToastSlice(VW/2,340,frac);
-    fillRR(40,470,VW-80,20,10,'#1a2035');
+    fillRR(40,470,VW-80,20,10,'#2A1D14');
     var goodX0=40+(VW-80)*TOAST_GOOD[0], goodX1=40+(VW-80)*TOAST_GOOD[1];
     ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(goodX0,470,goodX1-goodX0,20);
     fillRR(40,470,(VW-80)*frac,20,10, frac<TOAST_GOOD[0]?C.acc: frac<=TOAST_GOOD[1]?C.gold:C.red);
@@ -1883,7 +1894,7 @@ function createCookingGame(words, callbacks) {
     parent: 'cookingGame',
     width:  VW, height: VH,
     render: {clearBeforeRender:false},
-    backgroundColor: '#111827',
+    backgroundColor: '#2B1B10',
     scale:  {mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH, autoRound:true},
     scene:  CookScene,
   });
