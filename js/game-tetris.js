@@ -31,7 +31,7 @@ function createTetrisGame(words, callbacks) {
   var PRACTICE_EVERY_PTS = 1000; // practice popup every time cumulative score crosses a multiple of this
   var GRAVITY_BASE_MS = 800;     // starting time between automatic falls
   var GRAVITY_MIN_MS  = 220;     // fastest gravity ever ramps to
-  var GRAVITY_STEP_MS = 14;      // gravity speeds up by this much per line cleared
+  var GRAVITY_STEP_MS = 30;      // gravity speeds up by this much per line cleared (reaches GRAVITY_MIN_MS after ~19 lines)
   var LINE_FLASH_MS = 180;       // how long a cleared row flashes before rows shift down
 
   // ── [PIECES] Shapes (as NxN boolean grids, rotated via rotateCW) + colours ──
