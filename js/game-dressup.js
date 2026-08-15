@@ -196,13 +196,37 @@ function createDressupGame(words, callbacks, closet) {
     // Sizes/positions are derived from the plain body's own geometry in
     // drawAvatar() (legs span AX-38..AX+38 / AY-40..AY+50, feet ellipses
     // sit at AY+49..AY+67, torso spans AY-120..AY-30, head circle is
-    // centered at AY-175 with radius 40).
+    // centered at AY-175 with radius 40, arms span AX-50..AX-34 (left) /
+    // AX+32..AX+48 (right) -- narrower than the torso's own edges, tucked
+    // in specifically so the widened shirt below actually reaches them).
+    //
+    // These w/h/x/y values (and drawAvatar()'s arm rects below) were tuned
+    // by actually rendering the real clothing SVGs (img/dressup/*.svg)
+    // composited over this body at these exact numbers -- via a local
+    // resvg + pngjs script, not guessed -- since the original values
+    // (shirt 112x100, bag 52x74 centered beside the torso, arms at
+    // AX-58/+40) left visible bare-skin gaps at the shoulders and a bag
+    // with no visible strap reaching the shoulder, looking like a prop
+    // floating next to the character rather than something worn:
+    //   - shirt widened+heightened (112x100 -> 130x120) to actually reach
+    //     the arms after they were tucked in, matching the source SVG's
+    //     own aspect ratio (~1.08) instead of a squished 1.12
+    //   - bag switched from a small centered box (which cropped out most
+    //     of its own drawn shoulder strap) to a tall top-anchored one
+    //     positioned so the strap's own top point in the source art lands
+    //     right at the shoulder, with the bag body hanging to hip height
+    //   - pants nudged up 6px so the waistband tucks under the taller
+    //     shirt's hem instead of leaving a visible bare-torso seam
     buildPieceImages: function () {
-      var specs = {
-        pants: { x: AX,      y: AY - 40,  ox: 0.5, oy: 0,   w: 88,  h: 96 },
+      // Stashed on the scene (this.pieceSpecs) so equipSlot() can re-apply
+      // the exact same target size on every equip -- see equipSlot()'s own
+      // comment for why that matters (the punch-in animation used to
+      // silently discard this size entirely).
+      var specs = this.pieceSpecs = {
+        pants: { x: AX,      y: AY - 46,  ox: 0.5, oy: 0,   w: 88,  h: 96 },
         shoes: { x: AX,      y: AY + 58,  ox: 0.5, oy: 0.5, w: 86,  h: 30 },
-        shirt: { x: AX,      y: AY - 124, ox: 0.5, oy: 0,   w: 112, h: 100 },
-        bag:   { x: AX + 44, y: AY - 82,  ox: 0.5, oy: 0.5, w: 52,  h: 74 },
+        shirt: { x: AX,      y: AY - 124, ox: 0.5, oy: 0,   w: 130, h: 120 },
+        bag:   { x: AX + 40, y: AY - 121, ox: 0.3, oy: 0,   w: 80,  h: 125 },
         hat:   { x: AX,      y: AY - 206, ox: 0.5, oy: 1,   w: 92,  h: 88 }
       };
       SLOTS.forEach(function (slot) {
@@ -229,10 +253,12 @@ function createDressupGame(words, callbacks, closet) {
       g.fillStyle(0x9CA3AF);
       g.fillEllipse(AX - 23, AY + 58, 34, 18);
       g.fillEllipse(AX + 23, AY + 58, 34, 18);
-      // arms (skin)
+      // arms (skin) -- narrower span than the torso's own edges (was
+      // AX-58/+40, 18 wide) so the widened shirt in buildPieceImages()
+      // actually reaches all the way to them instead of leaving a gap
       g.fillStyle(0xF5C9A0);
-      g.fillRoundedRect(AX - 58, AY - 110, 18, 80, 9);
-      g.fillRoundedRect(AX + 40, AY - 110, 18, 80, 9);
+      g.fillRoundedRect(AX - 50, AY - 110, 16, 80, 9);
+      g.fillRoundedRect(AX + 32, AY - 110, 16, 80, 9);
       // torso (bare base -- covered by the shirt sprite once equipped)
       g.fillStyle(0xE5E7EB);
       g.fillRoundedRect(AX - 40, AY - 120, 80, 90, 16);
@@ -405,8 +431,25 @@ function createDressupGame(words, callbacks, closet) {
       var img = this.pieceImgs[slotKey];
       if (!img) return;
       img.setTexture(item.id).setVisible(true);
-      img.setScale(0.9);
-      this.tweens.add({ targets: img, scaleX: 1, scaleY: 1, duration: 180, ease: 'Back.Out' });
+      // Re-apply this slot's real target size (buildPieceImages()'s
+      // pieceSpecs) before punching in, rather than trusting whatever
+      // scale the image happens to be holding right now. The old code did
+      // `img.setScale(0.9)` then tweened straight to the LITERAL values
+      // scaleX:1, scaleY:1 -- i.e. 100% of the raw loaded SVG texture's
+      // own pixel size (each slot's loadW/loadH in SLOTS, e.g. the hat's
+      // 140x130), completely ignoring the carefully-fitted display size
+      // set here. Every single equip silently resized the garment to its
+      // raw source dimensions instead of the size it was actually placed
+      // and tuned for -- the real cause of clothes visibly not fitting
+      // the body, far more than any position tweak. Recomputing the
+      // target scale from pieceSpecs and punching in AS A MULTIPLIER of
+      // that (90% -> 100% of the correct size) keeps the same "pop in"
+      // feel while landing on the right size every time.
+      var sp = this.pieceSpecs[slotKey];
+      img.setDisplaySize(sp.w, sp.h);
+      var targetScaleX = img.scaleX, targetScaleY = img.scaleY;
+      img.setScale(targetScaleX * 0.9, targetScaleY * 0.9);
+      this.tweens.add({ targets: img, scaleX: targetScaleX, scaleY: targetScaleY, duration: 180, ease: 'Back.Out' });
       this.sfxEquip.play();
     }
   });
