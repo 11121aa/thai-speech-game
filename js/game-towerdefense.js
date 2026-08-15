@@ -2,20 +2,26 @@
 //  TOWER DEFENSE GAME — Phaser 3  (place troops, defend the base)
 // ============================================================
 //  POLISH GUIDE (search for the label to find where to edit):
-//    [TUNE]    Starting gold/lives, wave count, pacing   (~line 20)
-//    [PATH]    The road enemies walk + placement slots    (~PATH / SLOTS)
-//    [TROOPS]  Archer & swordsman stats per tier          (~TROOPS)
-//    [ENEMY]   Enemy types + per-wave spawn scaling       (~ENEMY_TYPES / buildWave)
-//    [UI]      Bottom troop palette + start-wave button   (~drawPalette)
+//    [TUNE]    Grid size, road clearance, pacing knobs     (~line 20)
+//    [MAPS]    Map layouts (path/portal/base/waves/scaling)(~MAPS)
+//    [TROOPS]  Archer & swordsman stats per tier            (~TROOPS)
+//    [ENEMY]   Enemy types + per-wave spawn scaling         (~ENEMY_TYPES / buildWave)
+//    [PANEL]   Hover/tap unit stat + upgrade panel           (~PANEL_X etc / drawInfoPanel)
+//    [UI]      Bottom troop palette + start-wave button      (~drawPalette)
 // ============================================================
 //  How the game works:
-//    - A road winds across the screen from the portal (left) to your
-//      base (right). Enemies walk it every wave; each one that reaches
-//      the base costs you a life.
-//    - Tap a troop card at the bottom to select it, then tap an empty
-//      dashed slot near the road to place it (costs gold).
-//    - Tap an already-placed troop to upgrade it (also costs gold) —
-//      3 tiers per troop, the 3rd tier unlocks a special ability:
+//    - A road winds across the screen from the portal to your base.
+//      Enemies walk it every wave; each one that reaches the base
+//      costs you a life. Pick a map before starting (see game.html's
+//      setup overlay) — later maps are twistier, longer, and harder.
+//    - Placement is grid-based, not fixed spots: tap a troop card at
+//      the bottom to select it, then tap any open grid cell that isn't
+//      too close to the road/portal/base to place it there (costs gold).
+//    - Hover over (or tap) an already-placed troop to see its stats —
+//      damage, range, attack speed, and its tier-3 special ability.
+//      Tapping it opens a panel with an upgrade button (also shown on
+//      hover, without the button, for a quick peek); 3 tiers per troop,
+//      the 3rd tier unlocks a special ability:
 //        Archer:    tier 3 arrows pierce through several enemies in a line
 //        Swordsman: tier 3 periodically RAGES — faster attacks + more damage
 //    - Tap "เริ่มด่าน" to start the next wave — this is gated by a quick
@@ -32,37 +38,61 @@
 //    - CongratSFX → you win
 // ============================================================
 
-function createTowerDefenseGame(words, callbacks) {
+// createTowerDefenseGame is called with an optional 4th argument, mapIdx
+// (index into MAPS below, defaulting to 0) — see game.html's tdMapRow
+// setup-overlay selector for how a map gets picked before the game starts.
+function createTowerDefenseGame(words, callbacks, mapIdx) {
   var W = 800, H = 500;
 
-  // ── [TUNE] Difficulty & pacing knobs ─────────────────────────
-  var START_GOLD  = 100;
-  var START_LIVES = 10;
-  var WAVES_TOTAL = 8;
+  // ── [TUNE] Pacing knobs that don't vary by map ───────────────
   var SPAWN_GAP_MS = 750;      // time between enemy spawns within a wave
   var RAGE_INTERVAL = 8000;    // ms between swordsman-tier3 rage triggers
   var RAGE_DURATION = 3000;    // ms rage lasts
 
   var HUD_H = 40, FIELD_Y0 = HUD_H, FIELD_Y1 = 378, PAL_Y0 = 378;
 
-  // ── [PATH] The road (enemies walk waypoint-to-waypoint) + fixed
-  // placement pads flanking it. Not pixel-perfect clearance -- this is
-  // a rough first version -- just visually clear of the road.
-  var PATH = [
-    { x: -20, y: 90 }, { x: 170, y: 90 }, { x: 170, y: 270 },
-    { x: 380, y: 270 }, { x: 380, y: 110 }, { x: 580, y: 110 },
-    { x: 580, y: 300 }, { x: 800, y: 300 }
+  // ── [MAPS] Three layouts, each with its own road, portal/base
+  // position, wave count, and enemy-HP scaling — later maps are
+  // longer/twistier (less open room to place troops) AND scale enemies
+  // harder, so difficulty comes from both map geometry and raw numbers.
+  var MAPS = [
+    {
+      name: 'ทุ่งหญ้า', diffLabel: 'ง่าย', wavesTotal: 8, hpScale: 1.0, startGold: 100, startLives: 10,
+      path: [
+        { x: -20, y: 90 }, { x: 170, y: 90 }, { x: 170, y: 270 },
+        { x: 380, y: 270 }, { x: 380, y: 110 }, { x: 580, y: 110 },
+        { x: 580, y: 300 }, { x: 800, y: 300 }
+      ],
+      portal: { x: 10, y: 90 }, base: { x: 780, y: 300 }
+    },
+    {
+      name: 'ทะเลทราย', diffLabel: 'ปานกลาง', wavesTotal: 10, hpScale: 1.15, startGold: 110, startLives: 9,
+      path: [
+        { x: -20, y: 70 }, { x: 130, y: 70 }, { x: 130, y: 190 },
+        { x: 320, y: 190 }, { x: 320, y: 70 }, { x: 500, y: 70 },
+        { x: 500, y: 310 }, { x: 680, y: 310 }, { x: 680, y: 190 }, { x: 800, y: 190 }
+      ],
+      portal: { x: 10, y: 70 }, base: { x: 780, y: 190 }
+    },
+    {
+      name: 'ภูเขาไฟ', diffLabel: 'ยาก', wavesTotal: 12, hpScale: 1.3, startGold: 120, startLives: 8,
+      path: [
+        { x: -20, y: 350 }, { x: 100, y: 350 }, { x: 100, y: 75 },
+        { x: 250, y: 75 }, { x: 250, y: 350 }, { x: 400, y: 350 },
+        { x: 400, y: 75 }, { x: 550, y: 75 }, { x: 550, y: 350 },
+        { x: 700, y: 350 }, { x: 700, y: 190 }, { x: 800, y: 190 }
+      ],
+      portal: { x: 10, y: 350 }, base: { x: 780, y: 190 }
+    }
   ];
-  var BASE_X = 780, BASE_Y = 300, PORTAL_X = 10, PORTAL_Y = 90;
-  // Kept clear of the HUD strip (y < HUD_H) and palette bar (y > PAL_Y0)
-  // given the SLOT_R=26 circle drawn around each one.
-  var SLOTS = [
-    { x: 90,  y: 170 }, { x: 110, y: 230 }, { x: 250, y: 210 },
-    { x: 270, y: 335 }, { x: 320, y: 190 }, { x: 440, y: 190 },
-    { x: 480, y: 68 },  { x: 520, y: 230 }, { x: 650, y: 230 },
-    { x: 690, y: 348 }, { x: 700, y: 150 }
-  ];
-  var SLOT_R = 26;
+  var MAP = MAPS[mapIdx] || MAPS[0];
+  var PATH = MAP.path;
+  var PORTAL_X = MAP.portal.x, PORTAL_Y = MAP.portal.y;
+  var BASE_X = MAP.base.x, BASE_Y = MAP.base.y;
+  var WAVES_TOTAL = MAP.wavesTotal;
+  var HP_SCALE = MAP.hpScale;
+  var START_GOLD = MAP.startGold;
+  var START_LIVES = MAP.startLives;
 
   function buildPathMeta(path) {
     var segLens = [], total = 0;
@@ -88,6 +118,71 @@ function createTowerDefenseGame(words, callbacks) {
     return PATH[PATH.length - 1];
   }
 
+  // ── [TUNE] Placement grid — replaces the old fixed 11-spot SLOTS
+  // array with a real grid covering the field, so a troop can go
+  // (almost) anywhere instead of only a handful of predetermined spots.
+  // Column/row COUNTs are fixed; the actual pixel spacing is derived so
+  // the grid fills the usable field area evenly regardless of map.
+  var GRID_COLS = 19, GRID_ROWS = 8;
+  var GRID_X0 = 30, GRID_X1 = 770;
+  var GRID_Y0 = FIELD_Y0 + 32, GRID_Y1 = FIELD_Y1 - 32;
+  var GRID_STEP_X = (GRID_X1 - GRID_X0) / (GRID_COLS - 1);
+  var GRID_STEP_Y = (GRID_Y1 - GRID_Y0) / (GRID_ROWS - 1);
+  var ROAD_CLEARANCE = 36; // min distance from road centerline a tower can be placed
+  var PORTAL_CLEARANCE = 42, BASE_CLEARANCE = 48;
+
+  function cellCenter(col, row) {
+    return { x: GRID_X0 + col * GRID_STEP_X, y: GRID_Y0 + row * GRID_STEP_Y };
+  }
+  // Nearest grid cell to a raw pixel tap, or null if the tap isn't
+  // actually close enough to any cell's center (dead zone between cells,
+  // or outside the grid/field entirely).
+  function cellAtPixel(px, py) {
+    var col = Math.round((px - GRID_X0) / GRID_STEP_X);
+    var row = Math.round((py - GRID_Y0) / GRID_STEP_Y);
+    if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return null;
+    var c = cellCenter(col, row);
+    if (Math.abs(px - c.x) > GRID_STEP_X * 0.55 || Math.abs(py - c.y) > GRID_STEP_Y * 0.55) return null;
+    return { col: col, row: row, x: c.x, y: c.y };
+  }
+  function distToSegment(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var lenSq = dx * dx + dy * dy;
+    var t = lenSq > 0 ? ((px - ax) * dx + (py - ay) * dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    var cx = ax + t * dx, cy = ay + t * dy;
+    return Math.hypot(px - cx, py - cy);
+  }
+  function distToPath(px, py) {
+    var min = Infinity;
+    for (var i = 0; i < PATH.length - 1; i++) {
+      var d = distToSegment(px, py, PATH[i].x, PATH[i].y, PATH[i + 1].x, PATH[i + 1].y);
+      if (d < min) min = d;
+    }
+    return min;
+  }
+  // ── [PANEL] Fixed top-right stat/upgrade panel shown on hovering or
+  // tapping a placed troop. Hover shows the short (no-button) version;
+  // tapping "pins" it with the upgrade button until dismissed. Declared
+  // before isCellBuildable() (below) so that function can keep this
+  // whole footprint permanently unbuildable -- otherwise a tower placed
+  // underneath it could sit exactly where ANOTHER pinned tower's
+  // close/upgrade button gets hit-tested, so tapping that tower would
+  // silently upgrade/dismiss the wrong one instead of opening its own panel.
+  var PANEL_X = W - 200, PANEL_Y = HUD_H + 10, PANEL_W = 190;
+  var PANEL_H_PINNED = 132, PANEL_H_HOVER = 96;
+  var CLOSE_BTN = { x: PANEL_X + PANEL_W - 34, y: PANEL_Y, w: 34, h: 28 };
+  var UPGRADE_BTN = { x: PANEL_X + 10, y: PANEL_Y + PANEL_H_PINNED - 38, w: PANEL_W - 20, h: 28 };
+  var PANEL_NO_BUILD_MARGIN = 20; // extra padding beyond the panel's own rect
+
+  function isCellBuildable(cx, cy) {
+    if (distToPath(cx, cy) < ROAD_CLEARANCE) return false;
+    if (Math.hypot(cx - PORTAL_X, cy - PORTAL_Y) < PORTAL_CLEARANCE) return false;
+    if (Math.hypot(cx - BASE_X, cy - BASE_Y) < BASE_CLEARANCE) return false;
+    if (cx > PANEL_X - PANEL_NO_BUILD_MARGIN && cy < PANEL_Y + PANEL_H_PINNED + PANEL_NO_BUILD_MARGIN) return false;
+    return true;
+  }
+
   // ── [TROOPS] Base + upgrade-tier stats. costs[i] is what it takes to
   // reach tier i (costs[0] = placement cost). Tier index 2 is "final".
   var TROOPS = {
@@ -111,21 +206,27 @@ function createTowerDefenseGame(words, callbacks) {
     }
   };
 
-  // ── [ENEMY] Types + per-wave scaling ─────────────────────────
+  // ── [ENEMY] Types + per-wave scaling. "ยักษ์" (ogre) is a tougher
+  // late-game addition (wave >= 6) on top of the original three, for
+  // extra bite as waves climb — combined with HP_SCALE (map-driven) and
+  // the per-wave hpMul below, this is what makes later waves/maps feel
+  // meaningfully harder rather than just "the same fight, more hits".
   var ENEMY_TYPES = [
-    { key: 'slime', name: 'สไลม์',   emoji: '🟢', hp: 18, spd: 40, gold: 4, dmg: 1, color: 0x27AE60 },
-    { key: 'bat',   name: 'ค้างคาว', emoji: '🦇', hp: 10, spd: 66, gold: 3, dmg: 1, color: 0x8E44AD },
-    { key: 'rock',  name: 'หิน',     emoji: '🪨', hp: 46, spd: 24, gold: 8, dmg: 2, color: 0x7F8C8D }
+    { key: 'slime', name: 'สไลม์',   emoji: '🟢', hp: 18, spd: 40, gold: 4,  dmg: 1, color: 0x27AE60 },
+    { key: 'bat',   name: 'ค้างคาว', emoji: '🦇', hp: 10, spd: 66, gold: 3,  dmg: 1, color: 0x8E44AD },
+    { key: 'rock',  name: 'หิน',     emoji: '🪨', hp: 46, spd: 24, gold: 8,  dmg: 2, color: 0x7F8C8D },
+    { key: 'ogre',  name: 'ยักษ์',   emoji: '👹', hp: 90, spd: 18, gold: 14, dmg: 3, color: 0x6D4C41 }
   ];
   function buildWave(waveNum) {
     var count = 5 + waveNum * 2;
-    var hpMul = 1 + (waveNum - 1) * 0.16;
+    var hpMul = (1 + (waveNum - 1) * 0.16) * HP_SCALE;
     var list = [];
     for (var i = 0; i < count; i++) {
-      var type;
       var roll = Math.random();
-      if (waveNum >= 5 && roll < 0.28) type = ENEMY_TYPES[2];
-      else if (roll < 0.4) type = ENEMY_TYPES[1];
+      var type;
+      if (waveNum >= 6 && roll < 0.15) type = ENEMY_TYPES[3];
+      else if (waveNum >= 5 && roll < 0.40) type = ENEMY_TYPES[2];
+      else if (roll < 0.62) type = ENEMY_TYPES[1];
       else type = ENEMY_TYPES[0];
       list.push({ type: type, hpMul: hpMul });
     }
@@ -136,7 +237,7 @@ function createTowerDefenseGame(words, callbacks) {
     Extends: Phaser.Scene,
     initialize: function () {
       Phaser.Scene.call(this, { key: 'towerdefense' });
-      this.towers = [];       // { slot, kind, tier, x, y, nextAtkAt, nextRageAt, ragingUntil, icon }
+      this.towers = [];       // { col, row, kind, tier, x, y, nextAtkAt, nextRageAt, ragingUntil, icon }
       this.enemies = [];      // { type, hp, maxHp, travel, x, y, icon, hpBg, hpFg }
       this.fx = [];           // { kind:'text'|'slash'|'beam', ... startedAt }
       this.gold = START_GOLD;
@@ -147,6 +248,8 @@ function createTowerDefenseGame(words, callbacks) {
       this.spawnQueue = [];
       this.nextSpawnAt = 0;
       this.paused = false;
+      this.hoverTower = null; // live pointermove proximity — read-only preview
+      this.panelTower = null; // tap-pinned — shows the upgrade button too
     },
 
     preload: function () {
@@ -172,7 +275,7 @@ function createTowerDefenseGame(words, callbacks) {
       this.g = this.add.graphics();
 
       var hint = this.add.text(W / 2, HUD_H + 14,
-        'แตะเลือกทหาร → แตะจุดประวางกำลังพล — แล้วกด "เริ่มด่าน"!', {
+        'แตะเลือกทหาร → แตะช่องว่างเพื่อวาง — แตะทหารที่วางแล้วเพื่อดูสถานะ!', {
           fontFamily: 'Prompt, sans-serif', fontSize: '14px', fontStyle: 'bold',
           color: '#2b2438', backgroundColor: '#ffffffcc', padding: { x: 8, y: 4 }
         }).setOrigin(0.5, 0).setDepth(20);
@@ -181,9 +284,11 @@ function createTowerDefenseGame(words, callbacks) {
       });
 
       this.input.on('pointerdown', function (ptr) { self.onTap(ptr.x, ptr.y); });
+      this.input.on('pointermove', function (ptr) { self.onHover(ptr.x, ptr.y); });
     },
 
-    // ── Input: troop cards → start-wave button → slots ──────────
+    // ── Input: troop cards → start-wave button → info panel buttons →
+    // placed-troop toggle → empty-cell placement ──────────────────
     onTap: function (x, y) {
       if (this.paused || this.phase === 'lost' || this.phase === 'won') return;
 
@@ -198,33 +303,63 @@ function createTowerDefenseGame(words, callbacks) {
       var btnX = W - 190, btnY = cardY, btnW = 160, btnH = cardH;
       if (this.hit(x, y, btnX, btnY, btnW, btnH)) { this.tryStartWave(); return; }
 
-      for (var i = 0; i < SLOTS.length; i++) {
-        var s = SLOTS[i];
-        if (Math.hypot(x - s.x, y - s.y) <= SLOT_R + 6) { this.tapSlot(i); return; }
+      if (this.panelTower) {
+        if (this.hit(x, y, CLOSE_BTN.x, CLOSE_BTN.y, CLOSE_BTN.w, CLOSE_BTN.h)) { this.panelTower = null; return; }
+        if (this.hit(x, y, UPGRADE_BTN.x, UPGRADE_BTN.y, UPGRADE_BTN.w, UPGRADE_BTN.h)) { this.tryUpgrade(this.panelTower); return; }
+        // Any other tap inside the panel's own footprint is swallowed
+        // (it visually covers the field there) rather than falling
+        // through to a grid placement/toggle underneath it.
+        if (this.hit(x, y, PANEL_X, PANEL_Y, PANEL_W, PANEL_H_PINNED)) return;
       }
+
+      var cell = cellAtPixel(x, y);
+      if (cell) {
+        var existing = this.towerAt(cell.col, cell.row);
+        if (existing) {
+          this.panelTower = (this.panelTower === existing) ? null : existing;
+          return;
+        }
+        if (this.selected) { this.tryPlaceAt(cell, this.selected); return; }
+      }
+
+      if (this.panelTower) this.panelTower = null;
     },
     hit: function (px, py, x, y, w, h) { return px >= x && px <= x + w && py >= y && py <= y + h; },
 
-    tapSlot: function (idx) {
-      var existing = this.towers.filter(function (t) { return t.slot === idx; })[0];
-      if (existing) { this.tryUpgrade(existing); return; }
-      if (!this.selected) return;
-      this.tryPlace(idx, this.selected);
+    // Live pointer proximity to any placed troop, purely a read-only
+    // display hint — never mutates gold/towers/etc, so it's safe to run
+    // unconditionally on every pointermove, paused or not.
+    onHover: function (x, y) {
+      if (this.paused || this.phase === 'lost' || this.phase === 'won') { this.hoverTower = null; return; }
+      var found = null;
+      for (var i = 0; i < this.towers.length; i++) {
+        var t = this.towers[i];
+        var r = 15 + t.tier * 3 + 10; // baseR + a touch of hit-buffer
+        if (Math.hypot(x - t.x, y - t.y) <= r) { found = t; break; }
+      }
+      this.hoverTower = found;
     },
 
-    tryPlace: function (slotIdx, kind) {
+    towerAt: function (col, row) {
+      for (var i = 0; i < this.towers.length; i++) {
+        if (this.towers[i].col === col && this.towers[i].row === row) return this.towers[i];
+      }
+      return null;
+    },
+
+    tryPlaceAt: function (cell, kind) {
+      if (!isCellBuildable(cell.x, cell.y)) { this.badTap('วางตรงนี้ไม่ได้!'); return; }
       var def = TROOPS[kind];
       var cost = def.costs[0];
       if (this.gold < cost) { this.badTap('เหรียญไม่พอ! 🪙'); return; }
       this.gold -= cost;
-      var s = SLOTS[slotIdx];
-      var icon = this.add.text(s.x, s.y, def.emoji, { fontSize: '22px' }).setOrigin(0.5).setDepth(5);
+      var icon = this.add.text(cell.x, cell.y, def.emoji, { fontSize: '22px' }).setOrigin(0.5).setDepth(5);
       this.towers.push({
-        slot: slotIdx, kind: kind, tier: 0, x: s.x, y: s.y,
+        col: cell.col, row: cell.row, kind: kind, tier: 0, x: cell.x, y: cell.y,
         nextAtkAt: 0, nextRageAt: this.time.now + RAGE_INTERVAL, ragingUntil: 0, icon: icon
       });
       this.sfxCoin.play();
-      this.popText(s.x, s.y - 30, def.emoji + ' วาง!', '#2EC4B6');
+      this.popText(cell.x, cell.y - 30, def.emoji + ' วาง!', '#2EC4B6');
       this.selected = null;
     },
 
@@ -382,6 +517,7 @@ function createTowerDefenseGame(words, callbacks) {
       this.drawHud(this.g);
       this.drawPalette(this.g, time);
       this.drawFx(this.g, time);
+      this.drawInfoPanel(this.g);
 
       if (this.paused || this.phase === 'lost' || this.phase === 'won') {
         if (this.phase === 'lost' || this.phase === 'won') this.drawEndOverlay(this.g);
@@ -426,23 +562,32 @@ function createTowerDefenseGame(words, callbacks) {
       g.fillStyle(0x5D4037); g.fillRect(BASE_X - 22, BASE_Y - 30, 44, 44);
       g.fillStyle(0x8D6E63); g.fillTriangle(BASE_X - 26, BASE_Y - 30, BASE_X + 26, BASE_Y - 30, BASE_X, BASE_Y - 54);
 
-      // Slots
+      // [Grid] Only highlighted while a troop is selected, so the field
+      // stays clean otherwise -- every open, buildable cell pulses;
+      // cells too close to the road/portal/base are simply skipped
+      // rather than marked, so 150+ cells don't turn into visual noise.
       var self = this;
-      SLOTS.forEach(function (s, idx) {
-        var occ = self.towers.some(function (t) { return t.slot === idx; });
-        if (occ) return;
-        var canAfford = self.selected && self.gold >= TROOPS[self.selected].costs[0];
-        var pulse = canAfford ? 3 * Math.sin(time * 0.006 + idx) : 0;
-        g.lineStyle(2.5, canAfford ? 0x2EC4B6 : 0xBBAA88, canAfford ? 0.95 : 0.7);
-        g.strokeCircle(s.x, s.y, SLOT_R + pulse);
-      });
+      if (self.selected) {
+        var affordable = self.gold >= TROOPS[self.selected].costs[0];
+        for (var col = 0; col < GRID_COLS; col++) {
+          for (var row = 0; row < GRID_ROWS; row++) {
+            if (self.towerAt(col, row)) continue;
+            var c = cellCenter(col, row);
+            if (!isCellBuildable(c.x, c.y)) continue;
+            var pulse = affordable ? 2.5 * Math.sin(time * 0.006 + col * 0.7 + row) : 0;
+            g.lineStyle(2, affordable ? 0x2EC4B6 : 0xBBAA88, affordable ? 0.85 : 0.5);
+            g.strokeCircle(c.x, c.y, 13 + pulse);
+          }
+        }
+      }
 
       // Towers (range ring + base disc; icon text is a persistent GameObject updated below)
       this.towers.forEach(function (t) {
         var def = TROOPS[t.kind], tierDef = def.tiers[t.tier];
         var raging = t.ragingUntil > time;
-        g.fillStyle(def.color, 0.06); g.fillCircle(t.x, t.y, tierDef.range);
-        g.lineStyle(1, def.color, 0.18); g.strokeCircle(t.x, t.y, tierDef.range);
+        var highlighted = self.panelTower === t || self.hoverTower === t;
+        g.fillStyle(def.color, highlighted ? 0.12 : 0.06); g.fillCircle(t.x, t.y, tierDef.range);
+        g.lineStyle(highlighted ? 2 : 1, def.color, highlighted ? 0.4 : 0.18); g.strokeCircle(t.x, t.y, tierDef.range);
         var baseR = 15 + t.tier * 3;
         if (t.tier === def.tiers.length - 1) {
           var auraColor = t.kind === 'archer' ? 0xF0A500 : 0xE53935;
@@ -450,7 +595,7 @@ function createTowerDefenseGame(words, callbacks) {
           g.fillCircle(t.x, t.y, baseR + 9);
         }
         g.fillStyle(0xFFFFFF, 0.9); g.fillCircle(t.x, t.y, baseR);
-        g.lineStyle(3, def.color); g.strokeCircle(t.x, t.y, baseR);
+        g.lineStyle(highlighted ? 4 : 3, highlighted ? 0xffffff : def.color); g.strokeCircle(t.x, t.y, baseR);
         t.icon.setPosition(t.x, t.y).setFontSize(16 + t.tier * 3);
       });
 
@@ -480,7 +625,7 @@ function createTowerDefenseGame(words, callbacks) {
         fontFamily: 'Prompt, sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff'
       }).setDepth(25));
       var waveLbl = this.phase === 'won' ? WAVES_TOTAL + '/' + WAVES_TOTAL : Math.min(this.wave, WAVES_TOTAL) + '/' + WAVES_TOTAL;
-      t.setText('🌊 ด่าน ' + waveLbl + '     ❤️ ' + this.lives + '     🪙 ' + this.gold);
+      t.setText('🗺️ ' + MAP.name + '     🌊 ด่าน ' + waveLbl + '     ❤️ ' + this.lives + '     🪙 ' + this.gold);
       t.setPosition(14, 10);
     },
 
@@ -536,6 +681,60 @@ function createTowerDefenseGame(words, callbacks) {
       });
     },
 
+    // ── [PANEL] Hover (read-only preview) or tap-pinned (with upgrade
+    // button) stat panel for a placed troop -- panelTower wins over
+    // hoverTower when both would apply, so hovering elsewhere never
+    // yanks away a panel the player deliberately opened.
+    drawInfoPanel: function (g) {
+      var tower = this.panelTower || this.hoverTower;
+      if (!tower) {
+        if (this.infoPanelTxt) this.infoPanelTxt.setVisible(false);
+        if (this.infoCloseTxt) this.infoCloseTxt.setVisible(false);
+        if (this.infoUpgradeTxt) this.infoUpgradeTxt.setVisible(false);
+        return;
+      }
+      var pinned = this.panelTower === tower;
+      var def = TROOPS[tower.kind], tierDef = def.tiers[tower.tier];
+      var ph = pinned ? PANEL_H_PINNED : PANEL_H_HOVER;
+
+      g.fillStyle(0x0f1626, 0.94);
+      g.fillRoundedRect(PANEL_X, PANEL_Y, PANEL_W, ph, 12);
+      g.lineStyle(2, def.color, 0.9);
+      g.strokeRoundedRect(PANEL_X, PANEL_Y, PANEL_W, ph, 12);
+
+      var txt = this.infoPanelTxt || (this.infoPanelTxt = this.add.text(0, 0, '', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '12px', color: '#fff', lineSpacing: 5
+      }).setDepth(35));
+      var lines = [
+        def.emoji + ' ' + def.name + '  (ระดับ ' + (tower.tier + 1) + '/3)',
+        '⚔️ ดาเมจ: ' + tierDef.dmg,
+        '🎯 ระยะ: ' + tierDef.range,
+        '⏱ ความเร็ว: ' + tierDef.atkMs + 'ms'
+      ];
+      if (tierDef.pierce) lines.push('✨ ทะลุ ' + tierDef.pierceCount + ' เป้า');
+      if (tierDef.rage) lines.push('🔥 โกรธจัดทุก ' + (RAGE_INTERVAL / 1000) + ' วิ');
+      txt.setText(lines.join('\n')).setPosition(PANEL_X + 12, PANEL_Y + 10).setVisible(true);
+
+      var closeTxt = this.infoCloseTxt || (this.infoCloseTxt = this.add.text(0, 0, '✕', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '16px', fontStyle: 'bold', color: '#fff'
+      }).setDepth(35));
+      closeTxt.setPosition(CLOSE_BTN.x + CLOSE_BTN.w / 2, CLOSE_BTN.y + CLOSE_BTN.h / 2).setOrigin(0.5).setVisible(pinned);
+
+      var upTxt = this.infoUpgradeTxt || (this.infoUpgradeTxt = this.add.text(0, 0, '', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#fff', align: 'center'
+      }).setOrigin(0.5).setDepth(35));
+      if (pinned) {
+        var maxed = tower.tier >= def.tiers.length - 1;
+        g.fillStyle(maxed ? 0x555f74 : 0xF0A500, 1);
+        g.fillRoundedRect(UPGRADE_BTN.x, UPGRADE_BTN.y, UPGRADE_BTN.w, UPGRADE_BTN.h, 8);
+        upTxt.setText(maxed ? '⭐ สูงสุดแล้ว' : 'อัพเกรด 🪙' + def.costs[tower.tier + 1]);
+        upTxt.setPosition(UPGRADE_BTN.x + UPGRADE_BTN.w / 2, UPGRADE_BTN.y + UPGRADE_BTN.h / 2);
+        upTxt.setVisible(true);
+      } else {
+        upTxt.setVisible(false);
+      }
+    },
+
     drawEndOverlay: function (g) {
       g.fillStyle(0x000000, 0.55); g.fillRect(0, 0, W, H);
       var won = this.phase === 'won';
@@ -560,9 +759,9 @@ function createTowerDefenseGame(words, callbacks) {
 // Public API (mirrors ShootingGame, CrossyGame, etc.)
 var TowerDefenseGame = (function () {
   var game = null;
-  function start(words, cbs) {
+  function start(words, cbs, mapIdx) {
     stop();
-    setTimeout(function () { game = createTowerDefenseGame(words, cbs); }, 60);
+    setTimeout(function () { game = createTowerDefenseGame(words, cbs, mapIdx); }, 60);
   }
   function stop() {
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }

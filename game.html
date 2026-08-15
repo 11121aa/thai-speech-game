@@ -270,6 +270,15 @@
       </div>
     </div>
 
+    <div id="tdMapRow" class="setup-row" style="display:none;">
+      <label>แผนที่</label>
+      <div class="diff-btns">
+        <button class="td-map-btn diff-btn active" data-tdmap="0">ทุ่งหญ้า <small class="text-secondary">ง่าย</small></button>
+        <button class="td-map-btn diff-btn" data-tdmap="1">ทะเลทราย <small class="text-secondary">ปานกลาง</small></button>
+        <button class="td-map-btn diff-btn" data-tdmap="2">ภูเขาไฟ <small class="text-secondary">ยาก</small></button>
+      </div>
+    </div>
+
     <div id="soundLevelRows">
       <div class="setup-row">
         <label>1 · เลือกหมวดเสียง</label>
@@ -403,7 +412,7 @@
 <script src="js/game-crossy.js?v=5"></script>
 <script src="js/game-cooking.js?v=10"></script>
 <script src="js/game-dressup.js?v=11"></script>
-<script src="js/game-towerdefense.js?v=1"></script>
+<script src="js/game-towerdefense.js?v=2"></script>
 <script src="js/game-tetris.js?v=3"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
@@ -741,6 +750,10 @@ function openSetup(mode) {
   document.getElementById('pfDiffRow').style.display = (mode === 'platformer') ? 'block' : 'none';
   document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.remove('active'); });
   document.querySelector('.pf-diff-btn[data-pfdiff="ธรรมดา"]').classList.add('active');
+  // Tower defense map selector — only shown for that mode, reset to map 0 (easiest)
+  document.getElementById('tdMapRow').style.display = (mode === 'towerdefense') ? 'block' : 'none';
+  document.querySelectorAll('.td-map-btn').forEach(function (b) { b.classList.remove('active'); });
+  document.querySelector('.td-map-btn[data-tdmap="0"]').classList.add('active');
   // How many times a word must be pronounced per practice pop-up — reset to default (1)
   _pronounceCount = 1;
   document.getElementById('setupPronounceCount').textContent = _pronounceCount;
@@ -800,6 +813,11 @@ function isHardMode() {
 function getPfDifficulty() {
   var btn = document.querySelector('.pf-diff-btn.active');
   return btn ? btn.getAttribute('data-pfdiff') : 'ธรรมดา';
+}
+
+function getTdMapIdx() {
+  var btn = document.querySelector('.td-map-btn.active');
+  return btn ? parseInt(btn.getAttribute('data-tdmap'), 10) : 0;
 }
 
 function getSetupPool() {
@@ -1106,7 +1124,7 @@ async function launchGame() {
     DressupGame.start(pool, GAME_CBS);    // Phaser game (dress-up avatar)
   } else if (G.mode === 'towerdefense') {
     document.getElementById('towerdefenseGame').style.display = 'block';
-    TowerDefenseGame.start(pool, GAME_CBS); // Phaser game (place troops, defend the base)
+    TowerDefenseGame.start(pool, GAME_CBS, getTdMapIdx()); // Phaser game (place troops, defend the base)
   } else if (G.mode === 'tetris') {
     document.getElementById('tetrisGame').style.display = 'block';
     TetrisGame.start(pool, GAME_CBS);     // Phaser game (falling blocks, line-clear scoring)
@@ -1160,6 +1178,13 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.querySelectorAll('.pf-diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.td-map-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.td-map-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
     });
   });
