@@ -89,9 +89,31 @@ function createDressupGame(words, callbacks, closet) {
           this.load.svg(item.id, item.asset_path + '?v=3', { width: slot.loadW, height: slot.loadH });
         }, this);
       }, this);
+      this.load.audio('ds_equip', 'soundeffect/FlipCard.mp3');
+      this.load.audio('ds_bonus', 'soundeffect/CoinSFX.mp3');
+      this.load.audio('ds_tab',   'soundeffect/Click.mp3');
     },
 
     create: function () {
+      var self = this;
+      // Each DressupGame.start() spins up a brand-new AudioContext, which
+      // boots suspended. Unlike game-cooking.js, this scene reaches
+      // create() through an async chain (loadCloset()'s network round
+      // trip, then a setTimeout) with no user-gesture trace left by the
+      // time it runs, so resuming here would silently no-op on strict
+      // mobile autoplay policies -- resuming only actually works inside a
+      // genuine, fresh pointerdown, so that's done for every tap below
+      // (the very first auto-equip's "bonus" sound plays before any tap
+      // has happened, so it may still be silently dropped once on some
+      // browsers -- same tradeoff every other automatic/ambient sound in
+      // this codebase already has, not specific to this fix).
+      this.input.on('pointerdown', function () {
+        if (self.sound.context && self.sound.context.state !== 'running') self.sound.context.resume();
+      });
+      this.sfxEquip = this.sound.add('ds_equip', { volume: 0.55 });
+      this.sfxBonus = this.sound.add('ds_bonus', { volume: 0.6 });
+      this.sfxTab   = this.sound.add('ds_tab',   { volume: 0.4 });
+
       // ── Warm background + ground strip ───────────────────────────
       var bg = this.add.graphics();
       bg.fillStyle(0xFFF7EC);
@@ -120,17 +142,59 @@ function createDressupGame(words, callbacks, closet) {
       }
 
       // Auto-equip the best-owned piece per slot and award the one-time
-      // session bonus for each slot that had anything to equip -- done
-      // before buildClosetPanel() so its first render already shows the
-      // correct selection border instead of nothing selected.
-      SLOTS.forEach(function (slot) {
-        if ((closet[slot.key] || []).length > 0) {
-          this.equipSlot(slot.key, 0);
-          callbacks.onPoints(PTS_PER_SLOT);
-        }
+      // session bonus for each slot that had anything to equip. The FIRST
+      // one equips immediately, synchronously, before buildClosetPanel()
+      // below -- that's what lets the very first grid render already show
+      // the right card highlighted as worn. The rest stagger in afterward
+      // purely for a "the outfit assembles piece by piece" visual beat;
+      // by the time a player switches to one of those tabs the equip has
+      // long since landed, so the ordering guarantee only matters for the
+      // slot shown first.
+      var equipSlots = SLOTS.filter(function (slot) { return (closet[slot.key] || []).length > 0; });
+      var POPUP_Y = { hat: AY - 220, shirt: AY - 110, pants: AY - 20, shoes: AY + 70, bag: AY - 70 };
+      function bonusEquip(slot) {
+        self.equipSlot(slot.key, 0, false);
+        callbacks.onPoints(PTS_PER_SLOT);
+        self.sfxBonus.play();
+        var px = slot.key === 'bag' ? AX + 70 : AX + 60;
+        self.popText(px, POPUP_Y[slot.key] || AY, '+' + PTS_PER_SLOT + ' ⭐', '#F0A500');
+      }
+      equipSlots.forEach(function (slot, i) {
+        if (i === 0) bonusEquip(slot);
+        else this.time.delayedCall(i * 160, function () { bonusEquip(slot); });
       }, this);
 
       this.buildClosetPanel();
+    },
+
+    // Floating score/feedback text -- same "create, tween up+fade,
+    // destroy on complete" shape used across the other games' pop-text
+    // effects (see e.g. game-shooting.js's showPop).
+    popText: function (x, y, text, color) {
+      var t = this.add.text(x, y, text, {
+        fontFamily: 'Prompt, sans-serif', fontSize: '20px', fontStyle: 'bold',
+        color: color, stroke: '#ffffff', strokeThickness: 4
+      }).setOrigin(0.5).setDepth(30);
+      this.tweens.add({
+        targets: t, y: y - 46, alpha: 0, duration: 850, ease: 'Power2',
+        onComplete: function () { t.destroy(); }
+      });
+    },
+
+    // A quick expanding-ring tap ripple at the given position -- purely
+    // decorative feedback that a tap registered, same spirit as the
+    // cooking/shooting games' own tap ripples, just built from a Graphics
+    // object + tween since this scene has no per-frame redraw loop of
+    // its own to hang a lightweight canvas effect off of.
+    pressRipple: function (x, y) {
+      var g = this.add.graphics().setDepth(29);
+      g.lineStyle(3, 0x2EC4B6, 0.7);
+      g.strokeCircle(0, 0, 10);
+      g.setPosition(x, y);
+      this.tweens.add({
+        targets: g, scaleX: 2.6, scaleY: 2.6, alpha: 0, duration: 320, ease: 'Power2',
+        onComplete: function () { g.destroy(); }
+      });
     },
 
     // ── [AVATAR] One illustrated sprite per outfit slot, positioned over
@@ -216,7 +280,12 @@ function createDressupGame(words, callbacks, closet) {
         // the visibly-colored tab should register, not just the icon.
         var hit = this.add.rectangle(tx, ty, tabW - 8, TAB_H, 0x000000, 0)
           .setInteractive({ useHandCursor: true });
-        hit.on('pointerdown', function () { self.selectSlot(slot.key); });
+        hit.on('pointerdown', function () {
+          if (slot.key === self.activeSlot) return;
+          self.sfxTab.play();
+          self.pressRipple(tx, ty);
+          self.selectSlot(slot.key);
+        });
         this.tabIcons[slot.key] = { x: tx, w: tabW };
       }, this);
 
@@ -301,6 +370,7 @@ function createDressupGame(words, callbacks, closet) {
             .setInteractive({ useHandCursor: true });
           hit.on('pointerdown', function () {
             if (self.selectedIdx[self.activeSlot] === idx) return; // already worn
+            self.pressRipple(cx, cy);
             self.equipSlot(self.activeSlot, idx);
             self.renderItemGrid();
           });
@@ -311,8 +381,10 @@ function createDressupGame(words, callbacks, closet) {
     },
 
     // Puts item index `idx` of a slot's owned list onto the avatar --
-    // used for the initial auto-equip and every card tap afterward.
-    equipSlot: function (slotKey, idx) {
+    // used for the initial auto-equip (playSound=false, since that path
+    // plays its own distinct "bonus" sound + popup instead) and every
+    // card tap afterward (playSound defaults true).
+    equipSlot: function (slotKey, idx, playSound) {
       var items = closet[slotKey] || [];
       if (!items.length) return;
       this.selectedIdx[slotKey] = idx;
@@ -322,6 +394,7 @@ function createDressupGame(words, callbacks, closet) {
       img.setTexture(item.id).setVisible(true);
       img.setScale(0.9);
       this.tweens.add({ targets: img, scaleX: 1, scaleY: 1, duration: 180, ease: 'Back.Out' });
+      if (playSound !== false) this.sfxEquip.play();
     }
   });
 
@@ -330,8 +403,7 @@ function createDressupGame(words, callbacks, closet) {
     parent: 'dressupGame',
     width:  W, height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
-    scene:  DsScene,
-    audio:  { noAudio: true }
+    scene:  DsScene
   });
 }
 
