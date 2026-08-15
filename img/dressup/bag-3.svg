@@ -1,8 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 150">
-  <path d="M 30 30 C 30 10 44 2 55 2 C 66 2 80 10 80 30" fill="none" stroke="#17130F" stroke-width="10" stroke-linecap="round"/>
-  <path d="M 30 30 C 30 10 44 2 55 2 C 66 2 80 10 80 30" fill="none" stroke="#E0B800" stroke-width="5" stroke-linecap="round"/>
-  <path d="M 18 40 L 92 40 L 86 138 C 86 144 82 148 76 148 L 34 148 C 28 148 24 144 24 138 Z" fill="#FFD400" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
-  <rect x="18" y="40" width="74" height="14" fill="#E0B800" stroke="#17130F" stroke-width="3"/>
-  <path d="M 40 70 L 70 70 M 40 90 L 70 90" stroke="#E0B800" stroke-width="4" stroke-linecap="round"/>
-  <ellipse cx="38" cy="60" rx="10" ry="16" fill="#FFFFFF" opacity="0.3" transform="rotate(-8 38 60)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="13.5 3.5 82.8 150.3">
+  <!-- two separate handle loops, not one bucket-style arc -->
+  <path d="M 34 44 C 34 22 34 12 44 12 C 54 12 54 22 54 44" fill="none" stroke="#17130F" stroke-width="9" stroke-linecap="round"/>
+  <path d="M 34 44 C 34 22 34 12 44 12 C 54 12 54 22 54 44" fill="none" stroke="#E0B800" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M 56 44 C 56 22 56 12 66 12 C 76 12 76 22 76 44" fill="none" stroke="#17130F" stroke-width="9" stroke-linecap="round"/>
+  <path d="M 56 44 C 56 22 56 12 66 12 C 76 12 76 22 76 44" fill="none" stroke="#E0B800" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- boxy body, flat-ish bottom -->
+  <path d="M 20 44 L 90 44 L 85 142 C 85 146 82 148 78 148 L 32 148 C 28 148 25 146 25 142 Z" fill="#FFD400" stroke="#17130F" stroke-width="5" stroke-linejoin="round"/>
+  <!-- open top rim -->
+  <ellipse cx="55" cy="44" rx="35" ry="7" fill="#E0B800" stroke="#17130F" stroke-width="3.5"/>
+  <path d="M 30 66 L 30 128 M 80 66 L 80 128" stroke="#E0B800" stroke-width="3.5" stroke-linecap="round" opacity="0.8"/>
+  <ellipse cx="38" cy="80" rx="10" ry="18" fill="#FFFFFF" opacity="0.3" transform="rotate(-8 38 80)"/>
 </svg>

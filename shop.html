@@ -245,10 +245,16 @@
   // they render crisply at any size, same approach as the dress-up
   // gallery preview -- an <img> pointing at an .svg works too, but inline
   // keeps this consistent with how the game itself will show these.
+  // Cosmetic art paths come from the DB (cosmetics.asset_path), not a
+  // <script>/<link> tag, so they don't get this repo's usual ?v=N bump on
+  // deploy -- append one here instead, bumped whenever the SVGs change,
+  // so a browser that already visited the shop doesn't keep serving a
+  // stale cached copy.
+  var ASSET_V = '?v=3';
   async function svgMarkup(path) {
     if (svgCache[path]) return svgCache[path];
     try {
-      var res = await fetch(path);
+      var res = await fetch(path + ASSET_V);
       var text = await res.text();
       svgCache[path] = text;
       return text;

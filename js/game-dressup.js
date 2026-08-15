@@ -86,7 +86,7 @@ function createDressupGame(words, callbacks, closet) {
     preload: function () {
       SLOTS.forEach(function (slot) {
         (closet[slot.key] || []).forEach(function (item) {
-          this.load.svg(item.id, item.asset_path + '?v=2', { width: slot.loadW, height: slot.loadH });
+          this.load.svg(item.id, item.asset_path + '?v=3', { width: slot.loadW, height: slot.loadH });
         }, this);
       }, this);
     },

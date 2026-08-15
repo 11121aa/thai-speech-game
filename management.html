@@ -828,7 +828,11 @@ async function loadEquippedCosmetics(profile) {
   if (!ids.length) return;
   var { data: rows, error } = await sb.from('cosmetics').select('id, asset_path').in('id', ids);
   if (error) { console.error('[avatar] failed to load equipped cosmetics art:', error); return; }
-  (rows || []).forEach(function (c) { equippedAssetById[c.id] = c.asset_path; });
+  // ?v=N bump: asset_path comes from the DB, not a <script>/<link> tag,
+  // so it doesn't get this repo's usual cache-bust on deploy -- append
+  // one here so a browser that already loaded this page doesn't keep
+  // showing a stale cached SVG after the art changes.
+  (rows || []).forEach(function (c) { equippedAssetById[c.id] = c.asset_path + '?v=3'; });
 }
 
 // Body proportions/coordinate space match the dress-up mini-game's
