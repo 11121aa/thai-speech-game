@@ -787,7 +787,7 @@ async function loadHwSelectorList() {
     return;
   }
   var { data } = await sb.from('homework_assignments')
-    .select('id, homework(id, name, repeat_count, homework_words(word_id, words(id, word, emoji, level, letter_category, image_url, sound_url, sounds(id, letter, mouth_animation_url))))')
+    .select('id, homework(id, name, repeat_count, homework_words(word_id, words(id, word, emoji, level, letter_category, image_url, sound_url, sounds(id, letter, mouth_animation_url, pronunciation_tip))))')
     .eq('patient_user_id', session.user.id)
     .order('assigned_at', { ascending: false });
   var allAssignments = data || [];
@@ -853,7 +853,7 @@ async function loadWorksheetSelectorList() {
     return;
   }
   var { data } = await sb.from('worksheets')
-    .select('id, name, repeat_count, worksheet_words(word_id, words(id, word, emoji, level, letter_category, image_url, sound_url, sounds(id, letter, mouth_animation_url)))')
+    .select('id, name, repeat_count, worksheet_words(word_id, words(id, word, emoji, level, letter_category, image_url, sound_url, sounds(id, letter, mouth_animation_url, pronunciation_tip)))')
     .order('created_at', { ascending: false });
   _worksheets = data || [];
 
