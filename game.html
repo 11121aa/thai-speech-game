@@ -115,6 +115,11 @@
           <span class="mode-title">ป้องกันฐาน</span>
           <span class="mode-desc">วางทหารป้องกันเส้นทาง ฝึกพูดคำก่อนแต่ละด่าน</span>
         </div>
+        <div class="game-mode-card" id="cardTetris">
+          <span class="mode-icon">🧩</span>
+          <span class="mode-title">เตตริส</span>
+          <span class="mode-desc">ต่อบล็อกให้เต็มแถว ฝึกพูดคำทุก 1,000 คะแนน</span>
+        </div>
       </div>
     </div>
 
@@ -166,6 +171,26 @@
                 ↓<br><small>หลัง</small>
               </button>
               <button class="pf-btn" id="cryBtnRight">→<br><small>ขวา</small></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Tetris: Phaser canvas + rotate/left/right/drop DOM buttons -->
+      <div id="tetrisGame" style="display:none;">
+        <div class="platformer-wrap">
+          <div id="tetrisCanvas" class="game-canvas-wrap"></div>
+          <div class="platformer-btns" style="flex-direction:column;gap:4px;align-items:center;justify-content:flex-end;">
+            <button class="pf-btn" id="tetBtnRotate"
+              style="background:rgba(39,174,96,0.88);border-color:rgba(39,174,96,0.95);color:#fff;">
+              ↻<br><small>หมุน</small>
+            </button>
+            <div style="display:flex;gap:4px;">
+              <button class="pf-btn" id="tetBtnLeft">←<br><small>ซ้าย</small></button>
+              <button class="pf-btn" id="tetBtnDrop"
+                style="background:rgba(231,76,60,0.82);border-color:rgba(231,76,60,0.95);color:#fff;">
+                ▼<br><small>ตกเลย</small>
+              </button>
+              <button class="pf-btn" id="tetBtnRight">→<br><small>ขวา</small></button>
             </div>
           </div>
         </div>
@@ -374,6 +399,7 @@
 <script src="js/game-cooking.js?v=10"></script>
 <script src="js/game-dressup.js?v=10"></script>
 <script src="js/game-towerdefense.js?v=1"></script>
+<script src="js/game-tetris.js?v=1"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -399,7 +425,7 @@ var G = {
    inside those containers to avoid doubling up). A single preloaded
    Audio element is reused (instead of `new Audio()` per click) so
    playback starts instantly instead of re-fetching/decoding every time. */
-var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame, #towerdefenseGame';
+var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame, #towerdefenseGame, #tetrisGame';
 var clickAudio = new Audio('soundeffect/Click.mp3');
 clickAudio.preload = 'auto';
 document.addEventListener('click', function (e) {
@@ -544,6 +570,7 @@ function finishGame(matchElapsedMs) {
   CookingGame.stop();
   DressupGame.stop();
   TowerDefenseGame.stop();
+  TetrisGame.stop();
 
   // Matching game is timed, not scored — lower is better, so it's tracked
   // and displayed separately from every other game's point-based scoring.
@@ -573,7 +600,7 @@ function finishGame(matchElapsedMs) {
     scoreToSave = G.pts;
   }
 
-  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', cooking:'ทำอาหาร 🌭', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹' };
+  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', cooking:'ทำอาหาร 🌭', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹', tetris:'เตตริส 🧩' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
   document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
 
@@ -586,7 +613,7 @@ function finishGame(matchElapsedMs) {
 }
 
 /* ── Leaderboard helpers ── */
-var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', cooking:'ทำอาหาร', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน' };
+var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', cooking:'ทำอาหาร', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน', tetris:'เตตริส' };
 
 async function saveGameScore(gameKey, score) {
   try {
@@ -671,7 +698,7 @@ var PRONOUNCE_COUNT_MIN = 1, PRONOUNCE_COUNT_MAX = 10;
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭', dressup: 'แต่งตัวตุ๊กตา 👗' };
+  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭', dressup: 'แต่งตัวตุ๊กตา 👗', towerdefense: 'ป้องกันฐาน 🏹', tetris: 'เตตริส 🧩' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
   // Reset to homework word-set / easy difficulty
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
@@ -988,11 +1015,12 @@ async function launchGame() {
     crossy:     'ข้ามถนน 🚗',
     cooking:    'ทำอาหาร 🌭',
     dressup:    'แต่งตัวตุ๊กตา 👗',
-    towerdefense: 'ป้องกันฐาน 🏹'
+    towerdefense: 'ป้องกันฐาน 🏹',
+    tetris:     'เตตริส 🧩'
   };
   document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
 
-  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame','towerdefenseGame'].forEach(function (id) {
+  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame','towerdefenseGame','tetrisGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
@@ -1016,9 +1044,10 @@ async function launchGame() {
     if (timerPill) timerPill.style.visibility = '';
     clearInterval(G.timerHandle);
     document.getElementById('hudTimer').textContent = '0';
-  } else if (G.mode === 'platformer' || G.mode === 'towerdefense') {
+  } else if (G.mode === 'platformer' || G.mode === 'towerdefense' || G.mode === 'tetris') {
     // No countdown — platformer ends on death, tower defense ends on
-    // win/lose (both handled inside the game itself via onFinish)
+    // win/lose, tetris ends when the stack tops out (all three handled
+    // inside the game itself via onFinish)
     if (timerPill) timerPill.style.visibility = 'hidden';
     clearInterval(G.timerHandle);
     G.timeLeft = 9999;
@@ -1052,6 +1081,9 @@ async function launchGame() {
   } else if (G.mode === 'towerdefense') {
     document.getElementById('towerdefenseGame').style.display = 'block';
     TowerDefenseGame.start(pool, GAME_CBS); // Phaser game (place troops, defend the base)
+  } else if (G.mode === 'tetris') {
+    document.getElementById('tetrisGame').style.display = 'block';
+    TetrisGame.start(pool, GAME_CBS);     // Phaser game (falling blocks, line-clear scoring)
   } else {
     document.getElementById('airplaneGame').style.display = 'block';
     AirplaneGame.start(pool, GAME_CBS);   // Phaser game
@@ -1074,6 +1106,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardCooking').addEventListener('click', function () { openSetup('cooking'); });
   document.getElementById('cardDressup').addEventListener('click', function () { openSetup('dressup'); });
   document.getElementById('cardTowerdefense').addEventListener('click', function () { openSetup('towerdefense'); });
+  document.getElementById('cardTetris').addEventListener('click', function () { openSetup('tetris'); });
 
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1122,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
     restoreTimerPill();
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop(); DressupGame.stop(); TowerDefenseGame.stop();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop(); DressupGame.stop(); TowerDefenseGame.stop(); TetrisGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });

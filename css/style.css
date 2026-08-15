@@ -834,6 +834,7 @@ a {
 #crossyCanvas.game-canvas-wrap      { aspect-ratio: 800 / 400; }
 #dressupGame.game-canvas-wrap       { aspect-ratio: 800 / 500; }
 #towerdefenseGame.game-canvas-wrap  { aspect-ratio: 800 / 500; cursor: pointer; }
+#tetrisCanvas.game-canvas-wrap      { aspect-ratio: 480 / 800; max-width: 480px; }
 
 /* ============ Finish screen ============ */
 .finish-screen {
