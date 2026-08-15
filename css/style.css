@@ -653,6 +653,21 @@ a {
   overflow-y: auto;
   box-shadow: var(--shadow-soft);
 }
+.setup-tutorial {
+  background: var(--color-bg-soft);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  margin-bottom: 1.2rem;
+  text-align: center;
+}
+.setup-tutorial-img {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto 0.5rem;
+  border-radius: var(--radius-md);
+}
+.setup-tutorial-desc { margin: 0; font-size: 0.88rem; color: var(--color-text-soft); }
 .setup-row { margin-bottom: 1.2rem; }
 .setup-row label { font-weight: 700; display: block; margin-bottom: 0.4rem; color: var(--color-text-soft); font-size: 0.9rem; }
 .diff-btns { display: flex; gap: 0.6rem; }

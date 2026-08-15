@@ -229,6 +229,11 @@
   <div class="setup-panel">
     <h4 class="mb-3">⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
 
+    <div class="setup-tutorial" id="setupTutorial">
+      <img id="tutorialImg" class="setup-tutorial-img" src="" alt="ตัวอย่างวิธีเล่น">
+      <p class="setup-tutorial-desc" id="tutorialDesc"></p>
+    </div>
+
     <div class="setup-row">
       <label>ชุดคำที่จะฝึก</label>
       <div class="diff-btns" id="hwDiffBtns">
@@ -696,10 +701,31 @@ var _worksheets = [], _selectedWorksheetId = null, _worksheetPool = [];
 var _pronounceCount = 1;
 var PRONOUNCE_COUNT_MIN = 1, PRONOUNCE_COUNT_MAX = 10;
 
+// ── Tutorial card shown at the top of the setup overlay, one entry per
+// game mode. `img` is a placeholder for every mode right now (a single
+// shared graphic) — swap each mode's `img` to a real screenshot/diagram
+// later; nothing else needs to change since openSetup() just reads
+// whatever path is here.
+var TUTORIAL_INFO = {
+  matching:     { img: 'img/tutorial/placeholder.svg', desc: 'พลิกไพ่จับคู่ภาพกับคำที่ตรงกัน จับคู่ถูกจะได้ฝึกออกเสียงคำนั้น จับคู่ให้ครบให้เร็วที่สุด!' },
+  shooting:     { img: 'img/tutorial/placeholder.svg', desc: 'เล็งปืนใหญ่ไปที่เป้า แล้วแตะหน้าจอเพื่อยิง ยิงโดนเป้าแล้วฝึกออกเสียงคำ' },
+  airplane:     { img: 'img/tutorial/placeholder.svg', desc: 'แตะซ้าย-ขวาเพื่อสลับเลนเครื่องบิน เก็บเหรียญและคำศัพท์ หลบสิ่งกีดขวาง' },
+  flashcard:    { img: 'img/tutorial/placeholder.svg', desc: 'ดูภาพแล้วเลือกคำที่ตรงกับภาพจาก 3 ตัวเลือก เลือกถูกแล้วฝึกออกเสียงคำนั้น' },
+  platformer:   { img: 'img/tutorial/placeholder.svg', desc: 'กระโดดข้ามหลุมและหนาม สไลด์ลอดใต้สิ่งกีดขวาง เก็บคำศัพท์ระหว่างทางเพื่อฝึกออกเสียง' },
+  crossy:       { img: 'img/tutorial/placeholder.svg', desc: 'พาตัวละครข้ามถนน หลบรถที่วิ่งไปมา ถึงจุดหมายเพื่อฝึกออกเสียงคำ' },
+  cooking:      { img: 'img/tutorial/placeholder.svg', desc: 'หั่น สับ ประกอบวัตถุดิบทำอาหารตามขั้นตอน ฝึกออกเสียงคำศัพท์ระหว่างทำ' },
+  dressup:      { img: 'img/tutorial/placeholder.svg', desc: 'เลือกของแต่งตัวจากตู้เสื้อผ้า ฝึกออกเสียงคำให้ถูกต้องก่อนจึงจะใส่ได้' },
+  towerdefense: { img: 'img/tutorial/placeholder.svg', desc: 'วางทหารป้องกันเส้นทางไม่ให้ศัตรูเดินถึงฐาน แตะการ์ดทหารแล้วแตะช่องว่างเพื่อวาง แตะทหารที่วางแล้วเพื่อดูสถานะและอัพเกรด' },
+  tetris:       { img: 'img/tutorial/placeholder.svg', desc: 'บังคับบล็อกที่ตกลงมาให้เรียงเต็มแถว แถวที่เต็มจะหายไปและได้คะแนน ฝึกออกเสียงคำทุก 1,000 คะแนน' }
+};
+
 function openSetup(mode) {
   _setupMode = mode;
   var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭', dressup: 'แต่งตัวตุ๊กตา 👗', towerdefense: 'ป้องกันฐาน 🏹', tetris: 'เตตริส 🧩' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
+  var tut = TUTORIAL_INFO[mode];
+  document.getElementById('tutorialImg').src = tut ? tut.img : '';
+  document.getElementById('tutorialDesc').textContent = tut ? tut.desc : '';
   // Reset to homework word-set / easy difficulty
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
   document.querySelector('#hwDiffBtns .diff-btn[data-diff="hw"]').classList.add('active');
