@@ -1,11 +1,11 @@
 // ============================================================
-//  DRESS-UP GAME — Phaser 3  (free-play closet, try on anything)
+//  DRESS-UP GAME — Phaser 3  (browse the whole closet, pronounce to wear)
 // ============================================================
 //  POLISH GUIDE (search for the label to find where to edit):
-//    [TUNE]    Points per slot, avatar position       (~line 15)
-//    [SLOTS]   Clothing slots + labels                 (~SLOTS array)
-//    [AVATAR]  Body base + clothing sprite overlays    (~drawAvatar / buildPieceImages)
-//    [CLOSET]  Slot tabs + tappable item grid           (~buildClosetPanel / renderItemGrid)
+//    [TUNE]    Points per equip, avatar position        (~line 15)
+//    [SLOTS]   Clothing slots + labels                  (~SLOTS array)
+//    [AVATAR]  Body base + clothing sprite overlays     (~drawAvatar / buildPieceImages)
+//    [CLOSET]  Slot tabs + tappable item grid            (~buildClosetPanel / renderItemGrid)
 //  Clothing art itself lives in img/dressup/*.svg (and img/dressup/doll/)
 //  — edit those files directly to restyle a piece; the shop's cosmetics
 //  catalog (supabase/coin_shop_migration.sql) is what maps each file to
@@ -14,24 +14,26 @@
 //  How the game works:
 //    - This mini-game is independent of the shop and coin ownership --
 //      every cosmetic in the whole catalog (both art styles, 10 designs
-//      per slot) is free to try on here, for fun/practice. It has
-//      nothing to do with what's actually bought or worn on your
-//      persistent profile avatar (that's shop.html + management.html).
-//    - Every slot (hat/shirt/pants/shoes/bag) auto-equips a starting
-//      piece, earning a one-time bonus per slot for the session.
-//    - Tap a slot's tab (hat/shirt/pants/shoes/bag) to see every design
-//      for it as real thumbnail art (sticker style top row, doll style
-//      bottom row), then tap any card to wear it — pure browsing after
-//      the initial bonus, no extra points.
+//      per slot) can be BROWSED here regardless of what's actually owned.
+//      It has nothing to do with what's bought or worn on your persistent
+//      profile avatar (that's shop.html + management.html) -- picking
+//      something here never touches ownership, coins, or the profile's
+//      equipped_* columns.
+//    - The avatar starts bare. Tap a slot's tab (hat/shirt/pants/shoes/bag)
+//      to see every design for it as real thumbnail art (sticker style top
+//      row, doll style bottom row), then tap a card to try to wear it --
+//      that opens the shared pronunciation practice popup first. Only once
+//      the popup closes does the piece actually go on (+points), same
+//      "act now, say the word, then it counts" flow every other game in
+//      this app uses for its own success moment.
 //    - Nothing to "finish" here — the round just runs until the shared
 //      HUD countdown timer ends it, like the timer-driven games.
 // ============================================================
 
 // createDressupGame is called with:
-//   words     = array of word objects (kept for signature compatibility
-//               with DressupGame.start(words, cbs); unused now that this
-//               is free play rather than practice-gated unlocks)
-//   callbacks = { onPoints, onFinish, onTime }
+//   words     = array of word objects -- cycled through one at a time as
+//               the practice word gating each equip attempt
+//   callbacks = { onPoints, onPractice, onFinish, onTime }
 //   closet    = { hat:[...], shirt:[...], pants:[...], shoes:[...], bag:[...] }
 //               every cosmetic for that slot (both styles) -- the whole
 //               catalog, not just what's owned -- each entry
@@ -40,7 +42,7 @@
 function createDressupGame(words, callbacks, closet) {
 
   // ── [TUNE] Numbers you can change ────────────────────────────
-  var PTS_PER_SLOT = 20;  // one-time bonus for equipping anything in a slot this session
+  var PTS_PER_EQUIP = 20; // points awarded each time a practice popup closes and a piece goes on
   var W = 800, H = 500;   // canvas size in pixels
   // Avatar anchor point (base of the torso). AY needs enough headroom
   // above it that the hat -- anchored bottom-up at AY-206 with a fixed
@@ -79,11 +81,13 @@ function createDressupGame(words, callbacks, closet) {
     initialize: function () {
       Phaser.Scene.call(this, { key: 'dressup' });
       this.avatarGfx    = null;
-      this.pieceImgs    = {};   // slotKey -> Image (only created for slots you own something in)
-      this.selectedIdx  = {};   // slotKey -> index into closet[slotKey] currently worn
+      this.pieceImgs    = {};   // slotKey -> Image (only created for slots the catalog has designs for)
+      this.selectedIdx  = {};   // slotKey -> index into closet[slotKey] currently worn (unset = bare)
       this.activeSlot   = null; // which slot's cards are shown in the grid right now
       this.tabIcons     = {};   // slotKey -> {x, w} for hit-testing/redrawing tabs
       this.gridCards    = [];   // GameObjects for the current grid -- destroyed/rebuilt on slot switch
+      this.wordIdx      = 0;    // cycles through `words` for each equip attempt's practice popup
+      this.isPaused     = false; // true while a practice popup is open -- blocks new taps underneath
     },
 
     // Loads one texture per catalog cosmetic (every design, regardless of
@@ -110,11 +114,7 @@ function createDressupGame(words, callbacks, closet) {
       // trip, then a setTimeout) with no user-gesture trace left by the
       // time it runs, so resuming here would silently no-op on strict
       // mobile autoplay policies -- resuming only actually works inside a
-      // genuine, fresh pointerdown, so that's done for every tap below
-      // (the very first auto-equip's "bonus" sound plays before any tap
-      // has happened, so it may still be silently dropped once on some
-      // browsers -- same tradeoff every other automatic/ambient sound in
-      // this codebase already has, not specific to this fix).
+      // genuine, fresh pointerdown, so that's done for every tap below.
       this.input.on('pointerdown', function () {
         if (self.sound.context && self.sound.context.state !== 'running') self.sound.context.resume();
       });
@@ -149,28 +149,9 @@ function createDressupGame(words, callbacks, closet) {
         return;
       }
 
-      // Auto-equip the best-owned piece per slot and award the one-time
-      // session bonus for each slot that had anything to equip. The FIRST
-      // one equips immediately, synchronously, before buildClosetPanel()
-      // below -- that's what lets the very first grid render already show
-      // the right card highlighted as worn. The rest stagger in afterward
-      // purely for a "the outfit assembles piece by piece" visual beat;
-      // by the time a player switches to one of those tabs the equip has
-      // long since landed, so the ordering guarantee only matters for the
-      // slot shown first.
-      var equipSlots = SLOTS.filter(function (slot) { return (closet[slot.key] || []).length > 0; });
-      var POPUP_Y = { hat: AY - 220, shirt: AY - 110, pants: AY - 20, shoes: AY + 70, bag: AY - 70 };
-      function bonusEquip(slot) {
-        self.equipSlot(slot.key, 0, false);
-        callbacks.onPoints(PTS_PER_SLOT);
-        self.sfxBonus.play();
-        var px = slot.key === 'bag' ? AX + 70 : AX + 60;
-        self.popText(px, POPUP_Y[slot.key] || AY, '+' + PTS_PER_SLOT + ' ⭐', '#F0A500');
-      }
-      equipSlots.forEach(function (slot, i) {
-        if (i === 0) bonusEquip(slot);
-        else this.time.delayedCall(i * 160, function () { bonusEquip(slot); });
-      }, this);
+      // Popup position per slot for requestEquip()'s point pop-text --
+      // roughly where that slot's piece actually sits on the avatar.
+      this.popupY = { hat: AY - 220, shirt: AY - 110, pants: AY - 20, shoes: AY + 70, bag: AY - 70 };
 
       this.buildClosetPanel();
     },
@@ -209,8 +190,9 @@ function createDressupGame(words, callbacks, closet) {
     // the plain body drawn in drawAvatar() and stacked in the order that
     // looks right on the body (pants/shoes first, shirt over the torso,
     // bag over the shirt, hat last on top). Every slot always has a full
-    // catalog now, so every slot gets an Image (starting on its first
-    // design, per the auto-equip in create()).
+    // catalog now, so every slot gets an Image -- created hidden
+    // (setVisible(false)) since the avatar starts bare; equipSlot() shows
+    // it once the player actually wins that slot's practice popup.
     // Sizes/positions are derived from the plain body's own geometry in
     // drawAvatar() (legs span AX-38..AX+38 / AY-40..AY+50, feet ellipses
     // sit at AY+49..AY+67, torso spans AY-120..AY-30, head circle is
@@ -271,9 +253,10 @@ function createDressupGame(words, callbacks, closet) {
     },
 
     // ── [CLOSET] A tab per slot (hat/shirt/pants/shoes/bag) above a grid
-    // of tappable cards showing every item you own in that slot -- tap a
-    // card to wear it. The card itself shows the real thumbnail art, so
-    // there's no guessing what a name means before picking it.
+    // of tappable cards showing every design the catalog has for it --
+    // tap a card to try to wear it (see requestEquip). The card itself
+    // shows the real thumbnail art, so there's no guessing what a name
+    // means before picking it.
     buildClosetPanel: function () {
       var self = this;
       this.tabBg = this.add.graphics();
@@ -289,7 +272,7 @@ function createDressupGame(words, callbacks, closet) {
         var hit = this.add.rectangle(tx, ty, tabW - 8, TAB_H, 0x000000, 0)
           .setInteractive({ useHandCursor: true });
         hit.on('pointerdown', function () {
-          if (slot.key === self.activeSlot) return;
+          if (self.isPaused || slot.key === self.activeSlot) return;
           self.sfxTab.play();
           self.pressRipple(tx, ty);
           self.selectSlot(slot.key);
@@ -377,10 +360,9 @@ function createDressupGame(words, callbacks, closet) {
           var hit = self.add.rectangle(cx, cy, CARD_W, CARD_H, 0x000000, 0)
             .setInteractive({ useHandCursor: true });
           hit.on('pointerdown', function () {
-            if (self.selectedIdx[self.activeSlot] === idx) return; // already worn
+            if (self.isPaused || self.selectedIdx[self.activeSlot] === idx) return; // already worn, or a practice popup is already open
             self.pressRipple(cx, cy);
-            self.equipSlot(self.activeSlot, idx);
-            self.renderItemGrid();
+            self.requestEquip(self.activeSlot, idx);
           });
 
           self.gridCards.push(bg, thumb, name, rarity, hit);
@@ -388,11 +370,34 @@ function createDressupGame(words, callbacks, closet) {
       });
     },
 
-    // Puts item index `idx` of a slot's owned list onto the avatar --
-    // used for the initial auto-equip (playSound=false, since that path
-    // plays its own distinct "bonus" sound + popup instead) and every
-    // card tap afterward (playSound defaults true).
-    equipSlot: function (slotKey, idx, playSound) {
+    // Gates actually wearing an item behind the shared pronunciation
+    // practice popup -- tapping a card doesn't equip it directly; it opens
+    // practice for the next word in the pool, and only once that popup
+    // closes (correct or skipped, same as every other game's success
+    // moment in this app) does equipSlot() run and points get awarded.
+    // Re-picking the currently-worn item is already blocked by the
+    // caller (renderItemGrid's pointerdown handler), so every call here
+    // is a genuine change of what's worn in that slot.
+    requestEquip: function (slotKey, idx) {
+      if (this.isPaused) return;
+      var self = this;
+      if (!words || !words.length) { this.equipSlot(slotKey, idx); return; } // no pool to practice from -- fall back to a direct equip
+      this.isPaused = true;
+      var word = words[this.wordIdx++ % words.length];
+      callbacks.onPractice(word, null, function () {
+        self.isPaused = false;
+        self.equipSlot(slotKey, idx);
+        callbacks.onPoints(PTS_PER_EQUIP);
+        self.sfxBonus.play();
+        var px = slotKey === 'bag' ? AX + 70 : AX + 60;
+        self.popText(px, self.popupY[slotKey] || AY, '+' + PTS_PER_EQUIP + ' ⭐', '#F0A500');
+        self.renderItemGrid();
+      });
+    },
+
+    // Puts item index `idx` of a slot's catalog list onto the avatar.
+    // Only ever called from requestEquip() once its practice popup closes.
+    equipSlot: function (slotKey, idx) {
       var items = closet[slotKey] || [];
       if (!items.length) return;
       this.selectedIdx[slotKey] = idx;
@@ -402,7 +407,7 @@ function createDressupGame(words, callbacks, closet) {
       img.setTexture(item.id).setVisible(true);
       img.setScale(0.9);
       this.tweens.add({ targets: img, scaleX: 1, scaleY: 1, duration: 180, ease: 'Back.Out' });
-      if (playSound !== false) this.sfxEquip.play();
+      this.sfxEquip.play();
     }
   });
 
