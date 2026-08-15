@@ -987,6 +987,7 @@ a {
   padding: 0.5rem;
   font-size: 0.78rem;
   color: var(--color-text-soft);
+  overflow-y: auto;
 }
 .mouth-diagram-box .mouth-diagram-icon {
   font-size: 2.4rem;

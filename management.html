@@ -596,6 +596,10 @@
                 <button type="submit" class="btn btn-warning btn-bouncy" id="soundSubmitBtn">เพิ่มหมวดเสียง</button>
                 <button type="button" class="btn btn-outline-secondary" id="soundCancelEditBtn" style="display:none;">ยกเลิก</button>
               </div>
+              <div class="col-md-12">
+                <label class="form-label fw-semibold">คำอธิบายวิธีออกเสียง</label>
+                <textarea class="form-control" id="soundDescription" rows="2" maxlength="120" placeholder="เช่น ห่อปากกลม แตะปลายลิ้นที่เพดานปาก แล้วปล่อยลมออก (สั้นๆ จะแสดงผลได้ดีกว่า)"></textarea>
+              </div>
             </form>
           </div>
           <div class="soft-card">
@@ -1647,6 +1651,7 @@ function fillSoundForm(s) {
   document.getElementById('soundLetter').value = s.letter;
   document.getElementById('soundAnimationPreview').innerHTML = s.mouth_animation_url
     ? '<img src="' + s.mouth_animation_url + '" style="height:48px;border-radius:6px;" alt="">' : '';
+  document.getElementById('soundDescription').value = s.pronunciation_tip || '';
   document.getElementById('soundFormTitle').textContent = 'แก้ไขหมวดเสียง';
   document.getElementById('soundSubmitBtn').textContent = 'บันทึก';
   document.getElementById('soundCancelEditBtn').style.display = 'inline-block';
@@ -1675,7 +1680,7 @@ async function onSoundSubmit(e) {
   var btn = document.getElementById('soundSubmitBtn');
   btn.disabled = true;
   try {
-    var payload = { letter: letter };
+    var payload = { letter: letter, pronunciation_tip: document.getElementById('soundDescription').value.trim() || null };
     if (file) {
       var ext = (file.name.split('.').pop() || 'gif').toLowerCase();
       var path = 'sounds/' + letter + '-' + Date.now() + '.' + ext;

@@ -61,10 +61,6 @@ const PracticePanel = (function () {
     }
   }
 
-  function mouthInfoFor(word) {
-    return null;
-  }
-
   // Shared word-display setup (picture, title, mouth animation) used by
   // both the single-rep flow (open) and the multi-rep flow (openMultiRep).
   function setupWordDisplay(word) {
@@ -98,17 +94,16 @@ const PracticePanel = (function () {
       }
     }
 
-    // Picture/icon box: only shown when no animation
-    const mouth = mouthInfoFor(word);
+    // Pronunciation description box: teacher-written text on the sound,
+    // shown alongside the animation/camera boxes (not mutually exclusive).
+    const tip = word.sounds && word.sounds.pronunciation_tip;
     const diag = el("ppMouthDiagram");
-    if (animSvg || !mouth) {
-      diag.style.display = "none";
-    } else if (mouth.imageUrl) {
+    if (tip) {
       diag.style.display = "flex";
-      diag.innerHTML = '<img src="' + mouth.imageUrl + '" alt="ภาพปาก" style="width:100%;height:100%;object-fit:contain;border-radius:12px;" onerror="this.parentNode.style.display=\'none\'">';
+      diag.textContent = tip;
     } else {
-      diag.style.display = "flex";
-      diag.innerHTML = '<div class="mouth-diagram-icon">' + mouth.icon + "</div><div>" + mouth.label + "</div>";
+      diag.style.display = "none";
+      diag.textContent = "";
     }
   }
 

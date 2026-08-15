@@ -5,7 +5,7 @@ const WordsApi = (function () {
     if (!sb) return [];
     const { data, error } = await sb
       .from("words")
-      .select("*, sounds(id, letter, mouth_animation_url)")
+      .select("*, sounds(id, letter, mouth_animation_url, pronunciation_tip)")
       .order("letter_category", { ascending: true });
     if (error) { console.error(error); return []; }
     return data || [];
