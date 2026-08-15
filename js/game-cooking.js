@@ -7,8 +7,15 @@
 function createCookingGame(words, callbacks) {
   var VW = 480, VH = 800;
 
-  /* ── State machine ─────────────────────────────────────── */
-  var S = { SEL:0, BUN:1, BUN_R:2, TOM:3, TOM_R:4, CAB:5, CAB_R:6, SAU:7, SAU_R:8, CMB:9, CMB_R:10, FIN:11 };
+  /* ── State machine ─────────────────────────────────────────
+     Hot Dog uses 0-11, Pizza 100s, Breakfast 200s -- disjoint ranges so
+     G.st can never accidentally match a different dish's state while
+     only one dish's screens/logic are actually meant to be reachable
+     (see the DISHES registry below, and drawSel()/onDown's S.SEL
+     branch, for how a dish is picked). ── */
+  var S  = { SEL:0, BUN:1, BUN_R:2, TOM:3, TOM_R:4, CAB:5, CAB_R:6, SAU:7, SAU_R:8, CMB:9, CMB_R:10, FIN:11 };
+  var SP = { DOUGH:100, DOUGH_R:101, SAUCE:102, SAUCE_R:103, CHEESE:104, CHEESE_R:105, TOPPING:106, TOPPING_R:107, BAKE:108, BAKE_R:109, FIN:110 };
+  var SB = { EGG:200, EGG_R:201, BACON:202, BACON_R:203, TOAST:204, TOAST_R:205, PLATE:206, PLATE_R:207, FIN:208 };
 
   /* ── Colours ───────────────────────────────────────────── */
   var C = {
@@ -71,6 +78,60 @@ function createCookingGame(words, callbacks) {
   STEP_IDX[S.BUN_R]=0; STEP_IDX[S.TOM_R]=1; STEP_IDX[S.CAB_R]=2;
   STEP_IDX[S.SAU_R]=3; STEP_IDX[S.CMB_R]=4;
 
+  /* ── Pizza layout + steps ─────────────────────────────────────
+     DOUGH is the only step where the pizza's radius is actually
+     interactive (drag-to-stretch); every later step just displays it at
+     a fixed PZ_DISPLAY_R regardless of what the player stretched it to
+     -- G.doughFinal/G.doughR only ever feed the DOUGH step's own score,
+     never the layout math of later screens. Keeps SAUCE/CHEESE/TOPPING/
+     BAKE/FIN geometry fixed and simple instead of every one of them
+     needing to re-derive safe layout bounds from a variable radius. ── */
+  var PZ_CX=VW/2, PZ_CY=380, PZ_R_MIN=60, PZ_R_TARGET=150, PZ_R_MAX=185, PZ_R_TORN=210;
+  var PZ_DISPLAY_R=130;
+  var CHEESE_TAPS_NEEDED=32, SAUCE_DUR=8000;
+  var TOPPING_LIST=['pepperoni','mushroom','pepperoni','olive','pepperoni','mushroom'];
+  var TOPPING_LABELS={pepperoni:'เปปเปอโรนี', mushroom:'เห็ด', olive:'มะกอก'};
+  // Fixed decorative landing spots on the pizza (not the tap-timing
+  // position itself, which only drives the score) -- keeps toppings
+  // scattered readably instead of stacking on top of each other.
+  var TOPPING_SPOTS=[{dx:-45,dy:-30},{dx:40,dy:-35},{dx:-55,dy:15},{dx:50,dy:20},{dx:-15,dy:50},{dx:25,dy:-5}];
+  var BAKE_DUR=6000, BAKE_GOOD=[0.55,0.78]; // fraction-of-duration "perfectly baked" window
+  var PIZZA_STEPS=[
+    {icon:'🫓',lbl:'1.แป้ง', states:[SP.DOUGH,SP.DOUGH_R]},
+    {icon:'🍅',lbl:'2.ซอส', states:[SP.SAUCE,SP.SAUCE_R]},
+    {icon:'🧀',lbl:'3.ชีส', states:[SP.CHEESE,SP.CHEESE_R]},
+    {icon:'🍕',lbl:'4.หน้า', states:[SP.TOPPING,SP.TOPPING_R]},
+    {icon:'🔥',lbl:'5.อบ',  states:[SP.BAKE,SP.BAKE_R,SP.FIN]},
+  ];
+  var PIZZA_STEP_IDX={};
+  PIZZA_STEP_IDX[SP.DOUGH_R]=0; PIZZA_STEP_IDX[SP.SAUCE_R]=1; PIZZA_STEP_IDX[SP.CHEESE_R]=2;
+  PIZZA_STEP_IDX[SP.TOPPING_R]=3; PIZZA_STEP_IDX[SP.BAKE_R]=4;
+
+  /* ── Breakfast layout + steps ──────────────────────────────── */
+  var EGG_CX=VW/2, EGG_CY=380, EGG_R=100, EGG_TAPS_NEEDED=8, EGG_DUR=6000;
+  var BC_TOP=210, BC_BOT=560, BC_CUT_TY=[330,470], BC_KX=VW/2+120;
+  var TOAST_DUR=5000, TOAST_GOOD=[0.5,0.75];
+  var PLATE_LIST=['egg','bacon','toast'];
+  var PLATE_LABELS={egg:'ไข่ดาว', bacon:'เบคอน', toast:'ขนมปังปิ้ง'};
+  var BREAKFAST_STEPS=[
+    {icon:'🥚',lbl:'1.ไข่',    states:[SB.EGG,SB.EGG_R]},
+    {icon:'🥓',lbl:'2.เบคอน', states:[SB.BACON,SB.BACON_R]},
+    {icon:'🍞',lbl:'3.ปิ้ง',   states:[SB.TOAST,SB.TOAST_R]},
+    {icon:'🍽️',lbl:'4.จัดจาน',states:[SB.PLATE,SB.PLATE_R,SB.FIN]},
+  ];
+  var BREAKFAST_STEP_IDX={};
+  BREAKFAST_STEP_IDX[SB.EGG_R]=0; BREAKFAST_STEP_IDX[SB.BACON_R]=1;
+  BREAKFAST_STEP_IDX[SB.TOAST_R]=2; BREAKFAST_STEP_IDX[SB.PLATE_R]=3;
+
+  // Looked up by dish key wherever behaviour needs to branch by dish
+  // (step bar, word-practice cycling, food-select routing) instead of
+  // repeating the same three-way if/else in every one of those places.
+  var DISHES={
+    hotdog:    { steps:STEPS,           stepIdx:STEP_IDX,           first:S.BUN   },
+    pizza:     { steps:PIZZA_STEPS,     stepIdx:PIZZA_STEP_IDX,     first:SP.DOUGH},
+    breakfast: { steps:BREAKFAST_STEPS, stepIdx:BREAKFAST_STEP_IDX, first:SB.EGG  }
+  };
+
   /* ── Game state ────────────────────────────────────────── */
   var G;
   // Every screen change goes through this (instead of assigning G.st
@@ -80,7 +141,9 @@ function createCookingGame(words, callbacks) {
   function setState(s){ G.st=s; G.stAt=sc?sc.time.now:0; }
   function resetG(){
     G={
-      st:S.SEL, stAt:0, scores:{bun:0,tom:0,cab:0,sau:0,cmb:0}, total:0,
+      st:S.SEL, stAt:0, dish:null,
+      scores:{bun:0,tom:0,cab:0,sau:0,cmb:0, dough:0,sauce:0,cheese:0,topping:0,bake:0, egg:0,bacon:0,toast:0,plate:0},
+      total:0,
       cutting:false, pts:[], split:false, topPiece:[], botPiece:[],
       ing:'tom', taps:0, choppedCount:0,
       chopRun:false, chopDone:false, chopStart:0,
@@ -92,6 +155,20 @@ function createCookingGame(words, callbacks) {
       tapFx:null,    // {x, y, startedAt} -- ripple drawn at the last successful button tap
       chopPunch:0, starPunch:0, lastStarN:0, cutAt:[],
       confetti:null, confettiStart:0,
+
+      // ── Pizza ──
+      doughDragging:false, doughR:0, doughFinal:0, doughDone:false,
+      sauceRun:false, sauceStart:0, sauceDone:false, sauceCells:[false,false,false,false,false,false],
+      cheeseTaps:0, cheeseCount:0, cheeseRun:false, cheeseDone:false, cheeseStart:0,
+      cheesePunch:0, cheeseFinalPct:0,
+      toppingIdx:0, toppingX:VW/2, toppingDir:1, toppingSpd:3.2, toppingDropped:[], toppingAllDone:false,
+      bakeRun:false, bakeStart:0, bakeDone:false, bakeVal:0, bakeTapVal:0,
+
+      // ── Breakfast ──
+      eggTaps:0, eggCracks:0, eggRun:false, eggDone:false, eggStart:0, eggPunch:0,
+      baconY:260, baconDir:1, baconSpd:2.6, baconCuts:0, baconSc:[], baconCutY:[], baconAt:[],
+      toastRun:false, toastStart:0, toastDone:false, toastVal:0, toastTapVal:0,
+      plateIdx:0, plateX:VW/2, plateDir:1, plateSpd:3.2, plateDropped:[], plateAllDone:false,
     };
   }
   resetG();
@@ -431,28 +508,6 @@ function createCookingGame(words, callbacks) {
     }
     ctx.restore();
   }
-  function sIngLayer(ing,cx,cy,w){
-    ctx.save();
-    if(ing==='tom'||ing==='tomato'){
-      ctx.fillStyle=C.tom; ctx.beginPath(); ctx.ellipse(cx,cy,w/2,11,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='rgba(255,220,200,.55)';
-      [-22,0,22].forEach(function(dx){ctx.beginPath();ctx.ellipse(cx+dx,cy,4,8,0,0,Math.PI*2);ctx.fill();});
-      ctx.strokeStyle=C.outline; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(cx,cy,w/2,11,0,0,Math.PI*2); ctx.stroke();
-    }else if(ing==='cab'||ing==='cabbage'){
-      ctx.fillStyle=C.cab; ctx.beginPath(); ctx.ellipse(cx,cy,w/2+8,8,0,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle=C.cabD; ctx.lineWidth=1.5;
-      for(var i=-3;i<=3;i++){ctx.beginPath();ctx.moveTo(cx-w/2,cy+i*2.5);ctx.quadraticCurveTo(cx,cy+i*2.5-3,cx+w/2,cy+i*2.5);ctx.stroke();}
-      ctx.strokeStyle=C.outline; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(cx,cy,w/2+8,8,0,0,Math.PI*2); ctx.stroke();
-    }else{
-      ctx.fillStyle=C.sau; ctx.beginPath(); ctx.ellipse(cx,cy,w/2-8,18,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle=C.sauL; ctx.beginPath(); ctx.ellipse(cx-14,cy-6,11,5,-0.2,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle=C.outline; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(cx,cy,w/2-8,18,0,0,Math.PI*2); ctx.stroke();
-    }
-    ctx.restore();
-  }
   // Coloured to match the red-handled utensils hanging in img/cooking/bg.jpg
   // (dark-red base, lighter red grip band, silver blade) instead of the
   // previous grey/brown that didn't relate to the rest of the scene.
@@ -474,12 +529,232 @@ function createCookingGame(words, callbacks) {
     ctx.restore();
   }
 
-  /* ── Step bar ──────────────────────────────────────────────── */
-  function curStep(){for(var i=0;i<STEPS.length;i++)if(STEPS[i].states.indexOf(G.st)>=0)return i;return -1;}
+  /* ── Pizza: dough / sauce / cheese / toppings ────────────────
+     Sauce and cheese both reveal over the SAME 6-cell grid used for
+     chopping (vegCellRect/VEG_CELLS) -- sauce marks a cell "painted" as
+     the drag passes over it, cheese reveals cells by tap count, same
+     shape as sTomato/sCabbage's chop reveal just re-themed. ── */
+  function sDoughRaw(cx,cy,r){
+    ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    ctx.fillStyle='#F3DCA6';
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.fillStyle='rgba(255,255,255,.3)';
+    ctx.beginPath(); ctx.ellipse(cx-r*.25,cy-r*.3,r*.2,r*.13,-0.4,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  function sDoughDisc(cx,cy,r,torn){
+    ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    ctx.fillStyle=torn?'#E8C989':'#F3DCA6';
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.strokeStyle='#D8A857'; ctx.lineWidth=10;
+    ctx.beginPath(); ctx.arc(cx,cy,r-6,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.35)';
+    ctx.beginPath(); ctx.ellipse(cx-r*.3,cy-r*.3,r*.22,r*.14,-0.5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  function sSauceLayer(cx,cy,r,cells){
+    ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r-8,0,Math.PI*2); ctx.clip();
+    for(var i=0;i<VEG_CELLS;i++){
+      if(!cells[i])continue;
+      var c=vegCellRect(cx,cy,r,i);
+      ctx.fillStyle='rgba(196,42,32,.5)'; ctx.fillRect(c.x,c.y,c.w,c.h);
+      ctx.fillStyle='rgba(255,150,140,.25)';
+      ctx.beginPath(); ctx.ellipse(c.cx-c.w*.15,c.cy-c.h*.1,c.w*.18,c.h*.12,0,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // Deterministic dot offsets (not Math.random()) -- randomising inside a
+  // function redrawn every frame would make the shreds flicker to a new
+  // position 60 times a second instead of looking like settled cheese.
+  var CHEESE_DOTS=[[.18,.22],[.55,.15],[.32,.55],[.72,.6],[.14,.78],[.62,.82]];
+  function sCheeseLayer(cx,cy,r,pct){
+    var revealed=Math.round((pct||0)*VEG_CELLS);
+    if(revealed<=0)return;
+    ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r-8,0,Math.PI*2); ctx.clip();
+    for(var i=0;i<revealed;i++){
+      var c=vegCellRect(cx,cy,r,i);
+      CHEESE_DOTS.forEach(function(d){
+        ctx.fillStyle='#FCE7A3';
+        ctx.beginPath(); ctx.ellipse(c.x+d[0]*c.w,c.y+d[1]*c.h,4,2.4,0.3,0,Math.PI*2); ctx.fill();
+      });
+    }
+    ctx.restore();
+  }
+  function sTopping(kind,x,y){
+    ctx.save();
+    if(kind==='pepperoni'){
+      ctx.fillStyle='#C0392B'; ctx.beginPath(); ctx.arc(x,y,16,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#8F2419';
+      [[-.3,-.2],[.25,.1],[-.05,.35]].forEach(function(p){ctx.beginPath();ctx.arc(x+p[0]*16,y+p[1]*16,2.5,0,Math.PI*2);ctx.fill();});
+      ctx.strokeStyle=C.outline; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,16,0,Math.PI*2); ctx.stroke();
+    }else if(kind==='mushroom'){
+      ctx.fillStyle='#EFE0C8'; ctx.beginPath(); ctx.ellipse(x,y,14,10,0,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#C7B48A'; ctx.lineWidth=1.5;
+      for(var i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(x-12,y+i*3);ctx.lineTo(x+12,y+i*3);ctx.stroke();}
+      ctx.strokeStyle=C.outline; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(x,y,14,10,0,0,Math.PI*2); ctx.stroke();
+    }else{
+      ctx.fillStyle='#3D3226'; ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#1a1510'; ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle=C.outline; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* ── Breakfast: egg / bacon / toast / plate ──────────────────── */
+  function sEggWhole(cx,cy,r){
+    ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    ctx.fillStyle='#FBF3E3';
+    ctx.beginPath(); ctx.ellipse(cx,cy,r*0.78,r,0,0,Math.PI*2); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.fillStyle='rgba(255,255,255,.4)';
+    ctx.beginPath(); ctx.ellipse(cx-r*.25,cy-r*.35,r*.18,r*.28,-0.4,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(cx,cy,r*0.78,r,0,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  // Deterministic crack segments (relative to cx,cy,r), revealed one at a
+  // time by tap count -- same "no Math.random() in a per-frame draw"
+  // reasoning as CHEESE_DOTS above.
+  var EGG_CRACK_LINES=[
+    [[-.3,-.6],[-.15,-.2],[-.35,.1]],
+    [[.25,-.65],[.35,-.25],[.15,.05]],
+    [[-.1,.5],[.1,.75]],
+    [[.4,.3],[.55,.55]],
+    [[-.5,-.15],[-.6,.2]],
+    [[.05,-.3],[-.05,.0]],
+    [[.5,-.05],[.4,.25]]
+  ];
+  function sEggCracked(cx,cy,r,tapCount){
+    sEggWhole(cx,cy,r);
+    var n=Math.min(EGG_CRACK_LINES.length,tapCount);
+    ctx.save();
+    ctx.strokeStyle='#B99A6A'; ctx.lineWidth=2; ctx.lineJoin='round';
+    for(var i=0;i<n;i++){
+      var seg=EGG_CRACK_LINES[i];
+      ctx.beginPath();
+      ctx.moveTo(cx+seg[0][0]*r,cy+seg[0][1]*r);
+      for(var k=1;k<seg.length;k++) ctx.lineTo(cx+seg[k][0]*r,cy+seg[k][1]*r);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function sEggBroken(cx,cy,r){
+    ctx.save();
+    ctx.fillStyle='#FFF6E5';
+    ctx.beginPath(); ctx.ellipse(cx,cy+r*.15,r*1.05,r*.55,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#FFC94D';
+    ctx.beginPath(); ctx.arc(cx,cy+r*.15,r*.32,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#E0A82E'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(cx,cy+r*.15,r*.32,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#FBF3E3';
+    ctx.beginPath(); ctx.ellipse(cx-r*.6,cy-r*.7,r*.42,r*.3,-0.3,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.ellipse(cx-r*.6,cy-r*.7,r*.42,r*.3,-0.3,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#FBF3E3';
+    ctx.beginPath(); ctx.ellipse(cx+r*.58,cy-r*.68,r*.4,r*.28,0.35,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+r*.58,cy-r*.68,r*.4,r*.28,0.35,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(cx,cy+r*.15,r*1.05,r*.55,0,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  function sBaconStrip(){
+    ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    var bx=VW/2, bw=70;
+    fillRR(bx-bw/2,BC_TOP,bw,BC_BOT-BC_TOP,18,'#E8917A');
+    ctx.shadowColor='transparent';
+    ctx.strokeStyle='#B8523A'; ctx.lineWidth=5;
+    for(var i=0;i<5;i++){
+      var yy=BC_TOP+20+i*((BC_BOT-BC_TOP-40)/4);
+      ctx.beginPath();
+      ctx.moveTo(bx-bw/2+6,yy);
+      ctx.quadraticCurveTo(bx,yy+14,bx+bw/2-6,yy);
+      ctx.stroke();
+    }
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    rr(bx-bw/2,BC_TOP,bw,BC_BOT-BC_TOP,18); ctx.stroke();
+    ctx.restore();
+  }
+  // Mirrors sSausageFull's clean-vs-jagged cut-mark convention exactly
+  // (score >= 70 = clean glow line, else a jagged zigzag) -- same visual
+  // language, re-themed as bacon "flip" marks instead of sausage cuts.
+  function sBaconFull(cuts){
+    sBaconStrip();
+    var bx=VW/2, bw=70;
+    for(var ci=0;ci<Math.min(cuts,G.baconCutY.length);ci++){
+      var ty=G.baconCutY[ci], good=(G.baconSc[ci]||0)>=70;
+      ctx.save();
+      if(good){
+        ctx.strokeStyle='#fff'; ctx.lineWidth=3.5;
+        ctx.shadowColor=C.acc; ctx.shadowBlur=10;
+        ctx.beginPath(); ctx.moveTo(bx-bw/2-10,ty); ctx.lineTo(bx+bw/2+10,ty); ctx.stroke();
+      }else{
+        ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.lineCap='round';
+        ctx.beginPath();
+        var zx=bx-bw/2-8, zStep=(bw+16)/6, zDir=1;
+        ctx.moveTo(zx,ty);
+        for(var zi=0;zi<6;zi++){zx+=zStep; ctx.lineTo(zx,ty+zDir*5); zDir*=-1;}
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  function sToastSlice(cx,cy,frac){
+    var tint = frac<TOAST_GOOD[0]?'#F5E6C8':frac>TOAST_GOOD[1]?'#6B4423':'#D9A15C';
+    ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    ctx.fillStyle=tint;
+    var w=140,h=150;
+    ctx.beginPath();
+    ctx.moveTo(cx-w/2,cy+h/2); ctx.lineTo(cx-w/2,cy-h/2+30);
+    ctx.quadraticCurveTo(cx-w/2,cy-h/2,cx-w/2+30,cy-h/2);
+    ctx.lineTo(cx+w/2-30,cy-h/2);
+    ctx.quadraticCurveTo(cx+w/2,cy-h/2,cx+w/2,cy-h/2+30);
+    ctx.lineTo(cx+w/2,cy+h/2);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3; ctx.stroke();
+    ctx.restore();
+  }
+  function sPlateItem(kind,cx,cy,w){
+    ctx.save();
+    if(kind==='egg'){
+      ctx.fillStyle='#FFF6E5'; ctx.beginPath(); ctx.ellipse(cx,cy,w/2,w*0.32,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#FFC94D'; ctx.beginPath(); ctx.arc(cx,cy,w*0.18,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle=C.outline; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.ellipse(cx,cy,w/2,w*0.32,0,0,Math.PI*2); ctx.stroke();
+    }else if(kind==='bacon'){
+      fillRR(cx-w/2,cy-10,w,20,8,'#E8917A');
+      ctx.strokeStyle='#B8523A'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(cx-w/2+6,cy); ctx.quadraticCurveTo(cx,cy+8,cx+w/2-6,cy); ctx.stroke();
+      ctx.strokeStyle=C.outline; ctx.lineWidth=2; rr(cx-w/2,cy-10,w,20,8); ctx.stroke();
+    }else{
+      fillRR(cx-w*0.28,cy-w*0.32,w*0.56,w*0.6,8,'#D9A15C');
+      ctx.strokeStyle=C.outline; ctx.lineWidth=2; rr(cx-w*0.28,cy-w*0.32,w*0.56,w*0.6,8); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* ── Step bar (dish-aware: reads DISHES[G.dish].steps) ───────── */
+  function curStep(){
+    var steps=DISHES[G.dish].steps;
+    for(var i=0;i<steps.length;i++)if(steps[i].states.indexOf(G.st)>=0)return i;
+    return -1;
+  }
   function drawStepBar(time){
+    var steps=DISHES[G.dish].steps;
     ctx.fillStyle=C.ui; ctx.fillRect(0,0,VW,SH);
-    var cs=curStep(), sw=(VW-106)/4;
-    STEPS.forEach(function(si,i){
+    var cs=curStep(), sw=(VW-106)/steps.length;
+    steps.forEach(function(si,i){
       var sx=4+i*sw, bg=i<cs?C.sDone:i===cs?C.sAct:C.sOff;
       fillRR(sx,8,sw-5,SH-16,9,bg);
       var icx=sx+(sw-5)/2, icy=8+(SH-16)/2-7;
@@ -506,23 +781,34 @@ function createCookingGame(words, callbacks) {
   }
 
   /* ── Screens ───────────────────────────────────────────────── */
+  // SEL_FOODS drives both the drawn grid here AND onDown's S.SEL hit-test
+  // (below) -- keep them reading from this single array/layout formula
+  // instead of two hand-copied coordinate sets.
+  var SEL_FOODS=[
+    {l:'Hot Dog',    e:'🌭', ok:true,  dish:'hotdog'},
+    {l:'Pizza',      e:'🍕', ok:true,  dish:'pizza'},
+    {l:'Breakfast',  e:'🍳', ok:true,  dish:'breakfast'},
+    {l:'Burger',     e:'🍔', ok:false},
+    {l:'Fries',      e:'🍟', ok:false}
+  ];
+  var SEL_CARD_W=130, SEL_CARD_H=162, SEL_COL_GAP=145, SEL_ROW_GAP=176, SEL_X0=30, SEL_Y0=160;
+  function selCardRect(i){
+    var col=i%3, row=Math.floor(i/3);
+    return {x:SEL_X0+col*SEL_COL_GAP, y:SEL_Y0+row*SEL_ROW_GAP, w:SEL_CARD_W, h:SEL_CARD_H};
+  }
   function drawSel(){
     drawBg();
     ctx.font='bold 30px Prompt,sans-serif'; ctx.fillStyle=C.w;
     T('🍳 Cooking Game',VW/2,90,'center');
     ctx.font='16px Prompt'; ctx.fillStyle=C.acc; T('เลือกอาหารที่จะทำ',VW/2,124,'center');
-    var foods=[{l:'Hot Dog',e:'🌭',ok:true},{l:'Burger',e:'🍔',ok:false},{l:'Fries',e:'🍟',ok:false}];
-    foods.forEach(function(f,i){
-      var bx=30+i*145,by=160,bw=130,bh=162;
-      fillRR(bx,by,bw,bh,16,f.ok?'#7B3F10':'#1e2440');
+    SEL_FOODS.forEach(function(f,i){
+      var r=selCardRect(i);
+      fillRR(r.x,r.y,r.w,r.h,16,f.ok?'#7B3F10':'#1e2440');
       ctx.font='52px sans-serif'; ctx.textBaseline='middle';
-      ctx.globalAlpha=f.ok?1:0.32; T(f.e,bx+bw/2,by+bh/2-14,'center'); ctx.globalAlpha=1;
+      ctx.globalAlpha=f.ok?1:0.32; T(f.e,r.x+r.w/2,r.y+r.h/2-14,'center'); ctx.globalAlpha=1;
       ctx.font=(f.ok?'bold ':'')+'14px Prompt'; ctx.fillStyle=f.ok?C.w:'#3a3d62'; ctx.textBaseline='alphabetic';
-      T(f.l,bx+bw/2,by+bh-18,'center');
+      T(f.l,r.x+r.w/2,r.y+r.h-18,'center');
     });
-    var pc=VW/2, py=510;
-    sBunTop(pc,py-60,210,52); sIngLayer('cab',pc,py-18,192);
-    sIngLayer('tom',pc,py-6,174); sIngLayer('sau',pc,py+10,155); sBunBot(pc,py+26,210,44);
   }
 
   function drawBunCut(ts){
@@ -753,6 +1039,338 @@ function createCookingGame(words, callbacks) {
     drawBtn(VW/2-94,614,188,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
   }
 
+  /* ── Pizza screens ─────────────────────────────────────────── */
+  function drawPizzaDough(ts){
+    drawBg(); drawStepBar(ts);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
+    T('ลากออกจากตรงกลางเพื่อยืดแป้ง!',VW/2,SH+28,'center');
+    if(!G.doughDone){
+      var r=Math.max(PZ_R_MIN,G.doughR);
+      sDoughRaw(PZ_CX,PZ_CY,r);
+      ctx.setLineDash([8,6]); ctx.strokeStyle='rgba(240,165,0,.55)'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.arc(PZ_CX,PZ_CY,PZ_R_TARGET,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font='12px Prompt'; ctx.fillStyle=C.gold;
+      T('เป้าหมาย',PZ_CX,PZ_CY-PZ_R_TARGET-10,'center');
+    }else{
+      sDoughDisc(PZ_CX,PZ_CY,G.doughFinal,G.doughFinal>=PZ_R_TORN);
+      ctx.font='bold 26px Prompt'; ctx.fillStyle=C.gold;
+      T('ยืดแป้งได้ '+scoreVal('dough',G.scores.dough,ts)+' คะแนน!',VW/2,PZ_CY+G.doughFinal+56,'center');
+      drawBtn(VW/2-85,PZ_CY+G.doughFinal+78,170,52,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function paintSauceAt(x,y){
+    if(G.sauceDone)return;
+    for(var i=0;i<VEG_CELLS;i++){
+      var c=vegCellRect(PZ_CX,PZ_CY,PZ_DISPLAY_R,i);
+      if(x>=c.x&&x<=c.x+c.w&&y>=c.y&&y<=c.y+c.h){ G.sauceCells[i]=true; break; }
+    }
+    var painted=G.sauceCells.filter(function(b){return b;}).length;
+    if(painted>=VEG_CELLS) finishSauce();
+  }
+  function drawPizzaSauce(ts){
+    drawBg(); drawStepBar(ts);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+    T('ลากนิ้วป้ายซอสให้ทั่วแป้ง!',VW/2,SH+28,'center');
+    var elapsed=G.sauceRun?Math.min(SAUCE_DUR,ts-G.sauceStart):0;
+    var pct=Math.max(0,1-elapsed/SAUCE_DUR);
+    if(G.sauceRun&&!G.sauceDone&&elapsed>=SAUCE_DUR) finishSauce();
+    fillRR(40,SH+48,VW-80,18,9,'#1a2035');
+    fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
+    sDoughDisc(PZ_CX,PZ_CY,PZ_DISPLAY_R,false);
+    sSauceLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.sauceCells);
+    var painted=G.sauceCells.filter(function(b){return b;}).length;
+    ctx.font='bold 14px Prompt'; ctx.fillStyle=C.w;
+    T('ป้ายแล้ว '+painted+'/'+VEG_CELLS,VW/2,PZ_CY+PZ_DISPLAY_R+40,'center');
+    if(G.sauceDone){
+      ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('เสร็จแล้ว!',VW/2,320,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('sauce',G.scores.sauce,ts)+' คะแนน',VW/2,372,'center');
+      drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function drawPizzaCheese(ts){
+    drawBg(); drawStepBar(ts);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+    T('แตะโรยชีสให้ทั่ว!',VW/2,SH+30,'center');
+    var elapsed=G.cheeseRun?Math.min(CHOP_DUR,ts-G.cheeseStart):0;
+    var pct=Math.max(0,1-elapsed/CHOP_DUR);
+    if(G.cheeseRun&&!G.cheeseDone&&elapsed>=CHOP_DUR) finishCheese();
+    fillRR(40,SH+48,VW-80,18,9,'#1a2035');
+    fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
+    ctx.font='bold 11px Prompt'; ctx.fillStyle=C.w;
+    T(Math.max(0,Math.ceil((CHOP_DUR-elapsed)/1000))+'วิ',VW/2,SH+60,'center');
+    var cheesePct=(G.cheeseCount||0)/CHEESE_TAPS_NEEDED;
+    var punchT=G.cheesePunch?(ts-G.cheesePunch)/140:1, sq=1;
+    if(punchT<1){ var pe=1-Math.pow(1-punchT,2); sq=1-0.05*(1-pe); }
+    ctx.save(); ctx.translate(PZ_CX,PZ_CY); ctx.scale(1/sq,sq); ctx.translate(-PZ_CX,-PZ_CY);
+    sDoughDisc(PZ_CX,PZ_CY,PZ_DISPLAY_R,false);
+    sSauceLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.sauceCells);
+    sCheeseLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,cheesePct);
+    ctx.restore();
+    ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.4)';
+    T('โรย '+G.cheeseTaps+' ครั้ง',VW/2,PZ_CY+PZ_DISPLAY_R+40,'center');
+    if(G.cheeseDone){
+      ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('เสร็จแล้ว!',VW/2,320,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('cheese',G.scores.cheese,ts)+' คะแนน',VW/2,372,'center');
+      drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function drawPizzaTopping(ts){
+    drawBg(); drawStepBar(ts);
+    var cur=TOPPING_LIST[G.toppingIdx];
+    if(G.toppingIdx<TOPPING_LIST.length){
+      ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+      T('แตะเพื่อวาง'+(TOPPING_LABELS[cur]||cur)+'!',VW/2,SH+28,'center');
+      G.toppingX+=G.toppingDir*G.toppingSpd; if(G.toppingX>VW-45)G.toppingDir=-1; if(G.toppingX<45)G.toppingDir=1;
+    }
+    sDoughDisc(PZ_CX,PZ_CY,PZ_DISPLAY_R,false);
+    sSauceLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.sauceCells);
+    sCheeseLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.cheeseFinalPct);
+    G.toppingDropped.forEach(function(d,i){
+      var spot=TOPPING_SPOTS[i%TOPPING_SPOTS.length];
+      sTopping(d.kind,PZ_CX+spot.dx,PZ_CY+spot.dy);
+    });
+    if(G.toppingIdx<TOPPING_LIST.length){
+      ctx.strokeStyle='rgba(46,196,182,.38)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+      ctx.strokeRect(VW/2-40,180,80,40); ctx.setLineDash([]);
+      ctx.fillStyle='rgba(46,196,182,.06)'; ctx.fillRect(VW/2-40,180,80,40);
+      sTopping(cur,G.toppingX,200);
+    }
+    if(G.toppingIdx>=TOPPING_LIST.length&&!G.toppingAllDone){
+      G.toppingAllDone=true;
+      var acc=G.toppingDropped.reduce(function(s,d){return s+d.acc;},0)/G.toppingDropped.length;
+      G.scores.topping=Math.round(acc*100); G.total+=G.scores.topping;
+      animateScore('topping',G.scores.topping);
+    }
+    if(G.toppingAllDone){
+      ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('หน้าพิซซ่าเสร็จ!',VW/2,320,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('topping',G.scores.topping,ts)+' คะแนน',VW/2,372,'center');
+      drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function drawPizzaBake(ts){
+    drawBg(); drawStepBar(ts);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+    T('กดหยิบออกตอนสุกกำลังดี!',VW/2,SH+28,'center');
+    if(!G.bakeRun){G.bakeRun=true;G.bakeStart=ts;}
+    var elapsed=ts-G.bakeStart;
+    var frac=G.bakeDone?G.bakeTapVal:Math.min(1,elapsed/BAKE_DUR);
+    G.bakeVal=frac;
+    if(!G.bakeDone&&frac>=1) finishBake(1);
+    var tintCol = frac<BAKE_GOOD[0] ? '#F3DCA6' : frac>BAKE_GOOD[1] ? '#7A4A1E' : '#E0A73D';
+    sDoughDisc(PZ_CX,PZ_CY,PZ_DISPLAY_R,false);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(PZ_CX,PZ_CY,PZ_DISPLAY_R-8,0,Math.PI*2); ctx.clip();
+    ctx.globalAlpha=0.55; ctx.fillStyle=tintCol;
+    ctx.fillRect(PZ_CX-PZ_DISPLAY_R,PZ_CY-PZ_DISPLAY_R,PZ_DISPLAY_R*2,PZ_DISPLAY_R*2);
+    ctx.globalAlpha=1;
+    ctx.restore();
+    sSauceLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.sauceCells);
+    sCheeseLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.cheeseFinalPct);
+    G.toppingDropped.forEach(function(d,i){
+      var spot=TOPPING_SPOTS[i%TOPPING_SPOTS.length];
+      sTopping(d.kind,PZ_CX+spot.dx,PZ_CY+spot.dy);
+    });
+    fillRR(40,570,VW-80,20,10,'#1a2035');
+    var goodX0=40+(VW-80)*BAKE_GOOD[0], goodX1=40+(VW-80)*BAKE_GOOD[1];
+    ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(goodX0,570,goodX1-goodX0,20);
+    fillRR(40,570,(VW-80)*frac,20,10, frac<BAKE_GOOD[0]?C.acc: frac<=BAKE_GOOD[1]?C.gold:C.red);
+    if(!G.bakeDone){
+      drawBtn(VW/2-100,606,200,50,'หยิบออกจากเตา! 🔥',C.gold,ts);
+    }else{
+      ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('อบเสร็จ!',VW/2,320,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('bake',G.scores.bake,ts)+' คะแนน',VW/2,372,'center');
+      drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function drawPizzaFinal(ts){
+    drawBg();
+    if(!G.confetti) spawnConfetti();
+    drawConfetti(ts);
+    ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
+    T('🎉 พิซซ่าสำเร็จ! 🎉',VW/2,68,'center');
+    var fcx=VW/2, fcy=250, fr=PZ_DISPLAY_R;
+    sDoughDisc(fcx,fcy,fr,false);
+    sSauceLayer(fcx,fcy,fr,G.sauceCells);
+    sCheeseLayer(fcx,fcy,fr,G.cheeseFinalPct);
+    G.toppingDropped.forEach(function(d,i){
+      var spot=TOPPING_SPOTS[i%TOPPING_SPOTS.length];
+      sTopping(d.kind,fcx+spot.dx,fcy+spot.dy);
+    });
+    fillRR(28,400,VW-56,220,16,C.ui);
+    var rows=[['ยืดแป้ง','dough'],['ป้ายซอส','sauce'],['โรยชีส','cheese'],['วางหน้าพิซซ่า','topping'],['อบ','bake']];
+    rows.forEach(function(r,i){
+      var ry=432+i*34;
+      ctx.font='14px Prompt'; ctx.fillStyle='rgba(255,255,255,.72)'; T(r[0],48,ry,'left');
+      ctx.fillStyle=C.gold; T(G.scores[r[1]]+' pts',VW-48,ry,'right');
+    });
+    ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,608,VW-56,1);
+    ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
+    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,634,'center');
+    drawBtn(VW/2-94,664,188,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+  }
+
+  /* ── Breakfast screens ────────────────────────────────────────── */
+  function drawBreakfastEgg(ts){
+    drawBg(); drawStepBar(ts);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+    T('แตะตอกไข่ให้แตก!',VW/2,SH+30,'center');
+    var elapsed=G.eggRun?Math.min(EGG_DUR,ts-G.eggStart):0;
+    var pct=Math.max(0,1-elapsed/EGG_DUR);
+    if(G.eggRun&&!G.eggDone&&elapsed>=EGG_DUR) finishEgg();
+    fillRR(40,SH+48,VW-80,18,9,'#1a2035');
+    fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
+    var punchT=G.eggPunch?(ts-G.eggPunch)/140:1, sq=1;
+    if(punchT<1){ var pe=1-Math.pow(1-punchT,2); sq=1-0.05*(1-pe); }
+    ctx.save(); ctx.translate(EGG_CX,EGG_CY); ctx.scale(1/sq,sq); ctx.translate(-EGG_CX,-EGG_CY);
+    if(G.eggCracks>=EGG_TAPS_NEEDED) sEggBroken(EGG_CX,EGG_CY,EGG_R);
+    else sEggCracked(EGG_CX,EGG_CY,EGG_R,G.eggCracks);
+    ctx.restore();
+    ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.4)';
+    T('ตอก '+G.eggTaps+' ครั้ง',VW/2,EGG_CY+EGG_R+40,'center');
+    if(G.eggDone){
+      ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('เสร็จแล้ว!',VW/2,320,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('egg',G.scores.egg,ts)+' คะแนน',VW/2,372,'center');
+      drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function drawBreakfastBacon(ts){
+    drawBg(); drawStepBar(ts);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
+    T('แตะตอนที่ปลายพลิกผ่านจุดหมาย! (2 ครั้ง)',VW/2,SH+26,'center');
+    if(G.baconCuts<2){G.baconY+=G.baconDir*G.baconSpd; if(G.baconY>BC_BOT-12)G.baconDir=-1; if(G.baconY<BC_TOP+12)G.baconDir=1;}
+    sBaconFull(G.baconCuts);
+    if(G.baconCuts<2){
+      BC_CUT_TY.forEach(function(ty,i){
+        if(i>=G.baconCuts){
+          ctx.strokeStyle='rgba(46,196,182,.5)'; ctx.lineWidth=2.5; ctx.setLineDash([6,4]);
+          ctx.beginPath(); ctx.moveTo(VW/2-45,ty); ctx.lineTo(VW/2+45,ty); ctx.stroke(); ctx.setLineDash([]);
+          ctx.font='10px Prompt'; ctx.fillStyle=C.acc;
+          T('พลิกตรงนี้',VW/2+50,ty+4,'left');
+        }
+      });
+      ctx.save(); ctx.translate(BC_KX,G.baconY); ctx.rotate(-Math.PI/2);
+      ctx.shadowColor=C.sh; ctx.shadowBlur=5; ctx.shadowOffsetY=2;
+      fillRR(-30,-7,50,14,5,'#CFCFCF');
+      ctx.shadowColor='transparent';
+      ctx.strokeStyle=C.outline; ctx.lineWidth=2.5; rr(-30,-7,50,14,5); ctx.stroke();
+      fillRR(18,-9,26,18,5,'#8D6E63');
+      ctx.strokeStyle=C.outline; ctx.lineWidth=2.5; rr(18,-9,26,18,5); ctx.stroke();
+      ctx.restore();
+    }
+    if(G.baconSc.length>0){
+      G.baconSc.forEach(function(cs,i){
+        var cAt=G.baconAt[i]||0, ct=cAt?(ts-cAt)/220:1, cScale=1;
+        if(ct<1){ var ce=1-Math.pow(1-ct,2); cScale=1.12-0.12*ce; }
+        var lx=VW/2, ly=680-i*22;
+        ctx.save();
+        ctx.translate(lx,ly); ctx.scale(cScale,cScale); ctx.translate(-lx,-ly);
+        ctx.font='bold 13px Prompt'; ctx.fillStyle=cs>=70?C.grn:C.gold;
+        T(cs>=70?'🎯 พอดี! +'+cs:'📍 พอใช้ +'+cs,lx,ly,'center');
+        ctx.restore();
+      });
+    }
+    ctx.font='bold 14px Prompt'; ctx.fillStyle=C.w;
+    T('พลิกแล้ว '+G.baconCuts+'/2',VW/2,720,'center');
+    if(G.baconCuts>=2){
+      ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('ทอดเสร็จ! 🥓',VW/2,310,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('bacon',G.scores.bacon,ts)+' คะแนน',VW/2,362,'center');
+      drawBtn(VW/2-80,402,160,50,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function drawBreakfastToast(ts){
+    drawBg(); drawStepBar(ts);
+    ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+    T('กดป๊อปตอนสีเหลืองทองพอดี!',VW/2,SH+28,'center');
+    if(!G.toastRun){G.toastRun=true;G.toastStart=ts;}
+    var elapsed=ts-G.toastStart;
+    var frac=G.toastDone?G.toastTapVal:Math.min(1,elapsed/TOAST_DUR);
+    G.toastVal=frac;
+    if(!G.toastDone&&frac>=1) finishToast(1);
+    sToastSlice(VW/2,340,frac);
+    fillRR(40,470,VW-80,20,10,'#1a2035');
+    var goodX0=40+(VW-80)*TOAST_GOOD[0], goodX1=40+(VW-80)*TOAST_GOOD[1];
+    ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(goodX0,470,goodX1-goodX0,20);
+    fillRR(40,470,(VW-80)*frac,20,10, frac<TOAST_GOOD[0]?C.acc: frac<=TOAST_GOOD[1]?C.gold:C.red);
+    if(!G.toastDone){
+      drawBtn(VW/2-90,510,180,50,'ป๊อปขึ้นมา! 🍞',C.gold,ts);
+    }else{
+      ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
+      ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
+      T('ปิ้งเสร็จ!',VW/2,320,'center');
+      ctx.font='bold 22px Prompt'; ctx.fillStyle=C.w; T(scoreVal('toast',G.scores.toast,ts)+' คะแนน',VW/2,372,'center');
+      drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc,ts);
+    }
+  }
+  function drawBreakfastPlate(ts){
+    drawBg(); drawStepBar(ts);
+    var cur=PLATE_LIST[G.plateIdx];
+    if(G.plateIdx<PLATE_LIST.length){
+      ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
+      T('แตะเพื่อจัดวาง'+(PLATE_LABELS[cur]||cur)+'!',VW/2,SH+26,'center');
+      G.plateX+=G.plateDir*G.plateSpd; if(G.plateX>VW-45)G.plateDir=-1; if(G.plateX<45)G.plateDir=1;
+    }
+    ctx.save();
+    ctx.fillStyle='#EDEDED'; ctx.beginPath(); ctx.ellipse(VW/2,460,150,90,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3; ctx.beginPath(); ctx.ellipse(VW/2,460,150,90,0,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+    var plateSpots=[{dx:-70,dy:-10},{dx:20,dy:20},{dx:60,dy:-25}];
+    G.plateDropped.forEach(function(d,i){
+      var sp=plateSpots[i%plateSpots.length];
+      sPlateItem(d.ing,VW/2+sp.dx,460+sp.dy,90);
+    });
+    if(G.plateIdx<PLATE_LIST.length){
+      ctx.strokeStyle='rgba(46,196,182,.38)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+      ctx.strokeRect(VW/2-40,290,80,40); ctx.setLineDash([]);
+      ctx.fillStyle='rgba(46,196,182,.06)'; ctx.fillRect(VW/2-40,290,80,40);
+      sPlateItem(cur,G.plateX,310,60);
+    }
+    if(G.plateIdx>=PLATE_LIST.length&&!G.plateAllDone){
+      G.plateAllDone=true;
+      var acc=G.plateDropped.reduce(function(s,d){return s+d.acc;},0)/G.plateDropped.length;
+      G.scores.plate=Math.round(acc*100); G.total+=G.scores.plate;
+      sc.time.delayedCall(700,function(){animateScore('plate',G.scores.plate);setState(SB.PLATE_R);});
+    }
+  }
+  function drawBreakfastFinal(ts){
+    drawBg();
+    if(!G.confetti) spawnConfetti();
+    drawConfetti(ts);
+    ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
+    T('🎉 มื้อเช้าสำเร็จ! 🎉',VW/2,68,'center');
+    ctx.save();
+    ctx.fillStyle='#EDEDED'; ctx.beginPath(); ctx.ellipse(VW/2,220,140,84,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3; ctx.beginPath(); ctx.ellipse(VW/2,220,140,84,0,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+    var finSpots=[{dx:-65,dy:-8},{dx:18,dy:18},{dx:55,dy:-22}];
+    G.plateDropped.forEach(function(d,i){
+      var sp=finSpots[i%finSpots.length];
+      sPlateItem(d.ing,VW/2+sp.dx,220+sp.dy,85);
+    });
+    fillRR(28,350,VW-56,180,16,C.ui);
+    var rows=[['ตอกไข่','egg'],['ทอดเบคอน','bacon'],['ปิ้งขนมปัง','toast'],['จัดจาน','plate']];
+    rows.forEach(function(r,i){
+      var ry=382+i*34;
+      ctx.font='14px Prompt'; ctx.fillStyle='rgba(255,255,255,.72)'; T(r[0],48,ry,'left');
+      ctx.fillStyle=C.gold; T(G.scores[r[1]]+' pts',VW-48,ry,'right');
+    });
+    ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,528,VW-56,1);
+    ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
+    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,554,'center');
+    drawBtn(VW/2-94,584,188,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+  }
+
   // A one-time celebration for the single "you finished the whole dish"
   // moment -- not used anywhere else, so it stays a treat rather than
   // wearing out its welcome the way over-using juice on every tap would.
@@ -821,6 +1439,58 @@ function createCookingGame(words, callbacks) {
     animateScore(key,G.scores[key]);
     if(G.ing==='tom')G.tomFinalPct=pct; else G.cabFinalPct=pct;
   }
+  function finishDough(){
+    if(G.doughDone)return;
+    G.doughDone=true;
+    G.doughFinal=Math.max(PZ_R_MIN,Math.min(PZ_R_TORN,G.doughR));
+    var score=Math.round(Math.max(10,100-Math.abs(G.doughR-PZ_R_TARGET)*0.8));
+    G.scores.dough=score; G.total+=score; animateScore('dough',score);
+  }
+  function finishSauce(){
+    if(G.sauceDone)return;
+    G.sauceDone=true;
+    var painted=G.sauceCells.filter(function(b){return b;}).length;
+    var score=Math.round((painted/VEG_CELLS)*100);
+    G.scores.sauce=score; G.total+=score; animateScore('sauce',score);
+  }
+  function finishCheese(){
+    if(G.cheeseDone)return;
+    G.cheeseDone=true;
+    var pct=(G.cheeseCount||0)/CHEESE_TAPS_NEEDED;
+    var score=Math.round(pct*100);
+    G.scores.cheese=score; G.total+=score; animateScore('cheese',score);
+    G.cheeseFinalPct=pct;
+  }
+  // Shared shape for both BAKE (pizza) and TOAST (breakfast): a value
+  // rising 0..1 over a fixed duration, one tap locks it in, scored by
+  // proximity to a "good zone" window -- kept as two separate small
+  // functions per dish (not one generic helper) since each writes to a
+  // different score key and duration/window constant.
+  function finishBake(frac){
+    if(G.bakeDone)return;
+    G.bakeDone=true; G.bakeTapVal=frac;
+    var mid=(BAKE_GOOD[0]+BAKE_GOOD[1])/2, half=(BAKE_GOOD[1]-BAKE_GOOD[0])/2;
+    var score;
+    if(frac>=BAKE_GOOD[0]&&frac<=BAKE_GOOD[1]) score=Math.round(100-Math.abs(frac-mid)/half*20);
+    else { var distOut=frac<BAKE_GOOD[0]?BAKE_GOOD[0]-frac:frac-BAKE_GOOD[1]; score=Math.round(Math.max(10,80-distOut*220)); }
+    G.scores.bake=score; G.total+=score; animateScore('bake',score);
+  }
+  function finishEgg(){
+    if(G.eggDone)return;
+    G.eggDone=true;
+    var pct=Math.min(1,(G.eggCracks||0)/EGG_TAPS_NEEDED);
+    var score=Math.round(pct*100);
+    G.scores.egg=score; G.total+=score; animateScore('egg',score);
+  }
+  function finishToast(frac){
+    if(G.toastDone)return;
+    G.toastDone=true; G.toastTapVal=frac;
+    var mid=(TOAST_GOOD[0]+TOAST_GOOD[1])/2, half=(TOAST_GOOD[1]-TOAST_GOOD[0])/2;
+    var score;
+    if(frac>=TOAST_GOOD[0]&&frac<=TOAST_GOOD[1]) score=Math.round(100-Math.abs(frac-mid)/half*20);
+    else { var distOut=frac<TOAST_GOOD[0]?TOAST_GOOD[0]-frac:frac-TOAST_GOOD[1]; score=Math.round(Math.max(10,80-distOut*220)); }
+    G.scores.toast=score; G.total+=score; animateScore('toast',score);
+  }
   function initSt(s){
     if(s===S.TOM){G.ing='tom';G.taps=0;G.choppedCount=0;G.chopRun=false;G.chopDone=false;G.chopStart=0;G.kAnim=0;G.chopPunch=0;G.starPunch=0;G.lastStarN=0;}
     if(s===S.CAB){G.ing='cab';G.taps=0;G.choppedCount=0;G.chopRun=false;G.chopDone=false;G.chopStart=0;G.kAnim=0;G.chopPunch=0;G.starPunch=0;G.lastStarN=0;}
@@ -828,7 +1498,7 @@ function createCookingGame(words, callbacks) {
     if(s===S.CMB){G.cList=['tom','cab','sau'];G.cIdx=0;G.sX=240;G.sDir=1;G.dropped=[];G.allDone=false;}
   }
   function getWord(fromSt){
-    var idx=STEP_IDX[fromSt];
+    var idx=DISHES[G.dish].stepIdx[fromSt];
     if(idx===undefined||!words||!words.length)return null;
     return words[idx%words.length];
   }
@@ -903,6 +1573,28 @@ function createCookingGame(words, callbacks) {
         case S.CMB:   drawCmb(time);break;
         case S.CMB_R: drawResult('cmb',time);break;
         case S.FIN:   drawFinal(time);break;
+
+        case SP.DOUGH:     drawPizzaDough(time);break;
+        case SP.DOUGH_R:   drawResult('dough',time);break;
+        case SP.SAUCE:     drawPizzaSauce(time);break;
+        case SP.SAUCE_R:   drawResult('sauce',time);break;
+        case SP.CHEESE:    drawPizzaCheese(time);break;
+        case SP.CHEESE_R:  drawResult('cheese',time);break;
+        case SP.TOPPING:   drawPizzaTopping(time);break;
+        case SP.TOPPING_R: drawResult('topping',time);break;
+        case SP.BAKE:      drawPizzaBake(time);break;
+        case SP.BAKE_R:    drawResult('bake',time);break;
+        case SP.FIN:       drawPizzaFinal(time);break;
+
+        case SB.EGG:      drawBreakfastEgg(time);break;
+        case SB.EGG_R:    drawResult('egg',time);break;
+        case SB.BACON:    drawBreakfastBacon(time);break;
+        case SB.BACON_R:  drawResult('bacon',time);break;
+        case SB.TOAST:    drawBreakfastToast(time);break;
+        case SB.TOAST_R:  drawResult('toast',time);break;
+        case SB.PLATE:    drawBreakfastPlate(time);break;
+        case SB.PLATE_R:  drawResult('plate',time);break;
+        case SB.FIN:      drawBreakfastFinal(time);break;
       }
 
       ctx.restore();
@@ -910,7 +1602,16 @@ function createCookingGame(words, callbacks) {
     },
 
     onDown:function(x,y,now){
-      if(G.st===S.SEL){if(hit(x,y,30,160,130,162)){pressFx(x,y);setState(S.BUN);}return;}
+      if(G.st===S.SEL){
+        for(var fi=0;fi<SEL_FOODS.length;fi++){
+          var f=SEL_FOODS[fi], r=selCardRect(fi);
+          if(hit(x,y,r.x,r.y,r.w,r.h)){
+            if(f.ok){pressFx(x,y);G.dish=f.dish;setState(DISHES[f.dish].first);}
+            return;
+          }
+        }
+        return;
+      }
       if(G.st===S.BUN){
         if(!G.split){G.cutting=true;G.pts=[{x:x,y:y}];this.sfxBread.play(undefined,{seek:1});}
         else if(hit(x,y,VW/2-85,BUN_BBY+98,170,52)){pressFx(x,y);setState(S.BUN_R);}
@@ -962,14 +1663,114 @@ function createCookingGame(words, callbacks) {
           callbacks.onPoints&&callbacks.onPoints(G.total);
           resetG();
         }
+        return;
+      }
+
+      // ── Pizza ──
+      if(G.st===SP.DOUGH){
+        if(!G.doughDone){ G.doughDragging=true; G.doughR=Math.hypot(x-PZ_CX,y-PZ_CY); }
+        else if(hit(x,y,VW/2-85,PZ_CY+G.doughFinal+78,170,52)){pressFx(x,y);setState(SP.DOUGH_R);}
+        return;
+      }
+      if(G.st===SP.DOUGH_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.DOUGH_R,SP.SAUCE);}return;}
+      if(G.st===SP.SAUCE){
+        if(G.sauceDone){if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SP.SAUCE_R);}return;}
+        if(!G.sauceRun){G.sauceRun=true;G.sauceStart=now;}
+        paintSauceAt(x,y);
+        return;
+      }
+      if(G.st===SP.SAUCE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.SAUCE_R,SP.CHEESE);}return;}
+      if(G.st===SP.CHEESE){
+        if(G.cheeseDone){if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SP.CHEESE_R);}return;}
+        var cdx=x-PZ_CX,cdy=y-PZ_CY;
+        if(cdx*cdx+cdy*cdy<(PZ_DISPLAY_R+22)*(PZ_DISPLAY_R+22)){
+          if(!G.cheeseRun){G.cheeseRun=true;G.cheeseStart=now;}
+          G.cheeseTaps++;
+          if(G.cheeseCount<CHEESE_TAPS_NEEDED)G.cheeseCount++;
+          G.cheesePunch=now;
+          if(G.cheeseCount>=CHEESE_TAPS_NEEDED&&!G.cheeseDone)finishCheese();
+        }
+        return;
+      }
+      if(G.st===SP.CHEESE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.CHEESE_R,SP.TOPPING);}return;}
+      if(G.st===SP.TOPPING){
+        if(G.toppingAllDone){if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SP.TOPPING_R);}return;}
+        if(G.toppingIdx<TOPPING_LIST.length){
+          var tAcc=Math.max(0,1-Math.abs(G.toppingX-VW/2)/(VW/2-45));
+          G.toppingDropped.push({kind:TOPPING_LIST[G.toppingIdx],acc:tAcc});
+          G.toppingIdx++;
+        }
+        return;
+      }
+      if(G.st===SP.TOPPING_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.TOPPING_R,SP.BAKE);}return;}
+      if(G.st===SP.BAKE){
+        if(!G.bakeDone){
+          if(hit(x,y,VW/2-100,606,200,50)){pressFx(x,y);finishBake(G.bakeVal);}
+          return;
+        }
+        if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SP.BAKE_R);}
+        return;
+      }
+      if(G.st===SP.BAKE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.BAKE_R,SP.FIN);}return;}
+      if(G.st===SP.FIN){
+        if(hit(x,y,VW/2-94,664,188,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();}
+        return;
+      }
+
+      // ── Breakfast ──
+      if(G.st===SB.EGG){
+        if(G.eggDone){if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SB.EGG_R);}return;}
+        var edx=x-EGG_CX,edy=y-EGG_CY;
+        if(edx*edx+edy*edy<(EGG_R+22)*(EGG_R+22)){
+          if(!G.eggRun){G.eggRun=true;G.eggStart=now;}
+          G.eggTaps++;
+          if(G.eggCracks<EGG_TAPS_NEEDED)G.eggCracks++;
+          G.eggPunch=now;
+          if(G.eggCracks>=EGG_TAPS_NEEDED&&!G.eggDone)finishEgg();
+        }
+        return;
+      }
+      if(G.st===SB.EGG_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.EGG_R,SB.BACON);}return;}
+      if(G.st===SB.BACON){
+        if(G.baconCuts>=2){if(hit(x,y,VW/2-80,402,160,50)){pressFx(x,y);setState(SB.BACON_R);}return;}
+        var bcs=Math.round(Math.max(10,100-Math.abs(G.baconY-BC_CUT_TY[G.baconCuts])*2));
+        G.baconSc.push(bcs);G.baconCutY.push(G.baconY);G.baconAt.push(now);G.baconCuts++;
+        if(G.baconCuts>=2){G.scores.bacon=Math.round((G.baconSc[0]+G.baconSc[1])/2);G.total+=G.scores.bacon;animateScore('bacon',G.scores.bacon);}
+        return;
+      }
+      if(G.st===SB.BACON_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.BACON_R,SB.TOAST);}return;}
+      if(G.st===SB.TOAST){
+        if(!G.toastDone){
+          if(hit(x,y,VW/2-90,510,180,50)){pressFx(x,y);finishToast(G.toastVal);}
+          return;
+        }
+        if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SB.TOAST_R);}
+        return;
+      }
+      if(G.st===SB.TOAST_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.TOAST_R,SB.PLATE);}return;}
+      if(G.st===SB.PLATE){
+        if(G.plateIdx<PLATE_LIST.length){
+          var pAcc=Math.max(0,1-Math.abs(G.plateX-VW/2)/(VW/2-45));
+          G.plateDropped.push({ing:PLATE_LIST[G.plateIdx],acc:pAcc});
+          G.plateIdx++;
+        }
+        return;
+      }
+      if(G.st===SB.PLATE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.PLATE_R,SB.FIN);}return;}
+      if(G.st===SB.FIN){
+        if(hit(x,y,VW/2-94,584,188,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();}
+        return;
       }
     },
 
     onMove:function(x,y){
       if(G.st===S.BUN&&G.cutting)G.pts.push({x:x,y:y});
+      if(G.st===SP.DOUGH&&G.doughDragging)G.doughR=Math.hypot(x-PZ_CX,y-PZ_CY);
+      if(G.st===SP.SAUCE&&G.sauceRun&&!G.sauceDone)paintSauceAt(x,y);
     },
 
     onUp:function(x,y){
+      if(G.st===SP.DOUGH&&G.doughDragging){G.doughDragging=false;finishDough();return;}
       if(!(G.st===S.BUN&&G.cutting))return;
       this.sfxBread.stop();
       var raw=G.pts.slice(); G.cutting=false;
