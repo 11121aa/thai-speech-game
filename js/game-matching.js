@@ -11,9 +11,13 @@
 // ============================================================
 //  How the game works:
 //    - Cards are laid out face-down on a grid
-//    - Each word has TWO cards: one showing the EMOJI, one showing the THAI WORD
+//    - Each word has TWO cards, both showing the SAME picture -- classic
+//      picture-to-picture memory matching, no reading required, so it
+//      works for kids who can't read Thai text yet (previously one card
+//      showed the picture and the other the Thai word, which needed
+//      reading to solve -- too hard for younger kids).
 //    - Tap any face-down card to flip it over
-//    - Tap a second card — if they belong to the same word → correct match!
+//    - Tap a second card — if they show the same picture → correct match!
 //    - Correct match → pronunciation practice modal opens
 //    - Wrong match → both cards flip back face-down
 //    - A live stopwatch (HUD "⏱" pill) counts up from the moment the
@@ -90,13 +94,13 @@ function createMatchingGame(words, callbacks) {
       var pool = words.slice(0, n);                  // take the first n words
       this.totalPairs = pool.length;
 
-      // For each word, create TWO card data objects:
-      //   type = 'emoji' → shows the picture side
-      //   type = 'word'  → shows the Thai text side
+      // For each word, create TWO identical picture cards -- a real
+      // picture-to-picture pair (find the matching twin), not a
+      // picture-to-word pair, so it doesn't require reading.
       var deck = [];
       pool.forEach(function (w) {
         deck.push({ type: 'emoji', w: w });
-        deck.push({ type: 'word',  w: w });
+        deck.push({ type: 'emoji', w: w });
       });
 
       // Shuffle the deck using the Fisher-Yates algorithm
@@ -203,7 +207,7 @@ function createMatchingGame(words, callbacks) {
 
       // ── Hint text at the bottom ───────────────────────────────────
       this.add.text(W / 2, H - 16,
-        'แตะไพ่เพื่อพลิก — จับคู่ภาพ 🖼️ กับ คำ 📝  |  จับคู่ให้ครบให้เร็วที่สุด!', {
+        'แตะไพ่เพื่อพลิก — จับคู่ภาพที่เหมือนกัน 🖼️🖼️  |  จับคู่ให้ครบให้เร็วที่สุด!', {
           fontFamily: 'Prompt, sans-serif',
           fontSize: '13px', color: '#999'
         }).setOrigin(0.5, 1);
@@ -313,8 +317,10 @@ function createMatchingGame(words, callbacks) {
       this.flipped = []; // clear the waiting list immediately
       this.locked  = true; // block new taps until we finish the match/mismatch logic
 
-      // A correct match means: same word id AND different types (one emoji + one word)
-      var isMatch = a.data.w.id === b.data.w.id && a.data.type !== b.data.type;
+      // A correct match means: same word id -- both cards are the same
+      // picture now, so type is always 'emoji' on both and no longer
+      // part of the check (it used to require a picture+word pair).
+      var isMatch = a.data.w.id === b.data.w.id;
 
       if (isMatch) {
         // ── CORRECT MATCH ─────────────────────────────────────────
