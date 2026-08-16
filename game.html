@@ -448,7 +448,7 @@
 <script src="js/game-crossy.js?v=6"></script>
 <script src="js/game-cooking.js?v=13"></script>
 <script src="js/game-dressup.js?v=12"></script>
-<script src="js/game-towerdefense.js?v=6"></script>
+<script src="js/game-towerdefense.js?v=9"></script>
 <script src="js/game-tetris.js?v=4"></script>
 <script src="js/game-rpg.js?v=4"></script>
 <script src="js/config.js"></script>
@@ -1230,6 +1230,7 @@ async function launchGame() {
     DressupGame.start(pool, GAME_CBS);    // Phaser game (dress-up avatar)
   } else if (G.mode === 'towerdefense') {
     document.getElementById('towerdefenseGame').style.display = 'block';
+    window.__tdLoadout = { hasBarrack: hasUpgrade('td_barrack') };
     TowerDefenseGame.start(pool, GAME_CBS, getTdMapIdx()); // Phaser game (place troops, defend the base)
   } else if (G.mode === 'tetris') {
     document.getElementById('tetrisGame').style.display = 'block';

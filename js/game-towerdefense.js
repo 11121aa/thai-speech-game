@@ -49,6 +49,14 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   var RAGE_INTERVAL = 8000;    // ms between swordsman-tier3 rage triggers
   var RAGE_DURATION = 3000;    // ms rage lasts
 
+  // Shop upgrade (supabase/024_game_upgrades_migration.sql, td_barrack) --
+  // window.__tdLoadout is set by game.html just before start(); the
+  // barrack troop's palette card is simply absent for a guest/no-purchase
+  // player, same as the original 2-troop game unchanged.
+  var loadout = window.__tdLoadout || {};
+  var HAS_BARRACK = !!loadout.hasBarrack;
+  var ALLY_CONTACT_RANGE = 22; // how close an ally + enemy need to be to start trading hits
+
   var HUD_H = 40, FIELD_Y0 = HUD_H, FIELD_Y1 = 378, PAL_Y0 = 378;
 
   // ── [MAPS] Three layouts, each with its own road, portal/base
@@ -172,6 +180,27 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
     }
     return min;
   }
+  // Barrack troop only: the road-distance (arc-length from the portal, same
+  // unit as an enemy's own `travel`) of whichever point on the path sits
+  // closest to a given pixel -- used once, when a barrack spawns an ally,
+  // to put that ally onto the road at the point nearest the barrack's own
+  // tile rather than always starting it from the portal.
+  function travelAtNearestPoint(px, py) {
+    var best = Infinity, bestTravel = 0, acc = 0;
+    for (var i = 0; i < PATH.length - 1; i++) {
+      var ax = PATH[i].x, ay = PATH[i].y, bx = PATH[i + 1].x, by = PATH[i + 1].y;
+      var dx = bx - ax, dy = by - ay;
+      var lenSq = dx * dx + dy * dy;
+      var t = lenSq > 0 ? ((px - ax) * dx + (py - ay) * dy) / lenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      var cx = ax + t * dx, cy = ay + t * dy;
+      var d = Math.hypot(px - cx, py - cy);
+      var segLen = PATH_META.segLens[i];
+      if (d < best) { best = d; bestTravel = acc + t * segLen; }
+      acc += segLen;
+    }
+    return bestTravel;
+  }
   // ── [PANEL] Fixed top-right stat/upgrade panel shown on hovering or
   // tapping a placed troop. Hover shows the short (no-button) version;
   // tapping "pins" it with the upgrade button until dismissed. Declared
@@ -214,6 +243,23 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
         { range: 62, dmg: 10, atkMs: 750 },
         { range: 68, dmg: 13, atkMs: 650, rage: true }
       ]
+    },
+    // Unlocked by the td_barrack shop upgrade -- a fundamentally
+    // different troop shape than archer/sword: it doesn't attack in
+    // place. Instead it periodically SPAWNS a mobile ally that walks the
+    // road upstream (toward the portal) to meet enemies head-on and
+    // trades hits until one side dies (see spawnAlly()/allyTick()).
+    // tierDef fields are spawnMs/allyHp/allyDmg/allyAtkMs/allySpd instead
+    // of range/dmg/atkMs -- towerAttack()/drawField()/drawInfoPanel() all
+    // branch on tower.kind === 'barrack' to use these instead.
+    barrack: {
+      name: 'ค่ายทหาร', emoji: '🏰', color: 0x6D4C41,
+      costs: [50, 70, 100],
+      tiers: [
+        { spawnMs: 6000, allyHp: 40, allyDmg: 6,  allyAtkMs: 700, allySpd: 70 },
+        { spawnMs: 5000, allyHp: 55, allyDmg: 9,  allyAtkMs: 650, allySpd: 75 },
+        { spawnMs: 4200, allyHp: 75, allyDmg: 13, allyAtkMs: 550, allySpd: 80 }
+      ]
     }
   };
 
@@ -222,11 +268,14 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   // extra bite as waves climb — combined with HP_SCALE (map-driven) and
   // the per-wave hpMul below, this is what makes later waves/maps feel
   // meaningfully harder rather than just "the same fight, more hits".
+  // meleeDmg is what an enemy hits an engaged barrack ally for (per
+  // ally-vs-enemy trade tick, see allyTick()) -- distinct from dmg, which
+  // is only ever the (much smaller) life cost of reaching the base.
   var ENEMY_TYPES = [
-    { key: 'slime', name: 'สไลม์',   emoji: '🟢', hp: 18, spd: 50, gold: 4,  dmg: 1, color: 0x27AE60 },
-    { key: 'bat',   name: 'ค้างคาว', emoji: '🦇', hp: 10, spd: 82, gold: 3,  dmg: 1, color: 0x8E44AD },
-    { key: 'rock',  name: 'หิน',     emoji: '🪨', hp: 46, spd: 30, gold: 8,  dmg: 2, color: 0x7F8C8D },
-    { key: 'ogre',  name: 'ยักษ์',   emoji: '👹', hp: 90, spd: 22, gold: 14, dmg: 3, color: 0x6D4C41 }
+    { key: 'slime', name: 'สไลม์',   emoji: '🟢', hp: 18, spd: 50, gold: 4,  dmg: 1, meleeDmg: 5,  color: 0x27AE60 },
+    { key: 'bat',   name: 'ค้างคาว', emoji: '🦇', hp: 10, spd: 82, gold: 3,  dmg: 1, meleeDmg: 4,  color: 0x8E44AD },
+    { key: 'rock',  name: 'หิน',     emoji: '🪨', hp: 46, spd: 30, gold: 8,  dmg: 2, meleeDmg: 9,  color: 0x7F8C8D },
+    { key: 'ogre',  name: 'ยักษ์',   emoji: '👹', hp: 90, spd: 22, gold: 14, dmg: 3, meleeDmg: 15, color: 0x6D4C41 }
   ];
   function buildWave(waveNum) {
     var count = 5 + waveNum * 2;
@@ -250,6 +299,7 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       Phaser.Scene.call(this, { key: 'towerdefense' });
       this.towers = [];       // { col, row, kind, tier, x, y, nextAtkAt, nextRageAt, ragingUntil, icon }
       this.enemies = [];      // { type, hp, maxHp, travel, x, y, icon, hpBg, hpFg }
+      this.allies = [];       // barrack-spawned units: { x, y, travel, hp, maxHp, dmg, atkMs, spd, nextAtkAt, target, icon }
       this.fx = [];           // { kind:'text'|'slash'|'beam', ... startedAt }
       this.gold = START_GOLD;
       this.lives = START_LIVES;
@@ -304,12 +354,15 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       if (this.paused || this.phase === 'lost' || this.phase === 'won') return;
 
       var cardW = 150, cardH = 92, cardY = PAL_Y0 + 14;
-      var archerCardX = 30, swordCardX = 30 + cardW + 14;
+      var archerCardX = 30, swordCardX = 30 + cardW + 14, barrackCardX = 30 + (cardW + 14) * 2;
       if (this.hit(x, y, archerCardX, cardY, cardW, cardH)) {
         this.selected = this.selected === 'archer' ? null : 'archer'; return;
       }
       if (this.hit(x, y, swordCardX, cardY, cardW, cardH)) {
         this.selected = this.selected === 'sword' ? null : 'sword'; return;
+      }
+      if (HAS_BARRACK && this.hit(x, y, barrackCardX, cardY, cardW, cardH)) {
+        this.selected = this.selected === 'barrack' ? null : 'barrack'; return;
       }
       var btnX = W - 190, btnY = cardY, btnW = 160, btnH = cardH;
       if (this.hit(x, y, btnX, btnY, btnW, btnH)) { this.tryStartWave(); return; }
@@ -367,7 +420,9 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       var icon = this.add.text(cell.x, cell.y, def.emoji, { fontSize: '22px' }).setOrigin(0.5).setDepth(5);
       this.towers.push({
         col: cell.col, row: cell.row, kind: kind, tier: 0, x: cell.x, y: cell.y,
-        nextAtkAt: 0, nextRageAt: this.time.now + RAGE_INTERVAL, ragingUntil: 0, icon: icon
+        nextAtkAt: 0, nextRageAt: this.time.now + RAGE_INTERVAL, ragingUntil: 0,
+        nextSpawnAt: kind === 'barrack' ? this.time.now + def.tiers[0].spawnMs : 0, // barrack only
+        icon: icon
       });
       this.sfxCoin.play();
       this.popText(cell.x, cell.y - 30, def.emoji + ' วาง!', '#2EC4B6');
@@ -455,12 +510,69 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       this.time.delayedCall(2200, function () { callbacks.onFinish(); });
     },
 
-    // ── Combat: towers seek and attack enemies in range ─────────
+    // ── Barrack: spawn a walking melee ally at the road point nearest
+    // this tower, instead of attacking in place. ────────────────────
+    spawnAlly: function (tower, tierDef) {
+      var travel = travelAtNearestPoint(tower.x, tower.y);
+      var p = pointAtDistance(travel);
+      var icon = this.add.text(p.x, p.y, '💂', { fontSize: '16px' }).setOrigin(0.5).setDepth(4);
+      this.allies.push({
+        x: p.x, y: p.y, travel: travel,
+        hp: tierDef.allyHp, maxHp: tierDef.allyHp, dmg: tierDef.allyDmg,
+        atkMs: tierDef.allyAtkMs, spd: tierDef.allySpd, nextAtkAt: 0, target: null, icon: icon
+      });
+    },
+    // ── Allies: walk upstream (toward the portal) until an enemy is
+    // within ALLY_CONTACT_RANGE, then both sides stop moving and trade
+    // hits every allyAtkMs/enemy-melee tick until one dies. A winning
+    // ally resumes walking to look for its next target. ─────────────
+    allyTick: function (time, dt) {
+      var self = this;
+      var claimed = []; // enemies already targeted by an earlier ally this same tick, so two allies can't both engage (and double-damage) the same one
+      this.allies.forEach(function (a) {
+        var target = null, bestD = ALLY_CONTACT_RANGE;
+        self.enemies.forEach(function (e) {
+          if (claimed.indexOf(e) !== -1) return;
+          var d = Math.abs(e.travel - a.travel);
+          if (d < bestD) { bestD = d; target = e; }
+        });
+        if (target) claimed.push(target);
+        a.target = target;
+        if (target) {
+          if (time >= a.nextAtkAt) {
+            a.nextAtkAt = time + a.atkMs;
+            target.hp -= a.dmg;
+            a.hp -= (target.type.meleeDmg || target.type.dmg);
+            if (target.hp <= 0) self.killEnemy(target);
+          }
+        } else {
+          a.travel = Math.max(0, a.travel - a.spd * dt);
+          var p = pointAtDistance(a.travel);
+          a.x = p.x; a.y = p.y;
+          if (a.travel <= 0) a.hp = 0; // reached the portal with nothing to fight -- retires quietly
+        }
+      });
+      this.allies = this.allies.filter(function (a) {
+        if (a.hp > 0) return true;
+        a.icon.destroy();
+        return false;
+      });
+    },
+
+    // ── Combat: towers seek and attack enemies in range (barrack
+    // instead periodically spawns a walking ally, see spawnAlly()) ──
     towerAttack: function (time) {
       var self = this;
       this.towers.forEach(function (tower) {
         var def = TROOPS[tower.kind];
         var tierDef = def.tiers[tower.tier];
+        if (tower.kind === 'barrack') {
+          if (time >= tower.nextSpawnAt) {
+            self.spawnAlly(tower, tierDef);
+            tower.nextSpawnAt = time + tierDef.spawnMs;
+          }
+          return;
+        }
         var raging = tower.ragingUntil > time;
         if (tierDef.rage && time >= tower.nextRageAt) {
           tower.ragingUntil = time + RAGE_DURATION;
@@ -541,14 +653,19 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
         this.nextSpawnAt = time + SPAWN_GAP_MS;
       }
 
-      // Move enemies
+      // Move enemies -- blocked (frozen in place) while engaged in melee
+      // with a barrack ally, so the ally actually reads as holding the
+      // line rather than enemies just walking through it.
       this.enemies.forEach(function (e) {
+        var blocked = self.allies.some(function (a) { return a.target === e; });
+        if (blocked) return;
         e.travel += e.type.spd * dt;
         if (e.travel >= PATH_META.total) { self.enemyReachedBase(e); return; }
         var p = pointAtDistance(e.travel);
         e.x = p.x; e.y = p.y;
       });
 
+      this.allyTick(time, dt);
       this.towerAttack(time);
 
       // Wave-clear check
@@ -613,22 +730,39 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
         }
       }
 
-      // Towers (range ring + base disc; icon text is a persistent GameObject updated below)
+      // Towers (range ring + base disc; icon text is a persistent GameObject
+      // updated below). Barrack has no `range` (it doesn't attack in
+      // place), so it skips the range-ring entirely -- just the base disc.
       this.towers.forEach(function (t) {
         var def = TROOPS[t.kind], tierDef = def.tiers[t.tier];
         var raging = t.ragingUntil > time;
         var highlighted = self.panelTower === t || self.hoverTower === t;
-        g.fillStyle(def.color, highlighted ? 0.12 : 0.06); g.fillCircle(t.x, t.y, tierDef.range);
-        g.lineStyle(highlighted ? 2 : 1, def.color, highlighted ? 0.4 : 0.18); g.strokeCircle(t.x, t.y, tierDef.range);
+        if (t.kind !== 'barrack') {
+          g.fillStyle(def.color, highlighted ? 0.12 : 0.06); g.fillCircle(t.x, t.y, tierDef.range);
+          g.lineStyle(highlighted ? 2 : 1, def.color, highlighted ? 0.4 : 0.18); g.strokeCircle(t.x, t.y, tierDef.range);
+        }
         var baseR = 15 + t.tier * 3;
         if (t.tier === def.tiers.length - 1) {
-          var auraColor = t.kind === 'archer' ? 0xF0A500 : 0xE53935;
+          var auraColor = t.kind === 'archer' ? 0xF0A500 : t.kind === 'barrack' ? 0x8D6E63 : 0xE53935;
           g.fillStyle(auraColor, raging ? 0.5 : (0.22 + 0.1 * Math.sin(time * 0.006)));
           g.fillCircle(t.x, t.y, baseR + 9);
         }
         g.fillStyle(0xFFFFFF, 0.9); g.fillCircle(t.x, t.y, baseR);
         g.lineStyle(highlighted ? 4 : 3, highlighted ? 0xffffff : def.color); g.strokeCircle(t.x, t.y, baseR);
         t.icon.setPosition(t.x, t.y).setFontSize(16 + t.tier * 3);
+      });
+
+      // Allies (barrack-spawned walking units)
+      this.allies.forEach(function (a) {
+        var r = 10;
+        g.fillStyle(0xF0A500, 0.9); g.fillCircle(a.x, a.y, r);
+        g.lineStyle(2, 0x2b2438, 0.6); g.strokeCircle(a.x, a.y, r);
+        a.icon.setPosition(a.x, a.y);
+        var barW = 22, barX = a.x - barW / 2, barY = a.y - r - 10;
+        g.fillStyle(0x000000, 0.35); g.fillRect(barX, barY, barW, 4);
+        var afrac = Math.max(0, a.hp / a.maxHp);
+        g.fillStyle(afrac > 0.5 ? 0x27AE60 : afrac > 0.25 ? 0xF39C12 : 0xE53935);
+        g.fillRect(barX, barY, barW * afrac, 4);
       });
 
       // Enemies
@@ -665,7 +799,8 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       g.fillStyle(0x1e2a40); g.fillRect(0, PAL_Y0, W, H - PAL_Y0);
       var cardW = 150, cardH = 92, cardY = PAL_Y0 + 14;
       var self = this;
-      ['archer', 'sword'].forEach(function (kind, i) {
+      var cardKinds = HAS_BARRACK ? ['archer', 'sword', 'barrack'] : ['archer', 'sword'];
+      cardKinds.forEach(function (kind, i) {
         var def = TROOPS[kind];
         var x = 30 + i * (cardW + 14);
         var selected = self.selected === kind;
@@ -737,14 +872,18 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       var txt = this.infoPanelTxt || (this.infoPanelTxt = this.add.text(0, 0, '', {
         fontFamily: 'Prompt, sans-serif', fontSize: '12px', color: '#fff', lineSpacing: 5
       }).setDepth(35));
-      var lines = [
-        def.emoji + ' ' + def.name + '  (ระดับ ' + (tower.tier + 1) + '/3)',
-        '⚔️ ดาเมจ: ' + tierDef.dmg,
-        '🎯 ระยะ: ' + tierDef.range,
-        '⏱ ความเร็ว: ' + tierDef.atkMs + 'ms'
-      ];
-      if (tierDef.pierce) lines.push('✨ ทะลุ ' + tierDef.pierceCount + ' เป้า');
-      if (tierDef.rage) lines.push('🔥 โกรธจัดทุก ' + (RAGE_INTERVAL / 1000) + ' วิ');
+      var lines = [def.emoji + ' ' + def.name + '  (ระดับ ' + (tower.tier + 1) + '/3)'];
+      if (tower.kind === 'barrack') {
+        lines.push('💂 พลังชีวิตทหาร: ' + tierDef.allyHp);
+        lines.push('⚔️ ดาเมจทหาร: ' + tierDef.allyDmg);
+        lines.push('⏱ ส่งทหารทุก: ' + (tierDef.spawnMs / 1000) + ' วิ');
+      } else {
+        lines.push('⚔️ ดาเมจ: ' + tierDef.dmg);
+        lines.push('🎯 ระยะ: ' + tierDef.range);
+        lines.push('⏱ ความเร็ว: ' + tierDef.atkMs + 'ms');
+        if (tierDef.pierce) lines.push('✨ ทะลุ ' + tierDef.pierceCount + ' เป้า');
+        if (tierDef.rage) lines.push('🔥 โกรธจัดทุก ' + (RAGE_INTERVAL / 1000) + ' วิ');
+      }
       txt.setText(lines.join('\n')).setPosition(PANEL_X + 12, PANEL_Y + 10).setVisible(true);
 
       var closeTxt = this.infoCloseTxt || (this.infoCloseTxt = this.add.text(0, 0, '✕', {
