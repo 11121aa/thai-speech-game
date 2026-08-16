@@ -129,7 +129,17 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   var GRID_STEP_X = (GRID_X1 - GRID_X0) / (GRID_COLS - 1);
   var GRID_STEP_Y = (GRID_Y1 - GRID_Y0) / (GRID_ROWS - 1);
   var CELL_BOX_W = GRID_STEP_X - 6, CELL_BOX_H = GRID_STEP_Y - 6; // drawn box size per grid cell (leaves a gap between cells)
-  var ROAD_CLEARANCE = 36; // min distance from road centerline a tower can be placed
+  // Road is drawn 34px wide (17px half-width, see strokePath's lineStyle
+  // below) -- clearance used to be 36, leaving a ~19px dead zone beyond
+  // the road's visible edge where cells looked empty but were blocked.
+  // 32 = road half-width (17) + a freshly-placed tower's base-circle
+  // radius (15, see baseR in drawField) -- the tightest clearance that
+  // still keeps a tier-0 tower's solid disc off the visible road. A
+  // maxed (tier 2, baseR 21) tower can nose a few px into the road edge
+  // after upgrading, same as the existing tier-3 aura ring (radius up to
+  // baseR+9) already does regardless of this constant -- an accepted
+  // cosmetic tradeoff for opening up placement near the path.
+  var ROAD_CLEARANCE = 32; // min distance from road centerline a tower can be placed
   var PORTAL_CLEARANCE = 42, BASE_CLEARANCE = 48;
 
   function cellCenter(col, row) {
@@ -200,9 +210,9 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       name: 'นักดาบ', emoji: '⚔️', color: 0xB33A3A,
       costs: [35, 55, 85],
       tiers: [
-        { range: 72, dmg: 7,  atkMs: 850 },
-        { range: 82, dmg: 10, atkMs: 750 },
-        { range: 88, dmg: 13, atkMs: 650, rage: true }
+        { range: 55, dmg: 7,  atkMs: 850 },
+        { range: 62, dmg: 10, atkMs: 750 },
+        { range: 68, dmg: 13, atkMs: 650, rage: true }
       ]
     }
   };
@@ -213,10 +223,10 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   // the per-wave hpMul below, this is what makes later waves/maps feel
   // meaningfully harder rather than just "the same fight, more hits".
   var ENEMY_TYPES = [
-    { key: 'slime', name: 'สไลม์',   emoji: '🟢', hp: 18, spd: 40, gold: 4,  dmg: 1, color: 0x27AE60 },
-    { key: 'bat',   name: 'ค้างคาว', emoji: '🦇', hp: 10, spd: 66, gold: 3,  dmg: 1, color: 0x8E44AD },
-    { key: 'rock',  name: 'หิน',     emoji: '🪨', hp: 46, spd: 24, gold: 8,  dmg: 2, color: 0x7F8C8D },
-    { key: 'ogre',  name: 'ยักษ์',   emoji: '👹', hp: 90, spd: 18, gold: 14, dmg: 3, color: 0x6D4C41 }
+    { key: 'slime', name: 'สไลม์',   emoji: '🟢', hp: 18, spd: 50, gold: 4,  dmg: 1, color: 0x27AE60 },
+    { key: 'bat',   name: 'ค้างคาว', emoji: '🦇', hp: 10, spd: 82, gold: 3,  dmg: 1, color: 0x8E44AD },
+    { key: 'rock',  name: 'หิน',     emoji: '🪨', hp: 46, spd: 30, gold: 8,  dmg: 2, color: 0x7F8C8D },
+    { key: 'ogre',  name: 'ยักษ์',   emoji: '👹', hp: 90, spd: 22, gold: 14, dmg: 3, color: 0x6D4C41 }
   ];
   function buildWave(waveNum) {
     var count = 5 + waveNum * 2;
