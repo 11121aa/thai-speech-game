@@ -265,6 +265,15 @@
   <div class="setup-panel">
     <h4 class="mb-3">⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
 
+    <!-- Moved to the top (was at the bottom, requiring a scroll through
+         every option first) so "start" is reachable the instant the
+         panel opens, and stays pinned in view while scrolling through
+         the options below (position:sticky, see css/style.css). -->
+    <div class="setup-footer setup-footer-top">
+      <button class="btn btn-outline-secondary btn-bouncy" id="btnSetupCancel">ยกเลิก</button>
+      <button class="btn btn-warning btn-bouncy" id="btnSetupStart">เริ่มเกม! 🚀</button>
+    </div>
+
     <div class="setup-tutorial" id="setupTutorial">
       <img id="tutorialImg" class="setup-tutorial-img" src="" alt="ตัวอย่างวิธีเล่น">
       <p class="setup-tutorial-desc" id="tutorialDesc"></p>
@@ -289,12 +298,12 @@
 
     <div id="hwSelectorRow" class="setup-row" style="display:none;">
       <label>เลือกการบ้าน</label>
-      <div id="hwSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto;"></div>
+      <div id="hwSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;overscroll-behavior:contain;"></div>
     </div>
 
     <div id="worksheetSelectorRow" class="setup-row" style="display:none;">
       <label>เลือกแบบฝึกหัด</label>
-      <div id="worksheetSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto;"></div>
+      <div id="worksheetSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;overscroll-behavior:contain;"></div>
     </div>
 
     <div id="pfDiffRow" class="setup-row" style="display:none;">
@@ -347,11 +356,6 @@
         <video id="setupCameraVideo" autoplay muted playsinline></video>
       </div>
     </div>
-
-    <div class="setup-footer">
-      <button class="btn btn-outline-secondary btn-bouncy" id="btnSetupCancel">ยกเลิก</button>
-      <button class="btn btn-warning btn-bouncy" id="btnSetupStart">เริ่มเกม! 🚀</button>
-    </div>
   </div>
 </div>
 
@@ -384,7 +388,7 @@
           <div id="ppMultiCards" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:0.5rem 0;"></div>
           <p class="small fw-bold" id="ppMultiProgress" style="color:#8a5cf6;"></p>
           <button class="mic-btn mt-2" id="ppBtnMicHold"><i class="bi bi-mic-fill"></i></button>
-          <p class="small text-secondary" id="ppMultiHint">กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ</p>
+          <p class="small text-secondary" id="ppMultiHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด</p>
           <div class="d-flex gap-2 mt-2">
             <button class="btn btn-success flex-fill" id="ppBtnMultiDone" disabled>เสร็จแล้ว</button>
             <button class="btn btn-outline-secondary flex-fill" id="ppBtnMultiRedo">อัดใหม่</button>
@@ -457,7 +461,7 @@
 <script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/recorder.js?v=7"></script>
-<script src="js/practice-panel.js?v=10"></script>
+<script src="js/practice-panel.js?v=11"></script>
 <script src="js/main.js"></script>
 <script>
 /* ===== Global game-session state ===== */
@@ -859,6 +863,13 @@ function openSetup(mode) {
   updateWordCount();
   startSetupCam();
   document.getElementById('screenSetup').style.display = 'flex';
+  // Locks the page behind the overlay from scrolling -- on iPad, without
+  // this, dragging inside the (already scrollable) setup panel could
+  // chain into scrolling the page underneath instead once combined with
+  // certain gestures, even with overscroll-behavior:contain on the panel
+  // itself; this is the belt-and-suspenders fix. Restored wherever the
+  // overlay closes (cancel button, launchGame()).
+  document.body.style.overflow = 'hidden';
 }
 
 function populateSounds() {
@@ -1090,7 +1101,7 @@ async function getOrStartWorksheetRound(worksheetId, wordPool, repeatCount, user
   return created.id;
 }
 
-async function launchGame() {
+async function launchGame(reuse) {
   var diffBtn = document.querySelector('#hwDiffBtns .diff-btn.active');
   var diff = diffBtn ? diffBtn.getAttribute('data-diff') : 'custom';
   G.hwMode = diff === 'hw';
@@ -1106,7 +1117,11 @@ async function launchGame() {
   }
   if (G.hwMode && !_selectedHwAssignmentId) { alert('กรุณาเลือกการบ้านก่อน'); return; }
   if (G.worksheetMode && !_selectedWorksheetId) { alert('กรุณาเลือกแบบฝึกหัดก่อน'); return; }
-  var pool = getSetupPool();
+  // On replay, reuse the exact word set from the round that just finished
+  // instead of re-shuffling -- getSetupPool() picks randomly each call, so
+  // calling it again wouldn't reproduce the same words even with identical
+  // category/difficulty selections.
+  var pool = reuse ? G.words : getSetupPool();
 
   // How many times to record each word: the custom-mode stepper's value
   // for custom mode, but for homework/worksheet mode it must come from
@@ -1145,6 +1160,7 @@ async function launchGame() {
   if (_ownedUpgradesPromise) await _ownedUpgradesPromise;
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
+  document.body.style.overflow = '';
 
   G.mode = _setupMode; G.words = pool; G.pts = 0; G.paused = false; G.pronounceCount = effectivePronounceCount;
   document.getElementById('hudPoints').textContent = 0;
@@ -1330,8 +1346,12 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnSetupCancel').addEventListener('click', function () {
     stopSetupCam();
     document.getElementById('screenSetup').style.display = 'none';
+    document.body.style.overflow = '';
   });
-  document.getElementById('btnSetupStart').addEventListener('click', launchGame);
+  // No-arg wrapper -- addEventListener would otherwise pass the click Event
+  // itself as launchGame's `reuse` param (truthy), wrongly triggering replay
+  // behavior (reusing the last-played word pool) on every normal start.
+  document.getElementById('btnSetupStart').addEventListener('click', function () { launchGame(); });
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
     restoreTimerPill();
@@ -1339,7 +1359,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });
-  document.getElementById('btnPlayAgain').addEventListener('click', function () { openSetup(G.mode); });
+  document.getElementById('btnPlayAgain').addEventListener('click', function () {
+    // Skip the setup screen entirely -- openSetup() is what resets all the
+    // selection state (homework/worksheet pick, difficulty, pronounce
+    // count), so as long as we don't call it, everything the last round
+    // used is still sitting in place and launchGame(true) reuses it as-is,
+    // including the exact same word pool via G.words.
+    launchGame(true);
+  });
 });
 </script>
 </body>

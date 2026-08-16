@@ -32,9 +32,15 @@ const PracticePanel = (function () {
         // currentWord.sound_url exists (see resetPanelState).
         if (currentWord && currentWord.sound_url) new Audio(currentWord.sound_url).play();
       });
-      el("ppBtnMic").addEventListener("pointerdown", onSingleHoldStart);
-      el("ppBtnMic").addEventListener("pointerup", onSingleHoldEnd);
-      el("ppBtnMic").addEventListener("pointerleave", onSingleHoldEnd);
+      // Tap to start, tap again to stop -- was press-and-hold (release to
+      // stop), which is hard for young kids to sustain while also
+      // concentrating on saying the word. pointerup/pointerleave no longer
+      // stop it (lifting the finger mid-recording is now expected, not a
+      // "done" signal); pointercancel still stops it, since that's a real
+      // interruption (OS gesture, app losing focus), not a normal tap.
+      el("ppBtnMic").addEventListener("pointerdown", function (e) {
+        if (isRecording) onSingleHoldEnd(e); else onSingleHoldStart(e);
+      });
       el("ppBtnMic").addEventListener("pointercancel", onSingleHoldEnd);
       el("ppBtnCorrect").addEventListener("click", markCorrect);
       el("ppBtnRetry").addEventListener("click", resetForRetry);
@@ -51,9 +57,10 @@ const PracticePanel = (function () {
       // predates this branch and isn't fixed here.
       const micHoldBtn = el("ppBtnMicHold");
       if (micHoldBtn) {
-        micHoldBtn.addEventListener("pointerdown", onMultiHoldStart);
-        micHoldBtn.addEventListener("pointerup", onMultiHoldEnd);
-        micHoldBtn.addEventListener("pointerleave", onMultiHoldEnd);
+        // Same tap-to-start/tap-to-stop change as ppBtnMic above.
+        micHoldBtn.addEventListener("pointerdown", function (e) {
+          if (multiIsHolding) onMultiHoldEnd(e); else onMultiHoldStart(e);
+        });
         micHoldBtn.addEventListener("pointercancel", onMultiHoldEnd);
         el("ppBtnMultiRedo").addEventListener("click", onMultiRedo);
         el("ppBtnMultiDone").addEventListener("click", onMultiDone);
@@ -220,7 +227,7 @@ const PracticePanel = (function () {
     if (!btn) return;
     btn.classList.remove("recording");
     btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
-    el("ppMultiHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
+    el("ppMultiHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด";
   }
 
   function renderMultiCards() {
@@ -289,7 +296,7 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMicHold");
     btn.classList.add("recording");
     btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-    el("ppMultiHint").textContent = "กำลังอัดเสียง... ปล่อยปุ่มเมื่อพูดเสร็จ";
+    el("ppMultiHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเมื่อพูดเสร็จ";
     el("ppErrorMsg").style.display = "none";
 
     // getUserMedia() can resolve well after this call returns (notably,
@@ -442,7 +449,7 @@ const PracticePanel = (function () {
     el("ppRecordHint").textContent = "รอสักครู่...";
     setTimeout(function () {
       btn.disabled = false;
-      el("ppRecordHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
+      el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด";
     }, 1000);
   }
 
@@ -451,7 +458,7 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMic");
     btn.classList.remove("recording");
     btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
-    el("ppRecordHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
+    el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด";
   }
 
   function showError(message) {
@@ -493,7 +500,7 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMic");
     btn.classList.add("recording");
     btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-    el("ppRecordHint").textContent = "กำลังอัดเสียง... ปล่อยปุ่มเมื่อพูดเสร็จ";
+    el("ppRecordHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเมื่อพูดเสร็จ";
     el("ppErrorMsg").style.display = "none";
 
     // Same reasoning as onMultiHoldStart's heldWord: getUserMedia() can
@@ -517,7 +524,7 @@ const PracticePanel = (function () {
         setTimeout(function () {
           btn.disabled = false;
           if (el("ppPlaybackArea").style.display === "none") {
-            el("ppRecordHint").textContent = "กดค้างที่ปุ่มไมค์แล้วพูด ปล่อยเมื่อพูดเสร็จ";
+            el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด";
           }
         }, 1000);
         try {

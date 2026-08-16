@@ -651,6 +651,13 @@ a {
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  /* iOS Safari chains an inner scroll container's scroll to the page
+     behind it once you hit the top/bottom edge (or sometimes even before
+     that) unless told not to -- this is what made scrolling the setup
+     panel on iPad scroll the background page instead. Combined with
+     locking body scroll while the overlay is open (see openSetup/
+     closeSetup in game.html). */
+  overscroll-behavior: contain;
   box-shadow: var(--shadow-soft);
 }
 .setup-tutorial {
@@ -713,6 +720,7 @@ a {
 .word-set-list {
   max-height: 180px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid #e9e3f5;
   border-radius: var(--radius-md);
   padding: 0.5rem;
@@ -729,6 +737,20 @@ a {
 .word-set-item input[type="checkbox"] { width:18px; height:18px; cursor:pointer; accent-color: var(--color-primary); }
 .word-set-item label { cursor:pointer; font-size:0.9rem; margin:0; }
 .setup-footer { display: flex; gap: 0.75rem; justify-content: flex-end; padding-top: 1rem; border-top: 1px solid #f0ebfc; }
+/* Sticks to the top of .setup-panel's own scroll area (not the viewport)
+   so Start/Cancel stay visible while scrolling through the options below
+   instead of only being reachable after scrolling all the way down. */
+.setup-footer-top {
+  position: sticky;
+  top: -2rem; /* cancels .setup-panel's own padding so this sits flush at its actual scroll-top */
+  margin: -2rem -2rem 1.2rem;
+  padding: 1rem 2rem;
+  border-top: none;
+  border-bottom: 1px solid #f0ebfc;
+  background: #fff;
+  z-index: 2;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
 
 /* ============ Active game screen ============ */
 .game-hud-bar {
@@ -1533,6 +1555,10 @@ section.bg-soft-yellow {
   .setup-panel     { padding: 1rem 1rem 1.2rem; }
   .setup-footer    { flex-direction: column; }
   .setup-footer .btn { width: 100%; }
+  /* Re-matches .setup-footer-top's bleed-to-edge offsets to this
+     breakpoint's own smaller .setup-panel padding (1rem instead of 2rem),
+     otherwise it'd sit misaligned against the panel's edges/top. */
+  .setup-footer-top { top: -1rem; margin: -1rem -1rem 1rem; padding: 0.75rem 1rem; }
 
   /* Practice modal: boxes shrink so 2 fit side-by-side on a 375px screen */
   .mouth-animation-box,
