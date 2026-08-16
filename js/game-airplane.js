@@ -9,10 +9,12 @@
 //  [PLANE]     Plane colours & shape                       (~drawPlane)
 // ============================================================
 //  How the game works:
-//    - Tap the left/right half of the screen to swap the plane into the
-//      lane on that side (3 fixed lanes) — same instant, forgiving
-//      left/right control as Subway Surfers, just top-down instead of
-//      third-person, flying low over open ocean.
+//    - Press and drag anywhere to fly the plane -- it follows your
+//      finger/cursor across the 3 fixed lanes for as long as you hold,
+//      snapping to whichever lane you're over (still Subway-Surfers-style
+//      lane switching under the hood, just drag-controlled instead of a
+//      tap-per-lane), top-down instead of third-person, flying low over
+//      open ocean.
 //    - Everything scrolls toward the player from the top of the screen:
 //      coin strings (+2 ⭐ each), golden word bubbles (pronunciation
 //      practice → +5 ⭐ bonus, on top of the shared +20 for a correct
@@ -151,7 +153,7 @@ function createAirplaneGame(words, callbacks) {
 
       // Fading instructional hint
       this.hint = this.add.text(W / 2, H - 16,
-        '👈👉 แตะซ้าย-ขวาเพื่อสลับเลน — เก็บเหรียญ 🪙 คำ 💬 และเกาะโบนัส 🏝️ หลบหิน/นก/หนวดปลาหมึก 💥', {
+        '👈👉 กดค้างแล้วลากเพื่อบังคับเครื่องบิน — เก็บเหรียญ 🪙 คำ 💬 และเกาะโบนัส 🏝️ หลบหิน/นก/หนวดปลาหมึก 💥', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
           backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }, align: 'center',
           wordWrap: { width: W - 24 }
@@ -162,11 +164,29 @@ function createAirplaneGame(words, callbacks) {
         });
       });
 
-      // ── Input: tap the left/right half of the screen to shift lane ──
+      // ── Input: press and drag anywhere to fly the plane -- the target
+      // lane continuously tracks the pointer's x position while held
+      // (nearestLane below), instead of a one-time tap-left/tap-right
+      // shift, so the plane follows your finger as you drag it across
+      // lanes rather than needing a separate tap per lane. Collision/
+      // spawn logic is still lane-based under the hood (laneIdx), but
+      // planeX's existing easing toward LANE_X[laneIdx] (see update())
+      // already makes that read as smooth free movement while dragging.
+      function nearestLane(x) {
+        var best = 0, bestD = Infinity;
+        for (var i = 0; i < LANE_COUNT; i++) {
+          var d = Math.abs(x - LANE_X[i]);
+          if (d < bestD) { bestD = d; best = i; }
+        }
+        return best;
+      }
       this.input.on('pointerdown', function (ptr) {
         if (self.dead || self.isPaused) return;
-        if (ptr.x < W / 2) self.laneIdx = Math.max(0, self.laneIdx - 1);
-        else self.laneIdx = Math.min(LANE_COUNT - 1, self.laneIdx + 1);
+        self.laneIdx = nearestLane(ptr.x);
+      });
+      this.input.on('pointermove', function (ptr) {
+        if (self.dead || self.isPaused || !ptr.isDown) return;
+        self.laneIdx = nearestLane(ptr.x);
       });
       // Optional keyboard support (desktop testing/accessibility)
       this.input.keyboard && this.input.keyboard.on('keydown', function (e) {
