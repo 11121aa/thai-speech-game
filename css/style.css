@@ -1149,6 +1149,96 @@ a {
   filter: brightness(1.15);
 }
 
+/* ============ RPG controls: analog stick + skill button ============
+   Sits below the canvas rather than floating over it (unlike
+   .platformer-btns) -- the dungeon fills its whole field, so overlaid
+   controls would cover tiles the player needs to see. */
+.rpg-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px 4px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.rpg-stick {
+  position: relative;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(255,255,255,0.20), rgba(30,22,48,0.32));
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 3px 12px rgba(0,0,0,0.28), 0 4px 14px rgba(0,0,0,0.18);
+  flex: 0 0 auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.rpg-stick:active { cursor: grabbing; }
+/* Run is over -- controls stay visible for continuity but read as inert. */
+.rpg-controls.is-over { opacity: 0.4; pointer-events: none; }
+.rpg-stick-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  line-height: 2.6;
+  color: rgba(255, 255, 255, 0.34);
+  pointer-events: none;
+}
+.rpg-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 34%, #fff, #c9bde8 62%, #9a86c9);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  /* Only the spring-back to center is animated; while dragging, the JS
+     clears this so the knob tracks the finger with no lag. */
+  transition: transform 0.12s ease-out;
+}
+.rpg-skill-btn {
+  position: relative;
+  background: rgba(138, 92, 246, 0.9);
+  border-color: rgba(138, 92, 246, 0.95);
+  color: #fff;
+  overflow: hidden;
+}
+/* Cooldown wipe: --cd goes 1 (just fired) -> 0 (ready), driven per-frame
+   from the game loop, so the dark sweep drains as the skill recharges. */
+.rpg-skill-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(20, 10, 40, 0.62) calc(var(--cd, 0) * 360deg), transparent 0);
+  pointer-events: none;
+}
+.rpg-skill-face { position: relative; z-index: 1; line-height: 1.25; }
+.rpg-skill-btn.is-ready {
+  box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.75), 0 4px 14px rgba(0, 0, 0, 0.2);
+  animation: rpgSkillReady 1.6s ease-out infinite;
+}
+@keyframes rpgSkillReady {
+  0%   { box-shadow: 0 0 0 0 rgba(167,139,250,0.7), 0 4px 14px rgba(0,0,0,0.2); }
+  70%  { box-shadow: 0 0 0 12px rgba(167,139,250,0), 0 4px 14px rgba(0,0,0,0.2); }
+  100% { box-shadow: 0 0 0 0 rgba(167,139,250,0), 0 4px 14px rgba(0,0,0,0.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rpg-skill-btn.is-ready { animation: none; }
+}
+
 /* ============ Flashcard game ============ */
 .flashcard-arena {
   max-width: 480px;
@@ -1571,6 +1661,9 @@ section.bg-soft-yellow {
   /* Platformer/crossy touch buttons: slightly smaller to leave more game visible */
   .pf-btn         { width: 62px; height: 62px; font-size: 0.88rem; }
   .platformer-btns { bottom: 6px; padding: 0 6px; }
+  .rpg-controls   { padding: 8px 14px 2px; }
+  .rpg-stick      { width: 104px; height: 104px; }
+  .rpg-stick-knob { width: 48px; height: 48px; margin: -24px 0 0 -24px; }
 
   /* Finish screen: shrink giant trophy emoji */
   .finish-emoji { font-size: 3.5rem; }

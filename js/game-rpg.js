@@ -8,14 +8,16 @@
 //    [BOSS]    The 3 boss types + their special abilities    (~BOSSES / bossTick)
 //    [COMBAT]  Auto-attack, skill use, damage resolution     (~playerAttackTick / useSkill)
 //    [SHRINE]  Per-room practice pickup + boss-gate           (~spawnShrines / shrineTick)
-//    [UI]      HUD, skill button, movement d-pad              (~drawHud)
+//    [UI]      HUD, skill button, analog joystick             (~drawHud / wireInput)
 // ============================================================
 //  How the game works:
 //    - Every run generates a brand-new dungeon from a random seed
 //      (shown in the HUD) -- a handful of rooms connected by corridors,
-//      ending in a boss room. Move with the on-screen d-pad or arrow
-//      keys/WASD; combat is automatic -- walk near an enemy and you
-//      (and it) trade hits on a timer, no separate attack button needed.
+//      ending in a boss room. Move any of three ways -- the analog
+//      joystick below the canvas, holding/dragging a finger anywhere on
+//      the dungeon itself (the hero walks toward it), or arrow keys/WASD.
+//      Combat is automatic -- walk near an enemy and you (and it) trade
+//      hits on a timer, no separate attack button needed.
 //    - Every non-start room has a glowing practice shrine. Walking into
 //      one opens the shared pronunciation practice popup; closing it
 //      heals you a little and awards points. The boss room's own boss
@@ -40,10 +42,10 @@
 // so relying on it would leak listeners (and duplicate keydown/keyup
 // handlers on window) on every restart. RpgGame.stop() below does this
 // cleanup directly and unconditionally instead.
-var _rpgDirFns = null;
 var _rpgSkillFn = null;
 var _rpgKeydownFn = null;
 var _rpgKeyupFn = null;
+var _rpgStickFns = null;
 
 function createRpgGame(words, callbacks) {
   var W = 800, H = 500;
@@ -183,6 +185,13 @@ function createRpgGame(words, callbacks) {
       this.boss = null;        // set once the boss room is built
       this.fx = [];            // floating text / telegraph rings
       this.heldDir = { up: false, down: false, left: false, right: false };
+      // Analog move vector from the joystick (-1..1 each axis, already
+      // magnitude-limited to 1). Keyboard still writes heldDir; whichever
+      // source is actually active wins in getMoveVec().
+      this.stick = { x: 0, y: 0, active: false };
+      // World-space point the finger is holding on the canvas -- the
+      // player walks toward it while held ("drag the character").
+      this.dragTo = null;
       this.phase = 'playing';  // playing | won | lost
       this.paused = false;     // true while a practice popup is open
       this.wordIdx = 0;
@@ -288,27 +297,71 @@ function createRpgGame(words, callbacks) {
       }
     },
 
-    // ── Input: 4-way held movement (buttons + keyboard) + a skill tap ──
+    // ── Input: analog joystick, drag-on-canvas, keyboard, skill tap ──
     // Cleanup is NOT wired via this.events.on('shutdown', ...) -- see the
-    // comment on _rpgDirFns above createRpgGame(). RpgGame.stop() removes
+    // comment on _rpgStickFns above createRpgGame(). RpgGame.stop() removes
     // these listeners directly instead.
     wireInput: function () {
       var self = this;
-      var dirBtns = { up: 'rpgBtnUp', down: 'rpgBtnDown', left: 'rpgBtnLeft', right: 'rpgBtnRight' };
-      _rpgDirFns = {};
-      Object.keys(dirBtns).forEach(function (dir) {
-        var el = document.getElementById(dirBtns[dir]);
-        if (!el) return;
-        var downFn = function (e) { e.preventDefault(); self.heldDir[dir] = true; };
-        var upFn = function () { self.heldDir[dir] = false; };
-        el.addEventListener('mousedown', downFn);
-        el.addEventListener('touchstart', downFn, { passive: false });
-        el.addEventListener('mouseup', upFn);
-        el.addEventListener('mouseleave', upFn);
-        el.addEventListener('touchend', upFn);
-        el.addEventListener('touchcancel', upFn);
-        _rpgDirFns[dir] = { downFn: downFn, upFn: upFn, el: el };
-      });
+
+      // ── Virtual joystick ──
+      // Pointer Events + setPointerCapture means the drag keeps tracking
+      // even when the finger slides outside the stick's circle, which is
+      // exactly what happens when a child pushes it to full deflection.
+      var stick = document.getElementById('rpgStick');
+      var knob = document.getElementById('rpgStickKnob');
+      if (stick && knob) {
+        var STICK_DEAD = 0.16; // ignore tiny wobbles so the player doesn't creep
+        var moveKnob = function (dx, dy) {
+          knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        };
+        var applyPointer = function (e) {
+          var r = stick.getBoundingClientRect();
+          var maxR = r.width / 2 - 12;
+          var dx = e.clientX - (r.left + r.width / 2);
+          var dy = e.clientY - (r.top + r.height / 2);
+          var d = Math.hypot(dx, dy);
+          if (d > maxR) { dx = dx / d * maxR; dy = dy / d * maxR; d = maxR; }
+          moveKnob(dx, dy);
+          var mag = maxR ? d / maxR : 0;
+          if (mag < STICK_DEAD) { self.stick.x = 0; self.stick.y = 0; self.stick.active = false; return; }
+          self.stick.x = dx / maxR; self.stick.y = dy / maxR; self.stick.active = true;
+        };
+        // Track the owning pointer by id rather than asking the element
+        // whether it still holds capture -- capture can be silently lost
+        // (or never granted), and then the stick would stick at whatever
+        // deflection it was at with no way to recover.
+        var stickId = null;
+        var stickDown = function (e) {
+          e.preventDefault();
+          stickId = e.pointerId;
+          knob.style.transition = 'none'; // track the finger with no lag
+          try { stick.setPointerCapture(e.pointerId); } catch (err) {}
+          applyPointer(e);
+        };
+        var stickMove = function (e) { if (stickId === e.pointerId) applyPointer(e); };
+        var stickUp = function (e) {
+          if (stickId !== e.pointerId) return;
+          stickId = null;
+          try { stick.releasePointerCapture(e.pointerId); } catch (err) {}
+          knob.style.transition = '';   // spring back to center
+          moveKnob(0, 0);
+          self.stick.x = 0; self.stick.y = 0; self.stick.active = false;
+        };
+        stick.addEventListener('pointerdown', stickDown);
+        stick.addEventListener('pointermove', stickMove);
+        stick.addEventListener('pointerup', stickUp);
+        stick.addEventListener('pointercancel', stickUp);
+        _rpgStickFns = { stick: stick, down: stickDown, move: stickMove, up: stickUp };
+      }
+
+      // ── Drag anywhere on the dungeon to walk there ──
+      // Phaser reports pointer coords already in the game's own 800x500
+      // space, so these need no manual scaling from CSS pixels.
+      this.input.on('pointerdown', function (ptr) { self.dragTo = { x: ptr.worldX, y: ptr.worldY }; });
+      this.input.on('pointermove', function (ptr) { if (ptr.isDown) self.dragTo = { x: ptr.worldX, y: ptr.worldY }; });
+      this.input.on('pointerup', function () { self.dragTo = null; });
+      this.input.on('pointerupoutside', function () { self.dragTo = null; });
 
       var skillBtn = document.getElementById('rpgBtnSkill');
       _rpgSkillFn = function (e) { e.preventDefault(); self.useSkill(); };
@@ -332,6 +385,43 @@ function createRpgGame(words, callbacks) {
       };
       window.addEventListener('keydown', _rpgKeydownFn);
       window.addEventListener('keyup', _rpgKeyupFn);
+    },
+
+    // Releases every movement source at once, for moments where input
+    // can be left latched with no matching release event (see shrineTick).
+    clearMoveInput: function () {
+      this.dragTo = null;
+      this.stick.x = 0; this.stick.y = 0; this.stick.active = false;
+      this.heldDir.up = this.heldDir.down = this.heldDir.left = this.heldDir.right = false;
+      var knob = document.getElementById('rpgStickKnob');
+      if (knob) { knob.style.transition = ''; knob.style.transform = 'translate(0px,0px)'; }
+    },
+
+    // Resolves the three movement sources into one vector of magnitude
+    // <= 1. Joystick wins when deflected, then a held drag on the
+    // dungeon, then the keyboard -- so picking up one control never
+    // fights input still latched from another.
+    getMoveVec: function () {
+      if (this.stick.active) {
+        var m = Math.hypot(this.stick.x, this.stick.y);
+        if (m > 1) return { x: this.stick.x / m, y: this.stick.y / m };
+        return { x: this.stick.x, y: this.stick.y };
+      }
+      if (this.dragTo) {
+        var dx = this.dragTo.x - this.player.x, dy = this.dragTo.y - this.player.y;
+        var d = Math.hypot(dx, dy);
+        // Dead zone around the finger, else the player jitters back and
+        // forth across the exact point it's standing on.
+        if (d < PLAYER_R) return { x: 0, y: 0 };
+        // Ease down over the last stride so it settles instead of
+        // overshooting and snapping back.
+        var speed = Math.min(1, d / (PLAYER_R * 3));
+        return { x: dx / d * speed, y: dy / d * speed };
+      }
+      var kx = (this.heldDir.right ? 1 : 0) - (this.heldDir.left ? 1 : 0);
+      var ky = (this.heldDir.down ? 1 : 0) - (this.heldDir.up ? 1 : 0);
+      if (kx !== 0 && ky !== 0) { kx *= 0.7071; ky *= 0.7071; }
+      return { x: kx, y: ky };
     },
 
     isWallAtPixel: function (px, py) {
@@ -440,6 +530,11 @@ function createRpgGame(words, callbacks) {
           return;
         }
         self.paused = true;
+        // Drop any latched movement before the popup takes over. Walking
+        // into a shrine mid-drag means the finger lifts on top of the
+        // modal, not the canvas, so Phaser may never see the pointerup --
+        // without this the hero resumes marching the moment it closes.
+        self.clearMoveInput();
         var word = words[self.wordIdx++ % words.length];
         callbacks.onPractice(word, null, function () {
           self.paused = false;
@@ -532,6 +627,12 @@ function createRpgGame(words, callbacks) {
       var self = this;
       this.phase = won ? 'won' : 'lost';
       this.paused = true;
+      // Drop any held input and grey the controls out -- the run is over,
+      // so a still-deflected stick shouldn't look like it still does
+      // something during the 2.2s before the finish screen takes over.
+      this.clearMoveInput();
+      var ctrls = document.querySelector('.rpg-controls');
+      if (ctrls) ctrls.classList.add('is-over');
       if (won && this.sfxWin) this.sfxWin.play();
       this.time.delayedCall(2200, function () {
         // On a loss, one last forced practice word before finishing --
@@ -567,12 +668,10 @@ function createRpgGame(words, callbacks) {
       }
 
       // Movement
-      var vx = (this.heldDir.right ? 1 : 0) - (this.heldDir.left ? 1 : 0);
-      var vy = (this.heldDir.down ? 1 : 0) - (this.heldDir.up ? 1 : 0);
-      if (vx !== 0 && vy !== 0) { vx *= 0.7071; vy *= 0.7071; }
-      var nx = this.player.x + vx * PLAYER_SPD * dt;
+      var mv = this.getMoveVec();
+      var nx = this.player.x + mv.x * PLAYER_SPD * dt;
       if (this.canMoveTo(nx, this.player.y, PLAYER_R)) this.player.x = nx;
-      var ny = this.player.y + vy * PLAYER_SPD * dt;
+      var ny = this.player.y + mv.y * PLAYER_SPD * dt;
       if (this.canMoveTo(this.player.x, ny, PLAYER_R)) this.player.y = ny;
       this.playerIcon.setPosition(this.player.x, this.player.y);
 
@@ -667,13 +766,28 @@ function createRpgGame(words, callbacks) {
       var skillTxt = this.skillHudText || (this.skillHudText = this.add.text(0, 0, '', {
         fontFamily: 'Prompt, sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#fff', align: 'right'
       }).setOrigin(1, 0).setDepth(25));
+      var remain = 0, cdFrac = 0;
       if (this.player.skill) {
-        var remain = Math.max(0, this.player.skillReadyAt - time);
+        remain = Math.max(0, this.player.skillReadyAt - time);
+        cdFrac = remain / (this.player.skill.cooldownMs || DEFAULT_SKILL_CD_MS);
         skillTxt.setText(remain > 0 ? '🔮 ' + (remain / 1000).toFixed(1) + 's' : '🔮 พร้อม!');
       } else {
         skillTxt.setText('');
       }
       skillTxt.setPosition(W - 10, 8);
+
+      // Mirror the same cooldown onto the on-screen skill button, so the
+      // player watching their thumb doesn't have to also track the HUD.
+      var btn = this._skillBtnEl || (this._skillBtnEl = document.getElementById('rpgBtnSkill'));
+      if (btn) {
+        var ring = this._skillRingEl || (this._skillRingEl = document.getElementById('rpgSkillRing'));
+        if (ring) ring.style.setProperty('--cd', Math.max(0, Math.min(1, cdFrac)).toFixed(3));
+        var ready = !!this.player.skill && remain <= 0 && this.phase === 'playing';
+        if (ready !== this._skillWasReady) {
+          btn.classList.toggle('is-ready', ready);
+          this._skillWasReady = ready;
+        }
+      }
     },
     drawEndOverlay: function (g) {
       g.fillStyle(0x000000, 0.55); g.fillRect(0, 0, W, H);
@@ -709,7 +823,7 @@ var RpgGame = (function () {
   // stop() (e.g. a fast retry double-tap, or a fresh start() firing before
   // this one's async loadLoadout()/setTimeout resolve) can detect that and
   // skip creating its game -- otherwise its create() would clobber the
-  // newer call's _rpgDirFns/_rpgSkillFn/_rpgKeydownFn/_rpgKeyupFn module
+  // newer call's _rpgStickFns/_rpgSkillFn/_rpgKeydownFn/_rpgKeyupFn module
   // vars out from under it, leaking the superseded generation's listeners
   // with no way for stop() to ever reach them again.
   var startToken = 0;
@@ -756,18 +870,24 @@ var RpgGame = (function () {
     startToken++;
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
     // Done here rather than the scene's own 'shutdown' event -- see the
-    // comment on _rpgDirFns above createRpgGame().
-    Object.keys(_rpgDirFns || {}).forEach(function (dir) {
-      var f = _rpgDirFns[dir];
-      f.el.removeEventListener('mousedown', f.downFn);
-      f.el.removeEventListener('touchstart', f.downFn);
-      f.el.removeEventListener('mouseup', f.upFn);
-      f.el.removeEventListener('mouseleave', f.upFn);
-      f.el.removeEventListener('touchend', f.upFn);
-      f.el.removeEventListener('touchcancel', f.upFn);
-    });
-    _rpgDirFns = null;
+    // comment on _rpgStickFns above createRpgGame().
+    if (_rpgStickFns) {
+      var s = _rpgStickFns;
+      s.stick.removeEventListener('pointerdown', s.down);
+      s.stick.removeEventListener('pointermove', s.move);
+      s.stick.removeEventListener('pointerup', s.up);
+      s.stick.removeEventListener('pointercancel', s.up);
+      _rpgStickFns = null;
+    }
+    // Leave no stale cooldown wipe / ready-pulse on the button between runs.
+    var knob = document.getElementById('rpgStickKnob');
+    if (knob) { knob.style.transition = ''; knob.style.transform = ''; }
+    var ring = document.getElementById('rpgSkillRing');
+    if (ring) ring.style.setProperty('--cd', '0');
     var skillBtn = document.getElementById('rpgBtnSkill');
+    if (skillBtn) skillBtn.classList.remove('is-ready');
+    var ctrls = document.querySelector('.rpg-controls');
+    if (ctrls) ctrls.classList.remove('is-over');
     if (skillBtn && _rpgSkillFn) {
       skillBtn.removeEventListener('mousedown', _rpgSkillFn);
       skillBtn.removeEventListener('touchstart', _rpgSkillFn);
