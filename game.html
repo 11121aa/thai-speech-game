@@ -450,7 +450,7 @@
 <script src="js/game-matching.js?v=8"></script>
 <script src="js/game-flashcard.js?v=6"></script>
 <script src="js/game-crossy.js?v=6"></script>
-<script src="js/game-cooking.js?v=19"></script>
+<script src="js/game-cooking.js?v=20"></script>
 <script src="js/game-dressup.js?v=14"></script>
 <script src="js/game-towerdefense.js?v=11"></script>
 <script src="js/game-tetris.js?v=4"></script>
@@ -1189,7 +1189,12 @@ async function launchGame(reuse) {
     if (timerPillCk) timerPillCk.style.visibility = 'hidden';
     clearInterval(G.timerHandle);
     document.getElementById('cookingGame').style.display = 'block';
-    window.__cookLoadout = { hasPizza: hasUpgrade('cook_dish_pizza'), hasBreakfast: hasUpgrade('cook_dish_breakfast') };
+    window.__cookLoadout = {
+      hasPizza:     hasUpgrade('cook_dish_pizza'),
+      hasBreakfast: hasUpgrade('cook_dish_breakfast'),
+      hasBurger:    hasUpgrade('cook_dish_burger'),
+      hasFries:     hasUpgrade('cook_dish_fries')
+    };
     CookingGame.start(pool, GAME_CBS);
     return;
   }
