@@ -32,6 +32,16 @@ var PLATFORMER_DIFFICULTIES = {
   'ยาก':    { base: 6.2, max: 13.5 }
 };
 
+// Tracks the currently-attached #pfBtnJump/#pfBtnSlide listeners across
+// restarts. NOT cleaned up via the scene's own 'shutdown' event -- Phaser's
+// game.destroy(true) does not reliably fire it in this codebase's setup
+// (confirmed live the same way as js/game-shooting.js's identical comment),
+// so relying on it would leak listeners (and the touchstart-wrapped jump/slide
+// closures) on every restart. PlatformerGame.stop() below does this cleanup
+// directly and unconditionally instead.
+var _pfJumpFn = null, _pfJumpTouchFn = null;
+var _pfSlideDownFn = null, _pfSlideDownTouchFn = null, _pfSlideUpFn = null;
+
 function createPlatformerGame(words, callbacks, difficulty) {
 
   var diffCfg = PLATFORMER_DIFFICULTIES[difficulty] || PLATFORMER_DIFFICULTIES['ธรรมดา'];
@@ -45,6 +55,20 @@ function createPlatformerGame(words, callbacks, difficulty) {
   var FAST_FALL     = 1.0; // extra downward accel while airborne + slide held
   var IMMORTAL_FRAMES = 180; // "อมตะ" (immortal) shield duration after a successful word practice
   var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 10000; // [WORDS] random ms range between word-bubble spawns
+
+  // ── [ITEMS] Shop-unlocked pickups (supabase/024_game_upgrades_migration.sql)
+  // -- window.__pfLoadout is set by game.html just before start(). None of
+  // these spawn at all without their own unlock (see spawnPickup below),
+  // so the original word-bubble-only game is unchanged for a
+  // guest/no-purchase player. ──────────────────────────────────────
+  var loadout = window.__pfLoadout || {};
+  var HAS_JUMPBOOST = !!loadout.hasJumpBoost;
+  var HAS_BOMB = !!loadout.hasBomb;
+  var HAS_DOUBLEPOINT = !!loadout.hasDoublePoint;
+  var PICKUP_INTERVAL_MIN = 8000, PICKUP_INTERVAL_MAX = 13000;
+  var JUMP_BOOST_MS = 6000, JUMP_BOOST_MULT = 1.35;
+  var BOMB_RADIUS_WORLD = 320; // world-x distance an obstacle can be from the player and still get cleared
+  var DOUBLE_PTS_MS = 8000;
   var W = 800, H = 400;
   var GROUND_Y   = H - 55;
   var PLAYER_X   = 110;
@@ -146,6 +170,7 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.gaps       = [];
       this.words2     = [];
       this.obstacles  = [];
+      this.pickups    = []; // shop-unlocked items: { x, y, kind, collected }
       this.clouds     = [];
       this.player     = null;
       this.nextChunkX = W + 300; // clear runway before the first pattern
@@ -153,6 +178,8 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.lastPatternStreak = 0;  // [PATTERNS] how many times it's repeated in a row
       this.wordTimer  = 0; // [WORDS] ms accumulated since the last word spawn
       this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
+      this.pickupTimer = 0; // [ITEMS] ms accumulated since the last pickup spawn
+      this.nextPickupDelay = PICKUP_INTERVAL_MIN + Math.random() * (PICKUP_INTERVAL_MAX - PICKUP_INTERVAL_MIN);
       this.slideHeld  = false; // true while the mobile slide button is pressed
       this.surviveMs  = 0; // total time survived — drives the speed ramp
       this.pointTimer = 0; // ms accumulated since the last +1 survival point
@@ -203,7 +230,8 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.player = {
         y: GROUND_Y - PH, vy: 0, h: PH,
         onGround: true, sliding: false,
-        legPhase: 0, invincible: 0
+        legPhase: 0, invincible: 0,
+        jumpBoostUntil: 0, doublePointsUntil: 0 // [ITEMS] buff expiry timestamps (this.time.now-scale)
       };
 
       // [PLAYER] Sprite atlas + animation state machine — hand-drawn stick
@@ -242,29 +270,34 @@ function createPlatformerGame(words, callbacks, difficulty) {
 
       // Mobile buttons — slide tracks press/release so it lasts exactly as
       // long as the button is held, same as the keyboard's key.isDown.
+      // Cleanup is NOT wired via this.events.on('shutdown', ...) -- see the
+      // comment on _pfJumpFn above createPlatformerGame(). PlatformerGame.stop()
+      // removes these listeners directly instead.
       var bj = document.getElementById('pfBtnJump');
       var bs = document.getElementById('pfBtnSlide');
-      this._jumpFn      = function () { self.doJump(); };
-      this._slideDownFn = function () { self.slideHeld = true; };
-      this._slideUpFn   = function () { self.slideHeld = false; };
+      _pfJumpFn      = function () { self.doJump(); };
+      _pfSlideDownFn = function () { self.slideHeld = true; };
+      _pfSlideUpFn   = function () { self.slideHeld = false; };
       // preventDefault() on touchstart suppresses the synthetic mousedown
       // the browser would otherwise follow up with for the same tap, so
       // exactly one of the two listeners fires per interaction instead of
-      // both firing back-to-back for one real touch.
+      // both firing back-to-back for one real touch. Kept as named
+      // functions (not inline closures) so stop() can remove the exact
+      // same reference.
+      _pfJumpTouchFn = function (e) { e.preventDefault(); _pfJumpFn(); };
+      _pfSlideDownTouchFn = function (e) { e.preventDefault(); _pfSlideDownFn(); };
       if (bj) {
-        bj.addEventListener('mousedown',  this._jumpFn);
-        bj.addEventListener('touchstart', function (e) { e.preventDefault(); self._jumpFn(); }, { passive: false });
+        bj.addEventListener('mousedown',  _pfJumpFn);
+        bj.addEventListener('touchstart', _pfJumpTouchFn, { passive: false });
       }
       if (bs) {
-        bs.addEventListener('mousedown',   this._slideDownFn);
-        bs.addEventListener('touchstart',  function (e) { e.preventDefault(); self._slideDownFn(); }, { passive: false });
-        bs.addEventListener('mouseup',     this._slideUpFn);
-        bs.addEventListener('mouseleave',  this._slideUpFn);
-        bs.addEventListener('touchend',    this._slideUpFn);
-        bs.addEventListener('touchcancel', this._slideUpFn);
+        bs.addEventListener('mousedown',   _pfSlideDownFn);
+        bs.addEventListener('touchstart',  _pfSlideDownTouchFn, { passive: false });
+        bs.addEventListener('mouseup',     _pfSlideUpFn);
+        bs.addEventListener('mouseleave',  _pfSlideUpFn);
+        bs.addEventListener('touchend',    _pfSlideUpFn);
+        bs.addEventListener('touchcancel', _pfSlideUpFn);
       }
-
-      this.events.on('shutdown', this.shutdown, this);
 
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
@@ -291,7 +324,8 @@ function createPlatformerGame(words, callbacks, difficulty) {
     doJump: function () {
       if (this.isPaused) return;
       if (this.player.onGround) {
-        this.player.vy = JUMP_VY;
+        var boosted = this.player.jumpBoostUntil > this.time.now;
+        this.player.vy = boosted ? JUMP_VY * JUMP_BOOST_MULT : JUMP_VY;
         this.player.onGround = false;
         this.player.sliding  = false;
         this.player.h        = PH;
@@ -307,6 +341,20 @@ function createPlatformerGame(words, callbacks, difficulty) {
         x: x, y: GROUND_Y - 90 - Math.random() * 70,
         word: word, collected: false
       });
+    },
+
+    // [ITEMS] Picks a random OWNED kind (a kind whose upgrade isn't
+    // purchased never spawns at all -- this is the only gate needed,
+    // since an unowned kind simply never appears in `avail`). No-op if
+    // nothing is owned, same as the original word-bubble-only game.
+    spawnPickup: function (x) {
+      var avail = [];
+      if (HAS_JUMPBOOST) avail.push('jumpboost');
+      if (HAS_BOMB) avail.push('bomb');
+      if (HAS_DOUBLEPOINT) avail.push('doublepoint');
+      if (!avail.length) return;
+      var kind = avail[Math.floor(Math.random() * avail.length)];
+      this.pickups.push({ x: x, y: GROUND_Y - 90 - Math.random() * 70, kind: kind, collected: false });
     },
 
     // [PATTERNS] Spawns a random pattern at world-x startX, shifting every
@@ -403,7 +451,7 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.pointTimer += delta;
       if (this.pointTimer >= 1000) {
         this.pointTimer -= 1000;
-        callbacks.onPoints(1);
+        callbacks.onPoints(p.doublePointsUntil > time ? 2 : 1);
       }
       var scrollSpd = Math.min(SCROLL_SPD_MAX, SCROLL_SPD_BASE + (this.surviveMs / 1000) * SPEED_RAMP);
 
@@ -491,6 +539,14 @@ function createPlatformerGame(words, callbacks, difficulty) {
         this.nextWordDelay = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
         this.spawnWordItem(this.scrollX + W + 60);
       }
+      // [ITEMS]
+      this.pickupTimer += delta;
+      if (this.pickupTimer >= this.nextPickupDelay) {
+        this.pickupTimer -= this.nextPickupDelay;
+        this.nextPickupDelay = PICKUP_INTERVAL_MIN + Math.random() * (PICKUP_INTERVAL_MAX - PICKUP_INTERVAL_MIN);
+        this.spawnPickup(this.scrollX + W + 60);
+      }
+      this.pickups = this.pickups.filter(function (pk) { return pk.x - self.scrollX > -80; });
 
       var px = PLAYER_X, py = p.y, ph = p.h;
 
@@ -508,6 +564,32 @@ function createPlatformerGame(words, callbacks, difficulty) {
           });
         }
       });
+
+      // [ITEMS] Pickup collection -- same hitbox shape as a word bubble.
+      this.pickups.forEach(function (pk) {
+        if (pk.collected) return;
+        var pcx = pk.x - self.scrollX, pbw = 40;
+        if (px < pcx + pbw && px + PW > pcx - pbw && py < pk.y + 28 && py + ph > pk.y - 28) {
+          pk.collected = true;
+          if (pk.kind === 'jumpboost') {
+            p.jumpBoostUntil = time + JUMP_BOOST_MS;
+            self.showPop(PLAYER_X + PW / 2, p.y - 20, '⬆️ พลังกระโดด!');
+          } else if (pk.kind === 'bomb') {
+            var wx = PLAYER_X + self.scrollX, clearedCount = 0;
+            self.obstacles = self.obstacles.filter(function (ob) {
+              var obCx = ob.x + (ob.w || 0) / 2;
+              if (Math.abs(obCx - wx) < BOMB_RADIUS_WORLD) { clearedCount++; return false; }
+              return true;
+            });
+            self.showPop(PLAYER_X + PW / 2, p.y - 20, '💣 เคลียร์ ' + clearedCount + ' จุด');
+          } else if (pk.kind === 'doublepoint') {
+            p.doublePointsUntil = time + DOUBLE_PTS_MS;
+            self.showPop(PLAYER_X + PW / 2, p.y - 20, '⭐ คะแนนคูณสอง!');
+          }
+          if (self.sfxSwoosh) self.sfxSwoosh.play();
+        }
+      });
+      this.pickups = this.pickups.filter(function (pk) { return !pk.collected; });
 
       // Obstacle collision — instant game over. hw (if set) narrows the
       // hitbox below the drawn width, centered, for a fairer feel.
@@ -614,6 +696,22 @@ function createPlatformerGame(words, callbacks, difficulty) {
         self.time.delayedCall(16, function () { if (et) et.destroy(); wt.destroy(); });
       });
 
+      // [ITEMS] Pickups -- a colored disc + icon per kind, same bob motion as word bubbles.
+      var pkColors = { jumpboost: 0x2ec4b6, bomb: 0x2b2438, doublepoint: 0xf0a500 };
+      var pkIcons  = { jumpboost: '⬆️', bomb: '💣', doublepoint: '⭐' };
+      this.pickups.forEach(function (pk) {
+        if (pk.collected) return;
+        var pcx = pk.x - self.scrollX;
+        if (pcx < -60 || pcx > W + 60) return;
+        var pbob = Math.sin(now * 0.003 + pcx * 0.01) * 5;
+        g.fillStyle(pkColors[pk.kind], 0.9);
+        g.fillCircle(pcx, pk.y + pbob, 22);
+        g.lineStyle(2, 0xffffff, 0.9);
+        g.strokeCircle(pcx, pk.y + pbob, 22);
+        var pit = self.add.text(pcx, pk.y + pbob, pkIcons[pk.kind], { fontSize: '20px' }).setOrigin(0.5).setDepth(5);
+        self.time.delayedCall(16, function () { pit.destroy(); });
+      });
+
       // Obstacles — triangular spikes. 'ground' points up, 'ceiling' hangs
       // down as a row of small teeth (must slide under, or jump over).
       this.obstacles.forEach(function (ob) {
@@ -669,23 +767,6 @@ function createPlatformerGame(words, callbacks, difficulty) {
         targets: pop, y: y - 40, alpha: 0, duration: 800, ease: 'Power2',
         onComplete: function () { pop.destroy(); }
       });
-    },
-
-    shutdown: function () {
-      var bj = document.getElementById('pfBtnJump');
-      var bs = document.getElementById('pfBtnSlide');
-      if (bj && this._jumpFn) {
-        bj.removeEventListener('mousedown',  this._jumpFn);
-        bj.removeEventListener('touchstart', this._jumpFn);
-      }
-      if (bs && this._slideDownFn) {
-        bs.removeEventListener('mousedown',   this._slideDownFn);
-        bs.removeEventListener('touchstart',  this._slideDownFn);
-        bs.removeEventListener('mouseup',     this._slideUpFn);
-        bs.removeEventListener('mouseleave',  this._slideUpFn);
-        bs.removeEventListener('touchend',    this._slideUpFn);
-        bs.removeEventListener('touchcancel', this._slideUpFn);
-      }
     }
   });
 
@@ -708,6 +789,24 @@ var PlatformerGame = (function () {
   }
   function stop() {
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
+    // Done here rather than the scene's own 'shutdown' event -- see the
+    // comment on _pfJumpFn above createPlatformerGame().
+    var bj = document.getElementById('pfBtnJump');
+    var bs = document.getElementById('pfBtnSlide');
+    if (bj && _pfJumpFn) {
+      bj.removeEventListener('mousedown',  _pfJumpFn);
+      bj.removeEventListener('touchstart', _pfJumpTouchFn);
+    }
+    if (bs && _pfSlideDownFn) {
+      bs.removeEventListener('mousedown',   _pfSlideDownFn);
+      bs.removeEventListener('touchstart',  _pfSlideDownTouchFn);
+      bs.removeEventListener('mouseup',     _pfSlideUpFn);
+      bs.removeEventListener('mouseleave',  _pfSlideUpFn);
+      bs.removeEventListener('touchend',    _pfSlideUpFn);
+      bs.removeEventListener('touchcancel', _pfSlideUpFn);
+    }
+    _pfJumpFn = null; _pfJumpTouchFn = null;
+    _pfSlideDownFn = null; _pfSlideDownTouchFn = null; _pfSlideUpFn = null;
   }
   return { start: start, stop: stop };
 }());

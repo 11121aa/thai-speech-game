@@ -442,7 +442,7 @@
      fetch the new version instead of silently serving a stale copy. -->
 <script src="js/game-shooting.js?v=6"></script>
 <script src="js/game-airplane.js?v=12"></script>
-<script src="js/game-platformer.js?v=28"></script>
+<script src="js/game-platformer.js?v=31"></script>
 <script src="js/game-matching.js?v=6"></script>
 <script src="js/game-flashcard.js?v=6"></script>
 <script src="js/game-crossy.js?v=6"></script>
@@ -1221,6 +1221,11 @@ async function launchGame() {
     FlashcardGame.start(pool, GAME_CBS);  // Phaser game
   } else if (G.mode === 'platformer') {
     document.getElementById('platformerGame').style.display = 'block';
+    window.__pfLoadout = {
+      hasJumpBoost: hasUpgrade('plat_jumpboost'),
+      hasBomb: hasUpgrade('plat_bomb'),
+      hasDoublePoint: hasUpgrade('plat_doublepoint')
+    };
     PlatformerGame.start(pool, GAME_CBS, getPfDifficulty()); // Phaser game (jump + slide + obstacles)
   } else if (G.mode === 'crossy') {
     document.getElementById('crossyGame').style.display = 'block';
