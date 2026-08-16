@@ -88,6 +88,13 @@
     font-weight: 600; font-size: 0.78rem; color: var(--color-text-soft); background: #fff;
   }
 
+  /* Game-upgrades cards are text-heavy (name + description), not
+     square icon art like cosmetics/RPG gear -- a wider min column so
+     Thai descriptions don't wrap into a tall narrow sliver. */
+  .upgrade-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+  .upgrade-card .desc { font-size: 0.74rem; color: var(--color-text-soft); line-height: 1.35; min-height: 2.6em; }
+  .upgrade-card .locked-note { font-size: 0.72rem; color: #b45309; font-weight: 600; }
+
   #buyResultArt { width: 140px; height: 140px; margin: 0 auto; display: flex; align-items: center; justify-content: center; }
   #buyResultArt svg, #buyResultArt img { max-width: 100%; max-height: 100%; }
   .reveal-rarity-badge {
@@ -192,6 +199,26 @@
           <div id="rpgWearEmpty" class="text-secondary" style="display:none;">คุณยังไม่มีอุปกรณ์ที่ซื้อเลย เลือกซื้อด้านบนก่อนนะ</div>
           <div class="cosmetic-grid" id="rpgWearGrid"></div>
         </div>
+
+        <!-- ── Game upgrades shop: permanent gameplay upgrades for 7
+             other games -- a third catalog on the same coin balance.
+             No "wear"/equip step here: every owned upgrade for a game
+             is simply always active whenever that game is played. ── -->
+        <div class="wear-section">
+          <h2 class="h4 mb-1">🎮 ร้านอัปเกรดเกม</h2>
+          <p class="text-secondary mb-3">อัปเกรดถาวรสำหรับแต่ละเกม — ใช้เหรียญเดียวกับด้านบน ซื้อครั้งเดียวใช้ได้ตลอดไป</p>
+          <div class="closet-tabs" id="upgTabs">
+            <button class="closet-tab active" data-game="all">ทั้งหมด</button>
+            <button class="closet-tab" data-game="matching">🃏 จับคู่ภาพ</button>
+            <button class="closet-tab" data-game="tetris">🧱 เตตริส</button>
+            <button class="closet-tab" data-game="airplane">✈️ เครื่องบิน</button>
+            <button class="closet-tab" data-game="shooting">🎯 ยิงเป้า</button>
+            <button class="closet-tab" data-game="towerdefense">🏰 ป้องกันฐาน</button>
+            <button class="closet-tab" data-game="platformer">🏃 วิ่งเก็บเหรียญ</button>
+            <button class="closet-tab" data-game="cooking">🍳 ทำอาหาร</button>
+          </div>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid"></div>
+        </div>
       </div>
 
     </div>
@@ -272,6 +299,16 @@
   var activeRpgCatFilter = 'all';
   var rpgEquipped = { weapon: null, armor: null, skill: null };
 
+  // ── Game upgrades shop (matching/tetris/airplane/shooting/tower
+  // defense/platformer/cooking) -- a third catalog on the same coin
+  // balance. No equip step: ownership alone is what each game reads.
+  var GAME_ICON = { matching: '🃏', tetris: '🧱', airplane: '✈️', shooting: '🎯', towerdefense: '🏰', platformer: '🏃', cooking: '🍳' };
+  var GAME_NAMES_UPG = { matching: 'จับคู่ภาพ', tetris: 'เตตริส', airplane: 'เครื่องบิน', shooting: 'ยิงเป้า', towerdefense: 'ป้องกันฐาน', platformer: 'วิ่งเก็บเหรียญ', cooking: 'ทำอาหาร' };
+  var gameUpgrades = [];
+  var gameUpgradesById = {};
+  var ownedUpgradeIds = new Set();
+  var activeUpgGameFilter = 'all';
+
   function el(id) { return document.getElementById(id); }
 
   // SVGs are loaded as text and inlined directly (not <img src=...>) so
@@ -336,7 +373,17 @@
     if (ownedRpgErr) console.error('[shop] failed to load owned rpg items:', ownedRpgErr);
     ownedRpgIds = new Set((ownedRpg || []).map(function (o) { return o.item_id; }));
 
-    if (profileErr || cosmeticsErr || ownedErr || rpgItemsErr || ownedRpgErr) {
+    var { data: allUpgrades, error: upgradesErr } = await sb.from('game_upgrades').select('*').order('game').order('price');
+    if (upgradesErr) console.error('[shop] failed to load game_upgrades catalog:', upgradesErr);
+    gameUpgrades = allUpgrades || [];
+    gameUpgradesById = {};
+    gameUpgrades.forEach(function (u) { gameUpgradesById[u.id] = u; });
+
+    var { data: ownedUpg, error: ownedUpgErr } = await sb.from('owned_game_upgrades').select('upgrade_id').eq('user_id', session.user.id);
+    if (ownedUpgErr) console.error('[shop] failed to load owned game upgrades:', ownedUpgErr);
+    ownedUpgradeIds = new Set((ownedUpg || []).map(function (o) { return o.upgrade_id; }));
+
+    if (profileErr || cosmeticsErr || ownedErr || rpgItemsErr || ownedRpgErr || upgradesErr || ownedUpgErr) {
       var msgEl = el('shopMsg');
       msgEl.textContent = 'โหลดข้อมูลร้านค้าไม่สำเร็จบางส่วน ลองรีเฟรชหน้าใหม่';
       msgEl.style.display = 'block';
@@ -346,6 +393,7 @@
     renderWearGrid();
     renderRpgGrid();
     renderRpgWearGrid();
+    renderUpgGrid();
   }
 
   // Locked items show their real art too (not a silhouette) -- you're
@@ -517,6 +565,78 @@
       new bootstrap.Modal(el('buyResultModal')).show();
       renderRpgGrid();
       renderRpgWearGrid();
+    } catch (err) {
+      msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+      msgEl.style.display = 'block';
+      btn.disabled = false;
+    }
+  });
+
+  // Unlike cosmetics/RPG gear, an upgrade with a `requires` prerequisite
+  // that isn't owned yet shows a locked note instead of a buy button --
+  // buy_game_upgrade() would reject the purchase server-side anyway, but
+  // showing a disabled/priced button the tap can't actually complete
+  // would be confusing, so the card explains why instead.
+  function renderUpgGrid() {
+    var grid = el('upgGrid');
+    grid.innerHTML = '';
+    var list = gameUpgrades.filter(function (u) { return activeUpgGameFilter === 'all' || u.game === activeUpgGameFilter; });
+    list.forEach(function (u) {
+      var owned = ownedUpgradeIds.has(u.id);
+      var prereqMet = !u.requires || ownedUpgradeIds.has(u.requires);
+      var card = document.createElement('div');
+      card.className = 'cosmetic-card upgrade-card';
+      var actionHtml;
+      if (owned) {
+        actionHtml = '<div class="owned-badge"><i class="bi bi-check-circle-fill"></i>มีแล้ว</div>';
+      } else if (!prereqMet) {
+        actionHtml = '<div class="locked-note">🔒 ซื้อระดับก่อนหน้าก่อน</div>';
+      } else {
+        actionHtml = '<button class="upg-buy-btn" data-id="' + u.id + '"' + (coinBalance < u.price ? ' disabled' : '') + '>ซื้อ ' + u.price + ' 🪙</button>';
+      }
+      card.innerHTML =
+        '<div class="art" style="font-size:2rem;display:flex;align-items:center;justify-content:center;">' + (GAME_ICON[u.game] || '🎮') + '</div>' +
+        '<div class="name">' + u.name + '</div>' +
+        '<div class="desc">' + u.description + '</div>' +
+        actionHtml;
+      grid.appendChild(card);
+    });
+  }
+
+  el('upgTabs').addEventListener('click', function (e) {
+    var btn = e.target.closest('.closet-tab');
+    if (!btn) return;
+    document.querySelectorAll('#upgTabs .closet-tab').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    activeUpgGameFilter = btn.getAttribute('data-game');
+    renderUpgGrid();
+  });
+
+  el('upgGrid').addEventListener('click', async function (e) {
+    var btn = e.target.closest('.upg-buy-btn');
+    if (!btn || btn.disabled) return;
+    var targetId = btn.getAttribute('data-id');
+    var msgEl = el('shopMsg');
+    msgEl.style.display = 'none';
+    btn.disabled = true;
+    try {
+      var { data, error } = await sb.rpc('buy_game_upgrade', { target_id: targetId });
+      if (error) throw error;
+      var result = Array.isArray(data) ? data[0] : data;
+      if (!result) throw new Error('เกิดข้อผิดพลาด');
+
+      coinBalance = result.coins_left;
+      el('coinBalance').textContent = coinBalance;
+      ownedUpgradeIds.add(result.upgrade_id);
+
+      el('buyResultName').textContent = result.name;
+      var badge = el('buyResultRarity');
+      badge.textContent = GAME_NAMES_UPG[result.game] || result.game;
+      badge.style.background = '#2EC4B6';
+      el('buyResultArt').innerHTML = '<div style="font-size:3rem;">' + (GAME_ICON[result.game] || '🎮') + '</div>';
+
+      new bootstrap.Modal(el('buyResultModal')).show();
+      renderUpgGrid();
     } catch (err) {
       msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
       msgEl.style.display = 'block';

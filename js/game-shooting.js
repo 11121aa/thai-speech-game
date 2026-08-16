@@ -22,6 +22,14 @@
 //    - CongratSFX  → plays when the player finishes pronouncing a word
 // ============================================================
 
+// Tracks the currently-attached #shootBtnTimeStop listener across restarts.
+// NOT cleaned up via the scene's own 'shutdown' event -- confirmed live
+// that Phaser's game.destroy(true) does not fire it here (tested with a
+// one-off 'shutdown' listener that never logged), so relying on it would
+// leak a listener (and the wrap div) on every restart. ShootingGame.stop()
+// below does this cleanup directly and unconditionally instead.
+var _shootTimeStopBtnFn = null;
+
 function createShootingGame(words, callbacks) {
 
   // ── [TUNE] Difficulty knobs ────────────────────────────────────
@@ -36,11 +44,17 @@ function createShootingGame(words, callbacks) {
   var CANNON_Y = H - 30;
   var BARREL_LEN = 48;
 
-  // ── [PROJ] Projectile settings ────────────────────────────────
-  var PROJ_SPD   = 9;    // cannonball speed (px/frame at 60fps)
+  // ── [PROJ] Projectile settings -- speed/cooldown bonuses come from
+  // shop.html's shoot_speed_*/shoot_cooldown_* upgrades (see
+  // window.__shootLoadout, set by game.html just before start()); both
+  // default to 0 for a guest/no-purchase player, giving the original
+  // baseline numbers unchanged. ────────────────────────────────
+  var loadout = window.__shootLoadout || {};
+  var PROJ_SPD   = 9 * (1 + (loadout.speedBonus || 0));       // cannonball speed (px/frame at 60fps)
   var PROJ_HIT_R = 26;   // hit radius (px)
 
-  var RELOAD_MS  = 1500; // 1.5-second reload between shots
+  var RELOAD_MS  = Math.max(500, 1500 - (loadout.cooldownReductionMs || 0)); // reload between shots
+  var TIMESTOP_COOLDOWN_MS = 15000; // how often the time-stop ability can be reused, once owned
 
   // ── [RINGS] Bullseye colours outer → inner ─────────────────────
   var RING_R = [22, 17, 12, 8, 4];  // smaller target (~30% reduction)
@@ -64,6 +78,8 @@ function createShootingGame(words, callbacks) {
       this.isPaused    = false;
       this.trail       = null;          // { angle, life } — fading shot line
       this.reloadUntil = 0;            // timestamp when reload finishes
+      this.timeStopUntil  = 0;         // targets frozen (no movement, no expiry) until this timestamp
+      this.timeStopReadyAt = 0;        // ability off cooldown once time.now passes this
     },
 
     preload: function () {
@@ -92,6 +108,21 @@ function createShootingGame(words, callbacks) {
       this.input.keyboard.on('keydown-SPACE', function () {
         if (!self.isPaused) self.fire();
       });
+
+      // Time-stop ability -- a real DOM button (like the RPG game's skill
+      // button) rather than a canvas tap zone, so it can't be confused
+      // with (or accidentally trigger) the fire-on-tap-anywhere handler
+      // above. Only shown once the shoot_timestop upgrade is owned.
+      var wrap = document.getElementById('shootBtnWrap');
+      var btn = document.getElementById('shootBtnTimeStop');
+      if (loadout.hasTimeStop && wrap && btn) {
+        wrap.style.display = 'flex';
+        _shootTimeStopBtnFn = function (e) { e.preventDefault(); if (!self.isPaused) self.useTimeStop(); };
+        btn.addEventListener('mousedown', _shootTimeStopBtnFn);
+        btn.addEventListener('touchstart', _shootTimeStopBtnFn, { passive: false });
+      } else if (wrap) {
+        wrap.style.display = 'none';
+      }
 
       var hint = this.add.text(W / 2, 22,
         '🎯 เล็งให้ตรงแล้วแตะเพื่อยิง! — ลูกปืนใช้เวลาเดินทาง!', {
@@ -257,6 +288,23 @@ function createShootingGame(words, callbacks) {
       });
     },
 
+    // ── Time-stop ability (shoot_timestop upgrade): freezes every active
+    // target in place for loadout.timeStopMs -- their oscillation stops
+    // and their expiry countdown pauses (implemented by pushing each
+    // target's own `born` timestamp forward by the freeze duration,
+    // rather than tracking a separate "frozen so far" offset per target)
+    // -- while the player's own aim/fire/reload keep working normally,
+    // so it's purely a breather for lining up shots, not a full pause. ──
+    useTimeStop: function () {
+      var now = this.time.now;
+      if (now < this.timeStopReadyAt) return;
+      var freezeMs = loadout.timeStopMs || 3000;
+      this.timeStopReadyAt = now + TIMESTOP_COOLDOWN_MS;
+      this.timeStopUntil = now + freezeMs;
+      this.targets.forEach(function (t) { if (!t.hit && !t.expired) t.born += freezeMs; });
+      this.showPop(CANNON_X, CANNON_Y - 60, '⏱ หยุดเวลา!');
+    },
+
     // ── Spawn break particles at the hit position ─────────────────
     spawnBreakParticles: function (cx, cy) {
       for (var i = 0; i < 14; i++) {
@@ -294,12 +342,16 @@ function createShootingGame(words, callbacks) {
 
       if (this.isPaused) return;
 
-      // Update oscillating target x-positions before collision checks
-      this.targets.forEach(function (t) {
-        if (!t.hit && !t.expired) {
-          t.x = t.baseX + Math.sin(time * 0.001 * t.moveSpeed + t.movePhase) * t.moveAmp;
-        }
-      });
+      // Update oscillating target x-positions before collision checks --
+      // skipped while time-stop is active so frozen targets actually
+      // hold still rather than just having their expiry paused.
+      if (time >= this.timeStopUntil) {
+        this.targets.forEach(function (t) {
+          if (!t.hit && !t.expired) {
+            t.x = t.baseX + Math.sin(time * 0.001 * t.moveSpeed + t.movePhase) * t.moveAmp;
+          }
+        });
+      }
 
       // Sweep aim angle back and forth
       this.aimAngle += this.aimDir * AIM_SPEED * dt;
@@ -521,7 +573,7 @@ function createShootingGame(words, callbacks) {
 
   return new Phaser.Game({
     type:   Phaser.AUTO,
-    parent: 'shootingGame',
+    parent: 'shootingCanvas',
     width:  W, height: H,
     scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY, autoRound: true },
     scene:  ShootScene
@@ -537,6 +589,16 @@ var ShootingGame = (function () {
   }
   function stop() {
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
+    // Done here rather than the scene's own 'shutdown' event -- see the
+    // comment on _shootTimeStopBtnFn above createShootingGame().
+    var btn = document.getElementById('shootBtnTimeStop');
+    if (btn && _shootTimeStopBtnFn) {
+      btn.removeEventListener('mousedown', _shootTimeStopBtnFn);
+      btn.removeEventListener('touchstart', _shootTimeStopBtnFn);
+      _shootTimeStopBtnFn = null;
+    }
+    var wrap = document.getElementById('shootBtnWrap');
+    if (wrap) wrap.style.display = 'none';
   }
   return { start: start, stop: stop };
 }());

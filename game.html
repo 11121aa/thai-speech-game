@@ -140,7 +140,21 @@
       </div>
       <div id="matchingGame" style="display:none;"></div>
       <!-- Phaser creates its canvas inside each of these divs -->
-      <div id="shootingGame" class="game-canvas-wrap" style="display:none;"></div>
+      <!-- Shooting: Phaser canvas + an optional time-stop ability button
+           (only shown once the shoot_timestop shop upgrade is owned --
+           see ShootingGame's create(), which toggles #shootBtnWrap's
+           display based on window.__shootLoadout.hasTimeStop) -->
+      <div id="shootingGame" style="display:none;">
+        <div class="platformer-wrap">
+          <div id="shootingCanvas" class="game-canvas-wrap"></div>
+          <div class="platformer-btns" id="shootBtnWrap" style="display:none;justify-content:flex-end;">
+            <button class="pf-btn" id="shootBtnTimeStop"
+              style="background:rgba(41,128,185,0.88);border-color:rgba(41,128,185,0.95);color:#fff;">
+              ⏱<br><small>หยุดเวลา</small>
+            </button>
+          </div>
+        </div>
+      </div>
       <div id="airplaneGame" class="game-canvas-wrap" style="display:none;"></div>
       <!-- Platformer: Phaser canvas + DOM control buttons -->
       <div id="platformerGame" style="display:none;">
@@ -426,7 +440,7 @@
      ?v= is a cache-buster: bump it whenever a game-*.js file changes so
      Safari (which caches far more aggressively than Chrome) is forced to
      fetch the new version instead of silently serving a stale copy. -->
-<script src="js/game-shooting.js?v=3"></script>
+<script src="js/game-shooting.js?v=6"></script>
 <script src="js/game-airplane.js?v=10"></script>
 <script src="js/game-platformer.js?v=27"></script>
 <script src="js/game-matching.js?v=6"></script>
@@ -512,8 +526,66 @@ function showScreen(id) {
   });
 }
 
+// ── Shop-purchased game upgrades (supabase/024_game_upgrades_migration.sql)
+// -- fetched once at page load (see loadOwnedGameUpgrades in the
+// DOMContentLoaded handler below), read by every game via
+// upgradeEffectSum()/hasUpgrade(). Empty for guests/no purchases, so
+// every game still plays fine at baseline. ──
+var _ownedUpgrades = []; // rows from game_upgrades the current user owns
+var _ownedUpgradesPromise = null; // set by DOMContentLoaded, awaited by launchGame()
+// Sums effect_value across every owned upgrade for a given game+category
+// -- used for anything that stacks (score multipliers, shield/magnet
+// duration tiers, bomb radius tiers, bullet speed/cooldown tiers).
+function upgradeEffectSum(game, category) {
+  return _ownedUpgrades
+    .filter(function (u) { return u.game === game && u.category === category; })
+    .reduce(function (s, u) { return s + Number(u.effect_value || 0); }, 0);
+}
+// For simple owned/not-owned unlocks (barrack troop, platformer items,
+// cooking dishes, airplane bomb/magnet's own first tier) rather than a
+// stacking numeric effect.
+function hasUpgrade(id) {
+  return _ownedUpgrades.some(function (u) { return u.id === id; });
+}
+// Same idea as upgradeEffectSum, but grouped by id PREFIX instead of
+// game+category -- needed wherever several unrelated stacking effects
+// share one category (e.g. airplane's shield-duration/bomb-radius/
+// magnet-duration tiers are all category:'item', so summing by category
+// alone would nonsensically add a shield's ms to a bomb's px radius).
+// Every tiered id in this catalog follows '<prefix>_<tier number>', e.g.
+// 'air_shield_1'/'air_shield_2' both match prefix 'air_shield_'.
+function upgradeSumForPrefix(prefix) {
+  return _ownedUpgrades
+    .filter(function (u) { return u.id.indexOf(prefix) === 0; })
+    .reduce(function (s, u) { return s + Number(u.effect_value || 0); }, 0);
+}
+async function loadOwnedGameUpgrades() {
+  try {
+    var session = await Auth.getSession();
+    if (!session) { _ownedUpgrades = []; return; }
+    var { data: owned, error: ownedErr } = await sb.from('owned_game_upgrades').select('upgrade_id').eq('user_id', session.user.id);
+    if (ownedErr) throw ownedErr;
+    var ids = (owned || []).map(function (o) { return o.upgrade_id; });
+    if (!ids.length) { _ownedUpgrades = []; return; }
+    var { data: catalog, error: catalogErr } = await sb.from('game_upgrades').select('*').in('id', ids);
+    if (catalogErr) throw catalogErr;
+    _ownedUpgrades = catalog || [];
+  } catch (e) {
+    console.error('[game] failed to load owned game upgrades:', e);
+    _ownedUpgrades = [];
+  }
+}
+
 function addPts(n) {
-  G.pts += n;
+  // Central score-multiplier hook: matching/tetris/airplane's shop
+  // upgrades are plain "+N% points for this game" (category
+  // 'multiplier') -- applying it once here, keyed by whichever game is
+  // currently running, covers all of them (and any future game that
+  // adds a multiplier upgrade) without each game file needing its own
+  // multiplier-reading code, since every game's onPoints callback
+  // already funnels through this one function.
+  var mult = 1 + upgradeEffectSum(G.mode, 'multiplier');
+  G.pts += Math.round(n * mult);
   document.getElementById('hudPoints').textContent = G.pts;
 }
 
@@ -1070,6 +1142,7 @@ async function launchGame() {
     effectivePronounceCount = (hwAssignment && hwAssignment.homework && hwAssignment.homework.repeat_count) || 5;
   }
   if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
+  if (_ownedUpgradesPromise) await _ownedUpgradesPromise;
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
 
@@ -1136,6 +1209,12 @@ async function launchGame() {
     MatchingGame.start(pool, GAME_CBS);   // Phaser game
   } else if (G.mode === 'shooting') {
     document.getElementById('shootingGame').style.display = 'block';
+    window.__shootLoadout = {
+      speedBonus: upgradeEffectSum('shooting', 'speed'),
+      cooldownReductionMs: upgradeEffectSum('shooting', 'cooldown'),
+      hasTimeStop: hasUpgrade('shoot_timestop'),
+      timeStopMs: (function () { var u = _ownedUpgrades.filter(function (x) { return x.id === 'shoot_timestop'; })[0]; return u ? Number(u.effect_value) : 3000; })()
+    };
     ShootingGame.start(pool, GAME_CBS);   // Phaser game (rotating cannon)
   } else if (G.mode === 'flashcard') {
     document.getElementById('flashcardGame').style.display = 'block';
@@ -1170,6 +1249,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   _allWords = await WordsApi.fetchAllWords();
   await Illustrations.load();
   loadPracticeLeaderboard();
+  // Not awaited here -- the setup screen (word selection etc.) takes the
+  // player a few seconds regardless, and launchGame() awaits this exact
+  // same in-flight promise before actually starting a game, so no
+  // upgrade can ever be silently missed and no request is duplicated.
+  _ownedUpgradesPromise = loadOwnedGameUpgrades();
 
   document.getElementById('cardMatching').addEventListener('click', function () { openSetup('matching'); });
   document.getElementById('cardShooting').addEventListener('click', function () { openSetup('shooting'); });

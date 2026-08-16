@@ -842,7 +842,7 @@ a {
    height — that circular measurement compounds rounding on every resize
    event (mobile URL-bar show/hide on scroll fires these repeatedly), so the
    canvas visibly grows a little more each time you scroll. */
-#shootingGame.game-canvas-wrap      { aspect-ratio: 800 / 450; }
+#shootingCanvas.game-canvas-wrap    { aspect-ratio: 800 / 450; }
 #airplaneGame.game-canvas-wrap      { aspect-ratio: 480 / 800; max-width: 480px; }
 #cookingGame.game-canvas-wrap       { aspect-ratio: 480 / 800; max-width: 480px; }
 #platformerCanvas.game-canvas-wrap  { aspect-ratio: 800 / 400; }
@@ -1079,7 +1079,7 @@ a {
   box-shadow: var(--shadow-soft);
   cursor: pointer;
 }
-#platformerCanvas { display: block; width: 100%; }
+#platformerCanvas, #shootingCanvas { display: block; width: 100%; }
 .platformer-wrap canvas { display: block; max-width: 100%; }
 .platformer-btns {
   position: absolute;
