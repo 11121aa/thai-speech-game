@@ -9,7 +9,7 @@
 // ============================================================
 //  How the game works:
 //    - The world scrolls left; the player stays in place
-//    - JUMP (↑ / Space / Jump button)  SLIDE (↓ / Slide button)
+//    - JUMP (swipe up / ↑ / Space / Jump button)  SLIDE (swipe down / ↓ / Slide button)
 //    - The level is built from fixed hand-designed "patterns" spawned back
 //      to back (cycling through PATTERNS), instead of independently random
 //      platforms/obstacles — every jump is guaranteed makeable
@@ -54,6 +54,8 @@ function createPlatformerGame(words, callbacks, difficulty) {
   var JUMP_VY       = -13.5;
   var FAST_FALL     = 1.0; // extra downward accel while airborne + slide held
   var IMMORTAL_FRAMES = 180; // "อมตะ" (immortal) shield duration after a successful word practice
+  var SWIPE_MIN_PX = 36;    // minimum vertical drag distance to count as a swipe (not just a tap)
+  var SWIPE_SLIDE_MS = 450; // how long a swipe-down holds the slide, standing in for a held button/key
   var WORD_INTERVAL_MIN = 5000, WORD_INTERVAL_MAX = 10000; // [WORDS] random ms range between word-bubble spawns
 
   // ── [ITEMS] Shop-unlocked pickups (supabase/024_game_upgrades_migration.sql)
@@ -299,12 +301,35 @@ function createPlatformerGame(words, callbacks, difficulty) {
         bs.addEventListener('touchcancel', _pfSlideUpFn);
       }
 
+      // Swipe up/down anywhere on the field also jumps/slides, alongside
+      // the buttons and keyboard above -- Phaser's own pointer events
+      // (not raw DOM listeners on external elements), so no extra
+      // cleanup bookkeeping needed the way the DOM buttons above require.
+      // A swipe-down holds the slide for SWIPE_SLIDE_MS, standing in for
+      // a held key/button since a swipe itself is a single instant
+      // gesture rather than something you can "hold".
+      var swipeStartX = 0, swipeStartY = 0;
+      this.input.on('pointerdown', function (ptr) {
+        swipeStartX = ptr.x; swipeStartY = ptr.y;
+      });
+      this.input.on('pointerup', function (ptr) {
+        if (self.isPaused) return;
+        var dx = ptr.x - swipeStartX, dy = ptr.y - swipeStartY;
+        if (Math.abs(dy) < SWIPE_MIN_PX || Math.abs(dy) <= Math.abs(dx)) return;
+        if (dy < 0) {
+          self.doJump();
+        } else {
+          self.slideHeld = true;
+          self.time.delayedCall(SWIPE_SLIDE_MS, function () { self.slideHeld = false; });
+        }
+      });
+
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
       this.sfxSwoosh = this.sound.add('Swoosh',       { volume: 0.6 });
 
       this.hint = this.add.text(W / 2, 26,
-        '🐒 กระโดด: ↑ / Space   สไลด์: ↓   ชนหนาม/ตกหลุม = จบเกม!', {
+        '🐒 กระโดด: ปัดขึ้น/↑/Space   สไลด์: ปัดลง/↓   ชนหนาม/ตกหลุม = จบเกม!', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
           backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
         }).setOrigin(0.5).setDepth(10);
