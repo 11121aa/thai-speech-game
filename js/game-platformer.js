@@ -403,7 +403,16 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.showPop(PLAYER_X + PW / 2, this.player.y - 20, msg);
       var self = this;
       var cbs = callbacks;
-      this.time.delayedCall(900, function () { self.showTipScreen(function () { cbs.onFinish(); }); });
+      this.time.delayedCall(900, function () {
+        self.showTipScreen(function () {
+          // One last forced practice word before finishing -- same "act
+          // now, say the word, then it counts" popup every other game
+          // uses, just gating the finish itself this time.
+          if (!words.length) { cbs.onFinish(); return; }
+          var word = words[self.wordIdx++ % words.length];
+          cbs.onPractice(word, null, function () { cbs.onFinish(); });
+        });
+      });
     },
 
     // [TIPS] Shown every time the player dies, before handing off to the
@@ -783,11 +792,23 @@ function createPlatformerGame(words, callbacks, difficulty) {
 
 var PlatformerGame = (function () {
   var game = null;
+  // Bumped by every start()/stop() so a start() superseded by a later
+  // stop() (e.g. a fast retry double-tap firing before this one's 60ms
+  // setTimeout resolves) can detect that and skip creating its game --
+  // otherwise its create() would clobber the newer call's _pfJumpFn/etc
+  // module vars out from under it, leaking the superseded generation's
+  // button listeners with no way for stop() to ever reach them again.
+  var startToken = 0;
   function start(words, cbs, difficulty) {
     stop();
-    setTimeout(function () { game = createPlatformerGame(words, cbs, difficulty); }, 60);
+    var token = startToken;
+    setTimeout(function () {
+      if (token !== startToken) return; // superseded -- see comment on startToken
+      game = createPlatformerGame(words, cbs, difficulty);
+    }, 60);
   }
   function stop() {
+    startToken++;
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
     // Done here rather than the scene's own 'shutdown' event -- see the
     // comment on _pfJumpFn above createPlatformerGame().

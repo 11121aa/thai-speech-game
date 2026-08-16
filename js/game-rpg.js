@@ -33,6 +33,18 @@
 //      boss to win; run out of HP and it's over.
 // ============================================================
 
+// Tracks the currently-attached d-pad/skill/keyboard listeners across
+// restarts. NOT cleaned up via the scene's own 'shutdown' event -- Phaser's
+// game.destroy(true) does not reliably fire it in this codebase's setup
+// (confirmed live the same way as js/game-shooting.js's identical comment),
+// so relying on it would leak listeners (and duplicate keydown/keyup
+// handlers on window) on every restart. RpgGame.stop() below does this
+// cleanup directly and unconditionally instead.
+var _rpgDirFns = null;
+var _rpgSkillFn = null;
+var _rpgKeydownFn = null;
+var _rpgKeyupFn = null;
+
 function createRpgGame(words, callbacks) {
   var W = 800, H = 500;
 
@@ -277,10 +289,13 @@ function createRpgGame(words, callbacks) {
     },
 
     // ── Input: 4-way held movement (buttons + keyboard) + a skill tap ──
+    // Cleanup is NOT wired via this.events.on('shutdown', ...) -- see the
+    // comment on _rpgDirFns above createRpgGame(). RpgGame.stop() removes
+    // these listeners directly instead.
     wireInput: function () {
       var self = this;
       var dirBtns = { up: 'rpgBtnUp', down: 'rpgBtnDown', left: 'rpgBtnLeft', right: 'rpgBtnRight' };
-      this._dirFns = {};
+      _rpgDirFns = {};
       Object.keys(dirBtns).forEach(function (dir) {
         var el = document.getElementById(dirBtns[dir]);
         if (!el) return;
@@ -292,53 +307,31 @@ function createRpgGame(words, callbacks) {
         el.addEventListener('mouseleave', upFn);
         el.addEventListener('touchend', upFn);
         el.addEventListener('touchcancel', upFn);
-        self._dirFns[dir] = { downFn: downFn, upFn: upFn, el: el };
+        _rpgDirFns[dir] = { downFn: downFn, upFn: upFn, el: el };
       });
 
       var skillBtn = document.getElementById('rpgBtnSkill');
-      this._skillFn = function (e) { e.preventDefault(); self.useSkill(); };
+      _rpgSkillFn = function (e) { e.preventDefault(); self.useSkill(); };
       if (skillBtn) {
-        skillBtn.addEventListener('mousedown', this._skillFn);
-        skillBtn.addEventListener('touchstart', this._skillFn, { passive: false });
+        skillBtn.addEventListener('mousedown', _rpgSkillFn);
+        skillBtn.addEventListener('touchstart', _rpgSkillFn, { passive: false });
       }
 
-      this._keydownFn = function (e) {
+      _rpgKeydownFn = function (e) {
         if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') self.heldDir.up = true;
         if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') self.heldDir.down = true;
         if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') self.heldDir.left = true;
         if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') self.heldDir.right = true;
         if (e.key === ' ') self.useSkill();
       };
-      this._keyupFn = function (e) {
+      _rpgKeyupFn = function (e) {
         if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') self.heldDir.up = false;
         if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') self.heldDir.down = false;
         if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') self.heldDir.left = false;
         if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') self.heldDir.right = false;
       };
-      window.addEventListener('keydown', this._keydownFn);
-      window.addEventListener('keyup', this._keyupFn);
-
-      this.events.on('shutdown', this.shutdown, this);
-    },
-
-    shutdown: function () {
-      var self = this;
-      Object.keys(this._dirFns || {}).forEach(function (dir) {
-        var f = self._dirFns[dir];
-        f.el.removeEventListener('mousedown', f.downFn);
-        f.el.removeEventListener('touchstart', f.downFn);
-        f.el.removeEventListener('mouseup', f.upFn);
-        f.el.removeEventListener('mouseleave', f.upFn);
-        f.el.removeEventListener('touchend', f.upFn);
-        f.el.removeEventListener('touchcancel', f.upFn);
-      });
-      var skillBtn = document.getElementById('rpgBtnSkill');
-      if (skillBtn && this._skillFn) {
-        skillBtn.removeEventListener('mousedown', this._skillFn);
-        skillBtn.removeEventListener('touchstart', this._skillFn);
-      }
-      if (this._keydownFn) window.removeEventListener('keydown', this._keydownFn);
-      if (this._keyupFn) window.removeEventListener('keyup', this._keyupFn);
+      window.addEventListener('keydown', _rpgKeydownFn);
+      window.addEventListener('keyup', _rpgKeyupFn);
     },
 
     isWallAtPixel: function (px, py) {
@@ -540,7 +533,15 @@ function createRpgGame(words, callbacks) {
       this.phase = won ? 'won' : 'lost';
       this.paused = true;
       if (won && this.sfxWin) this.sfxWin.play();
-      this.time.delayedCall(2200, function () { callbacks.onFinish(); });
+      this.time.delayedCall(2200, function () {
+        // On a loss, one last forced practice word before finishing --
+        // same "act now, say the word, then it counts" popup every other
+        // game uses, just gating the finish itself this time. Not shown
+        // on a win, only "when died".
+        if (won || !words.length) { callbacks.onFinish(); return; }
+        var word = words[self.wordIdx++ % words.length];
+        callbacks.onPractice(word, null, function () { callbacks.onFinish(); });
+      });
     },
 
     popText: function (x, y, text, color) {
@@ -704,6 +705,14 @@ function createRpgGame(words, callbacks) {
 // catalog fetch.
 var RpgGame = (function () {
   var game = null;
+  // Bumped by every start()/stop() so a start() superseded by a later
+  // stop() (e.g. a fast retry double-tap, or a fresh start() firing before
+  // this one's async loadLoadout()/setTimeout resolve) can detect that and
+  // skip creating its game -- otherwise its create() would clobber the
+  // newer call's _rpgDirFns/_rpgSkillFn/_rpgKeydownFn/_rpgKeyupFn module
+  // vars out from under it, leaking the superseded generation's listeners
+  // with no way for stop() to ever reach them again.
+  var startToken = 0;
 
   async function loadLoadout() {
     var loadout = {};
@@ -733,13 +742,39 @@ var RpgGame = (function () {
 
   function start(words, cbs) {
     stop();
+    var token = startToken;
     loadLoadout().then(function (loadout) {
+      if (token !== startToken) return; // superseded -- see comment on startToken
       window.__rpgLoadout = loadout;
-      setTimeout(function () { game = createRpgGame(words, cbs); }, 60);
+      setTimeout(function () {
+        if (token !== startToken) return;
+        game = createRpgGame(words, cbs);
+      }, 60);
     });
   }
   function stop() {
+    startToken++;
     if (game) { try { game.destroy(true); } catch (e) {} game = null; }
+    // Done here rather than the scene's own 'shutdown' event -- see the
+    // comment on _rpgDirFns above createRpgGame().
+    Object.keys(_rpgDirFns || {}).forEach(function (dir) {
+      var f = _rpgDirFns[dir];
+      f.el.removeEventListener('mousedown', f.downFn);
+      f.el.removeEventListener('touchstart', f.downFn);
+      f.el.removeEventListener('mouseup', f.upFn);
+      f.el.removeEventListener('mouseleave', f.upFn);
+      f.el.removeEventListener('touchend', f.upFn);
+      f.el.removeEventListener('touchcancel', f.upFn);
+    });
+    _rpgDirFns = null;
+    var skillBtn = document.getElementById('rpgBtnSkill');
+    if (skillBtn && _rpgSkillFn) {
+      skillBtn.removeEventListener('mousedown', _rpgSkillFn);
+      skillBtn.removeEventListener('touchstart', _rpgSkillFn);
+      _rpgSkillFn = null;
+    }
+    if (_rpgKeydownFn) { window.removeEventListener('keydown', _rpgKeydownFn); _rpgKeydownFn = null; }
+    if (_rpgKeyupFn) { window.removeEventListener('keyup', _rpgKeyupFn); _rpgKeyupFn = null; }
   }
   return { start: start, stop: stop };
 }());

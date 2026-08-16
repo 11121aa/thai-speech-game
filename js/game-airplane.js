@@ -535,7 +535,15 @@ function createAirplaneGame(words, callbacks) {
       this.showPop(this.planeX, PLANE_Y - 34, '💥 ชนแล้ว!');
       var flash = this.add.rectangle(W / 2, H / 2, W, H, 0xff0000, 0.35).setDepth(20);
       this.tweens.add({ targets: flash, alpha: 0, duration: 500, onComplete: function () { flash.destroy(); } });
-      this.time.delayedCall(700, function () { callbacks.onFinish(); });
+      // One last forced practice word before finishing -- same "act now,
+      // say the word, then it counts" popup every other game uses, just
+      // gating the finish itself instead of an in-run reward this time.
+      this.time.delayedCall(700, function () {
+        if (!words.length) { callbacks.onFinish(); return; }
+        self.wordIdx = self.wordIdx || 0; // may not have been touched yet if death happened before the first word bubble spawned
+        var word = words[self.wordIdx++ % words.length];
+        callbacks.onPractice(word, null, function () { callbacks.onFinish(); });
+      });
     },
 
     // Scrolling lane dividers — dashed lines between each pair of lanes,

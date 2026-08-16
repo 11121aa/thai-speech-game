@@ -507,7 +507,15 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       this.phase = won ? 'won' : 'lost';
       this.paused = true;
       if (won) this.sfxWin.play();
-      this.time.delayedCall(2200, function () { callbacks.onFinish(); });
+      this.time.delayedCall(2200, function () {
+        // On a loss, one last forced practice word before finishing --
+        // same "act now, say the word, then it counts" popup every other
+        // game uses, just gating the finish itself this time. Not shown
+        // on a win, only "when died".
+        if (won || !words.length) { callbacks.onFinish(); return; }
+        var word = words[self.wave % words.length];
+        callbacks.onPractice(word, null, function () { callbacks.onFinish(); });
+      });
     },
 
     // ── Barrack: spawn a walking melee ally at the road point nearest
