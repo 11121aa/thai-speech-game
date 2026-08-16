@@ -215,9 +215,16 @@ function createCookingGame(words, callbacks) {
   var BIGFX_Y=300;
   // Cooking-Mama-style big flash text ("PERFECT!"/"GREAT!"/"OK!") shown on
   // every scored action -- pops in with a little overshoot, holds, then
-  // fades and drifts up. Drawn unscaled/unshaken (like drawTapFx) so the
-  // text itself always stays crisp and centered regardless of the
-  // screen's pop-in transform or the shake triggered alongside it.
+  // fades and drifts up. Drawn unscaled (like drawTapFx) so the text
+  // itself always stays crisp and centered regardless of the screen's
+  // pop-in transform. The shake (see triggerShake) is applied ONLY to
+  // this text's own jitter offset, not to the whole canvas -- it used to
+  // be a global ctx.translate in update() wrapping every draw call
+  // including buttons, which visibly shifted tappable elements by a few
+  // pixels away from where onDown's hit-testing (always untransformed)
+  // expected them, occasionally causing a real tap to miss right after a
+  // "PERFECT!" -- moving it here keeps the punchy feel without ever
+  // touching anything clickable.
   function triggerBigFx(txt,col){ G.bigFx={txt:txt,col:col,startedAt:sc.time.now}; }
   function drawBigFx(time){
     var fx=G.bigFx; if(!fx)return;
@@ -228,9 +235,14 @@ function createCookingGame(words, callbacks) {
     var scale=inT<1?1.4-0.4*ie:1;
     var alpha=t<0.7?1:Math.max(0,1-(t-0.7)/0.3);
     var rise=t>0.3?(t-0.3)*44:0;
+    var shakeX=0,shakeY=0;
+    if(G.shakeUntil&&time<G.shakeUntil){
+      var sMag=G.shakeMag*(G.shakeUntil-time)/220;
+      shakeX=(Math.random()-0.5)*2*sMag; shakeY=(Math.random()-0.5)*2*sMag;
+    }
     ctx.save();
     ctx.globalAlpha=alpha;
-    ctx.translate(VW/2,BIGFX_Y-rise);
+    ctx.translate(VW/2+shakeX,BIGFX_Y-rise+shakeY);
     ctx.scale(scale,scale);
     ctx.font='bold 38px Prompt,sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -241,9 +253,10 @@ function createCookingGame(words, callbacks) {
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     ctx.restore();
   }
-  // Short random-offset screen shake for a great/perfect hit -- decays
-  // linearly to 0 over 220ms. Applied once as a translate in update(),
-  // before the existing pop-in transform, so it never affects hit-testing.
+  // Short random-offset jitter magnitude for a great/perfect hit -- decays
+  // linearly to 0 over 220ms, consumed only by drawBigFx above (never
+  // affects hit-testing since it's not applied to the shared canvas
+  // transform anymore).
   function triggerShake(mag){ G.shakeUntil=sc.time.now+220; G.shakeMag=mag; }
   // Central "how good was that score" classification, reused everywhere a
   // step's numeric score becomes final -- keeps the flash text/colour,
@@ -1718,14 +1731,6 @@ function createCookingGame(words, callbacks) {
       var ease=1-Math.pow(1-pop,3);
       var scale=0.985+0.015*ease;
       ctx.save();
-      // Brief random-offset shake for a great/perfect hit (see
-      // triggerShake/gradeScore), decaying linearly to 0 -- applied before
-      // the pop-in transform below so it's a simple additive jolt, not
-      // touching input hit-testing which uses untransformed coordinates.
-      if(G.shakeUntil&&time<G.shakeUntil){
-        var sMag=G.shakeMag*(G.shakeUntil-time)/220;
-        ctx.translate((Math.random()-0.5)*2*sMag,(Math.random()-0.5)*2*sMag);
-      }
       ctx.translate(VW/2,VH/2); ctx.scale(scale,scale); ctx.translate(-VW/2,-VH/2);
 
       switch(G.st){
