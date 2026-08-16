@@ -446,11 +446,11 @@
 <script src="js/game-matching.js?v=6"></script>
 <script src="js/game-flashcard.js?v=6"></script>
 <script src="js/game-crossy.js?v=6"></script>
-<script src="js/game-cooking.js?v=13"></script>
+<script src="js/game-cooking.js?v=16"></script>
 <script src="js/game-dressup.js?v=12"></script>
 <script src="js/game-towerdefense.js?v=9"></script>
 <script src="js/game-tetris.js?v=4"></script>
-<script src="js/game-rpg.js?v=4"></script>
+<script src="js/game-rpg.js?v=5"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -1173,6 +1173,7 @@ async function launchGame() {
     if (timerPillCk) timerPillCk.style.visibility = 'hidden';
     clearInterval(G.timerHandle);
     document.getElementById('cookingGame').style.display = 'block';
+    window.__cookLoadout = { hasPizza: hasUpgrade('cook_dish_pizza'), hasBreakfast: hasUpgrade('cook_dish_breakfast') };
     CookingGame.start(pool, GAME_CBS);
     return;
   }

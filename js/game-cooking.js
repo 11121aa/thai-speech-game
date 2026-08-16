@@ -880,10 +880,17 @@ function createCookingGame(words, callbacks) {
   // SEL_FOODS drives both the drawn grid here AND onDown's S.SEL hit-test
   // (below) -- keep them reading from this single array/layout formula
   // instead of two hand-copied coordinate sets.
+  // Hot dog is free by default; pizza/breakfast are shop-unlocked dishes
+  // (supabase/024_game_upgrades_migration.sql, cook_dish_pizza/
+  // cook_dish_breakfast) -- window.__cookLoadout is set by game.html just
+  // before start(). Locked cards reuse the exact same dimmed/non-clickable
+  // treatment already used for Burger/Fries below (drawSel()/onDown's
+  // S.SEL branch both already only act on ok:true cards).
+  var cookLoadout = window.__cookLoadout || {};
   var SEL_FOODS=[
-    {l:'Hot Dog',    e:'🌭', ok:true,  dish:'hotdog'},
-    {l:'Pizza',      e:'🍕', ok:true,  dish:'pizza'},
-    {l:'Breakfast',  e:'🍳', ok:true,  dish:'breakfast'},
+    {l:'Hot Dog',    e:'🌭', ok:true,                       dish:'hotdog'},
+    {l:'Pizza',      e:'🍕', ok:!!cookLoadout.hasPizza,     dish:'pizza'},
+    {l:'Breakfast',  e:'🍳', ok:!!cookLoadout.hasBreakfast, dish:'breakfast'},
     {l:'Burger',     e:'🍔', ok:false},
     {l:'Fries',      e:'🍟', ok:false}
   ];
