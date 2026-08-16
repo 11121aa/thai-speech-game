@@ -171,6 +171,11 @@ function createCookingGame(words, callbacks) {
       tapFx:null,    // {x, y, startedAt} -- ripple drawn at the last successful button tap
       chopPunch:0, starPunch:0, lastStarN:0, cutAt:[],
       confetti:null, confettiStart:0,
+      // ── Cooking-Mama-style juice: a big flash text ("PERFECT!"/"OK!")
+      // on every scored action, a short screen-shake for great hits, and a
+      // consecutive-great-score combo counter (resets whenever a step
+      // scores below 80) -- see gradeScore()/triggerBigFx()/triggerShake(). ──
+      bigFx:null, shakeUntil:0, shakeMag:0, comboCount:0,
 
       // ── Pizza ──
       doughDragging:false, doughR:0, doughFinal:0, doughDone:false,
@@ -194,7 +199,7 @@ function createCookingGame(words, callbacks) {
   // no press state (buttons are hit-tested once in onDown, not held),
   // so this is a separate, position-only effect layered on top instead
   // of threading pressed-state through every button.
-  function pressFx(x,y){ G.tapFx={x:x,y:y,startedAt:sc.time.now}; }
+  function pressFx(x,y){ G.tapFx={x:x,y:y,startedAt:sc.time.now}; if(sc.sfxClick)sc.sfxClick.play(); }
   function drawTapFx(time){
     var fx=G.tapFx; if(!fx)return;
     var t=(time-fx.startedAt)/260;
@@ -205,6 +210,57 @@ function createCookingGame(words, callbacks) {
     ctx.lineWidth=3;
     ctx.beginPath(); ctx.arc(fx.x,fx.y,10+e*26,0,Math.PI*2); ctx.stroke();
     ctx.restore();
+  }
+
+  var BIGFX_Y=300;
+  // Cooking-Mama-style big flash text ("PERFECT!"/"GREAT!"/"OK!") shown on
+  // every scored action -- pops in with a little overshoot, holds, then
+  // fades and drifts up. Drawn unscaled/unshaken (like drawTapFx) so the
+  // text itself always stays crisp and centered regardless of the
+  // screen's pop-in transform or the shake triggered alongside it.
+  function triggerBigFx(txt,col){ G.bigFx={txt:txt,col:col,startedAt:sc.time.now}; }
+  function drawBigFx(time){
+    var fx=G.bigFx; if(!fx)return;
+    var t=(time-fx.startedAt)/650;
+    if(t>=1){G.bigFx=null;return;}
+    var inT=Math.min(1,t/0.22);
+    var ie=1-Math.pow(1-inT,3);
+    var scale=inT<1?1.4-0.4*ie:1;
+    var alpha=t<0.7?1:Math.max(0,1-(t-0.7)/0.3);
+    var rise=t>0.3?(t-0.3)*44:0;
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(VW/2,BIGFX_Y-rise);
+    ctx.scale(scale,scale);
+    ctx.font='bold 38px Prompt,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.lineWidth=7; ctx.strokeStyle='rgba(30,15,5,.55)';
+    ctx.strokeText(fx.txt,0,0);
+    ctx.fillStyle=fx.col;
+    ctx.fillText(fx.txt,0,0);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.restore();
+  }
+  // Short random-offset screen shake for a great/perfect hit -- decays
+  // linearly to 0 over 220ms. Applied once as a translate in update(),
+  // before the existing pop-in transform, so it never affects hit-testing.
+  function triggerShake(mag){ G.shakeUntil=sc.time.now+220; G.shakeMag=mag; }
+  // Central "how good was that score" classification, reused everywhere a
+  // step's numeric score becomes final -- keeps the flash text/colour,
+  // shake, combo count, and sound consistent across every mini-game
+  // instead of re-deriving thresholds at each of the ~13 scoring call
+  // sites (chop, cut, sauce, cheese, dough, bake, egg, toast, bun, plus
+  // the three drag-and-drop averages).
+  function gradeScore(score){
+    var grade = score>=90 ? {txt:'PERFECT!',col:'#FFD166',shake:5,ping:true}
+      : score>=70 ? {txt:'เยี่ยม!',col:'#2EC4B6',shake:0,ping:true}
+      : score>=50 ? {txt:'ดี!',col:'#F0A500',shake:0,ping:false}
+      : {txt:'ลองใหม่นะ',col:'#E57373',shake:0,ping:false};
+    G.comboCount = score>=80 ? (G.comboCount||0)+1 : 0;
+    var label = G.comboCount>=2 ? grade.txt+' x'+G.comboCount : grade.txt;
+    triggerBigFx(label,grade.col);
+    if(grade.shake) triggerShake(grade.shake);
+    if(grade.ping && sc.sfxOk) sc.sfxOk.play();
   }
 
   /* ── Canvas 2D context — set in create() ───────────────── */
@@ -1033,11 +1089,12 @@ function createCookingGame(words, callbacks) {
       G.allDone=true;
       var acc=G.dropped.reduce(function(s,d){return s+d.acc;},0)/G.dropped.length;
       G.scores.cmb=Math.round(acc*100); G.total+=G.scores.cmb;
-      // animateScore fires when CMB_R actually appears, not here -- this
-      // screen never displays the cmb score itself (only drawResult
-      // does, after the delay below), so starting the 600ms count-up
-      // now would let it finish before the player ever sees it.
-      sc.time.delayedCall(700,function(){animateScore('cmb',G.scores.cmb);setState(S.CMB_R);});
+      // animateScore/gradeScore fire when CMB_R actually appears, not here
+      // -- this screen never displays the cmb score itself (only
+      // drawResult does, after the delay below), so starting the 600ms
+      // count-up (or the big flash text) now would let them finish before
+      // the player ever sees them.
+      sc.time.delayedCall(700,function(){animateScore('cmb',G.scores.cmb);gradeScore(G.scores.cmb);setState(S.CMB_R);});
     }
   }
 
@@ -1059,7 +1116,7 @@ function createCookingGame(words, callbacks) {
 
   function drawFinal(ts){
     drawBg();
-    if(!G.confetti) spawnConfetti();
+    if(!G.confetti){ spawnConfetti(); if(sc.sfxCongrats)sc.sfxCongrats.play(); }
     drawConfetti(ts);
     ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
     T('🎉 Hot Dog สำเร็จ! 🎉',VW/2,68,'center');
@@ -1076,10 +1133,11 @@ function createCookingGame(words, callbacks) {
       ctx.fillStyle=C.gold; T(G.scores[r[1]]+' pts',VW-48,ry,'right');
     });
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,558,VW-56,1);
+    drawDishMedal(592,['bun','tom','cab','sau','cmb']);
     ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
-    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,584,'center');
-    drawBtn(FIN_BTN_X0,614,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
-    drawBtn(FIN_BTN_X1,614,FIN_BTN_W,52,'← ออก',C.gray,ts);
+    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,660,'center');
+    drawBtn(FIN_BTN_X0,690,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X1,690,FIN_BTN_W,52,'← ออก',C.gray,ts);
   }
 
   /* ── Pizza screens ─────────────────────────────────────────── */
@@ -1200,6 +1258,7 @@ function createCookingGame(words, callbacks) {
       var acc=G.toppingDropped.reduce(function(s,d){return s+d.acc;},0)/G.toppingDropped.length;
       G.scores.topping=Math.round(acc*100); G.total+=G.scores.topping;
       animateScore('topping',G.scores.topping);
+      gradeScore(G.scores.topping);
     }
     if(G.toppingAllDone){
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
@@ -1255,7 +1314,7 @@ function createCookingGame(words, callbacks) {
   }
   function drawPizzaFinal(ts){
     drawBg();
-    if(!G.confetti) spawnConfetti();
+    if(!G.confetti){ spawnConfetti(); if(sc.sfxCongrats)sc.sfxCongrats.play(); }
     drawConfetti(ts);
     ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
     T('🎉 พิซซ่าสำเร็จ! 🎉',VW/2,68,'center');
@@ -1275,10 +1334,11 @@ function createCookingGame(words, callbacks) {
       ctx.fillStyle=C.gold; T(G.scores[r[1]]+' pts',VW-48,ry,'right');
     });
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,608,VW-56,1);
+    drawDishMedal(642,['dough','sauce','cheese','topping','bake']);
     ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
-    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,634,'center');
-    drawBtn(FIN_BTN_X0,664,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
-    drawBtn(FIN_BTN_X1,664,FIN_BTN_W,52,'← ออก',C.gray,ts);
+    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,710,'center');
+    drawBtn(FIN_BTN_X0,740,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X1,740,FIN_BTN_W,52,'← ออก',C.gray,ts);
   }
 
   /* ── Breakfast screens ────────────────────────────────────────── */
@@ -1404,12 +1464,12 @@ function createCookingGame(words, callbacks) {
       G.plateAllDone=true;
       var acc=G.plateDropped.reduce(function(s,d){return s+d.acc;},0)/G.plateDropped.length;
       G.scores.plate=Math.round(acc*100); G.total+=G.scores.plate;
-      sc.time.delayedCall(700,function(){animateScore('plate',G.scores.plate);setState(SB.PLATE_R);});
+      sc.time.delayedCall(700,function(){animateScore('plate',G.scores.plate);gradeScore(G.scores.plate);setState(SB.PLATE_R);});
     }
   }
   function drawBreakfastFinal(ts){
     drawBg();
-    if(!G.confetti) spawnConfetti();
+    if(!G.confetti){ spawnConfetti(); if(sc.sfxCongrats)sc.sfxCongrats.play(); }
     drawConfetti(ts);
     ctx.font='bold 24px Prompt'; ctx.fillStyle=C.gold;
     T('🎉 มื้อเช้าสำเร็จ! 🎉',VW/2,68,'center');
@@ -1430,10 +1490,11 @@ function createCookingGame(words, callbacks) {
       ctx.fillStyle=C.gold; T(G.scores[r[1]]+' pts',VW-48,ry,'right');
     });
     ctx.fillStyle='rgba(255,255,255,.2)'; ctx.fillRect(28,528,VW-56,1);
+    drawDishMedal(562,['egg','bacon','toast','plate']);
     ctx.font='bold 20px Prompt'; ctx.fillStyle=C.w;
-    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,554,'center');
-    drawBtn(FIN_BTN_X0,584,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
-    drawBtn(FIN_BTN_X1,584,FIN_BTN_W,52,'← ออก',C.gray,ts);
+    T('คะแนนรวม: '+G.total+' คะแนน',VW/2,630,'center');
+    drawBtn(FIN_BTN_X0,660,FIN_BTN_W,52,'🔄 เล่นอีกครั้ง',C.acc,ts);
+    drawBtn(FIN_BTN_X1,660,FIN_BTN_W,52,'← ออก',C.gray,ts);
   }
 
   // A one-time celebration for the single "you finished the whole dish"
@@ -1472,6 +1533,24 @@ function createCookingGame(words, callbacks) {
     ctx.restore();
   }
 
+  // Cooking-Mama-style medal for the whole finished dish, from the
+  // average of its steps' scores -- shown once on each dish's final
+  // screen alongside the existing per-step score breakdown/total.
+  function dishGrade(avg){
+    if(avg>=90) return {med:'🏆',txt:'สุดยอดเชฟตัวน้อย!',col:'#FFD166'};
+    if(avg>=75) return {med:'🥇',txt:'เก่งมาก!',col:'#F0A500'};
+    if(avg>=55) return {med:'🥈',txt:'ทำได้ดี!',col:'#C7CDD6'};
+    return {med:'🥉',txt:'ลองอีกครั้งนะ!',col:'#CD7F32'};
+  }
+  function drawDishMedal(y,scoreKeys){
+    var avg=scoreKeys.reduce(function(s,k){return s+(G.scores[k]||0);},0)/scoreKeys.length;
+    var g=dishGrade(avg);
+    ctx.font='54px sans-serif'; ctx.textBaseline='middle';
+    T(g.med,VW/2,y,'center');
+    ctx.font='bold 17px Prompt'; ctx.fillStyle=g.col; ctx.textBaseline='alphabetic';
+    T(g.txt,VW/2,y+40,'center');
+  }
+
   // Score count-up: call animateScore() the instant a score becomes
   // final, then read it back through scoreVal() wherever it's drawn --
   // counts up from 0 over 600ms instead of the number just appearing,
@@ -1502,6 +1581,7 @@ function createCookingGame(words, callbacks) {
     G.scores[key]=Math.round(pct*100);
     G.total+=G.scores[key];
     animateScore(key,G.scores[key]);
+    gradeScore(G.scores[key]);
     if(G.ing==='tom')G.tomFinalPct=pct; else G.cabFinalPct=pct;
   }
   function finishDough(){
@@ -1509,21 +1589,21 @@ function createCookingGame(words, callbacks) {
     G.doughDone=true;
     G.doughFinal=Math.max(PZ_R_MIN,Math.min(PZ_R_TORN,G.doughR));
     var score=Math.round(Math.max(10,100-Math.abs(G.doughR-PZ_R_TARGET)*0.8));
-    G.scores.dough=score; G.total+=score; animateScore('dough',score);
+    G.scores.dough=score; G.total+=score; animateScore('dough',score); gradeScore(score);
   }
   function finishSauce(){
     if(G.sauceDone)return;
     G.sauceDone=true;
     var painted=G.sauceCells.filter(function(b){return b;}).length;
     var score=Math.round((painted/VEG_CELLS)*100);
-    G.scores.sauce=score; G.total+=score; animateScore('sauce',score);
+    G.scores.sauce=score; G.total+=score; animateScore('sauce',score); gradeScore(score);
   }
   function finishCheese(){
     if(G.cheeseDone)return;
     G.cheeseDone=true;
     var pct=(G.cheeseCount||0)/CHEESE_TAPS_NEEDED;
     var score=Math.round(pct*100);
-    G.scores.cheese=score; G.total+=score; animateScore('cheese',score);
+    G.scores.cheese=score; G.total+=score; animateScore('cheese',score); gradeScore(score);
     G.cheeseFinalPct=pct;
   }
   // Shared shape for both BAKE (pizza) and TOAST (breakfast): a value
@@ -1538,14 +1618,14 @@ function createCookingGame(words, callbacks) {
     var score;
     if(frac>=BAKE_GOOD[0]&&frac<=BAKE_GOOD[1]) score=Math.round(100-Math.abs(frac-mid)/half*20);
     else { var distOut=frac<BAKE_GOOD[0]?BAKE_GOOD[0]-frac:frac-BAKE_GOOD[1]; score=Math.round(Math.max(10,80-distOut*220)); }
-    G.scores.bake=score; G.total+=score; animateScore('bake',score);
+    G.scores.bake=score; G.total+=score; animateScore('bake',score); gradeScore(score);
   }
   function finishEgg(){
     if(G.eggDone)return;
     G.eggDone=true;
     var pct=Math.min(1,(G.eggCracks||0)/EGG_TAPS_NEEDED);
     var score=Math.round(pct*100);
-    G.scores.egg=score; G.total+=score; animateScore('egg',score);
+    G.scores.egg=score; G.total+=score; animateScore('egg',score); gradeScore(score);
   }
   function finishToast(frac){
     if(G.toastDone)return;
@@ -1554,7 +1634,7 @@ function createCookingGame(words, callbacks) {
     var score;
     if(frac>=TOAST_GOOD[0]&&frac<=TOAST_GOOD[1]) score=Math.round(100-Math.abs(frac-mid)/half*20);
     else { var distOut=frac<TOAST_GOOD[0]?TOAST_GOOD[0]-frac:frac-TOAST_GOOD[1]; score=Math.round(Math.max(10,80-distOut*220)); }
-    G.scores.toast=score; G.total+=score; animateScore('toast',score);
+    G.scores.toast=score; G.total+=score; animateScore('toast',score); gradeScore(score);
   }
   function initSt(s){
     if(s===S.TOM){G.ing='tom';G.taps=0;G.choppedCount=0;G.chopRun=false;G.chopDone=false;G.chopStart=0;G.kAnim=0;G.chopPunch=0;G.starPunch=0;G.lastStarN=0;}
@@ -1583,6 +1663,10 @@ function createCookingGame(words, callbacks) {
       this.load.audio('ck_chop', 'soundeffect/KifeChop.mp3');
       this.load.audio('ck_cut',  'soundeffect/TomatoCut.mp3');
       this.load.audio('ck_bread','soundeffect/SlicingToast.mp3');
+      this.load.audio('ck_ok',       'soundeffect/CorrectSFX.mp3');
+      this.load.audio('ck_click',    'soundeffect/Click.mp3');
+      this.load.audio('ck_congrats', 'soundeffect/CongratSFX.mp3');
+      this.load.audio('ck_land',     'soundeffect/FlipCard.mp3');
       this.load.image('ck_bg', 'img/cooking/bg.jpg');
     },
 
@@ -1593,6 +1677,10 @@ function createCookingGame(words, callbacks) {
       this.sfxChop =this.sound.add('ck_chop', {volume:0.7});
       this.sfxCut  =this.sound.add('ck_cut',  {volume:0.8});
       this.sfxBread=this.sound.add('ck_bread',{volume:0.7,loop:true});
+      this.sfxOk       =this.sound.add('ck_ok',       {volume:0.7});
+      this.sfxClick    =this.sound.add('ck_click',    {volume:0.5});
+      this.sfxCongrats =this.sound.add('ck_congrats', {volume:0.8});
+      this.sfxLand     =this.sound.add('ck_land',     {volume:0.55});
       resetG();
       this.input.on('pointerdown', function(ptr){
         // Each CookingGame.start() spins up a brand-new AudioContext, which
@@ -1623,6 +1711,14 @@ function createCookingGame(words, callbacks) {
       var ease=1-Math.pow(1-pop,3);
       var scale=0.985+0.015*ease;
       ctx.save();
+      // Brief random-offset shake for a great/perfect hit (see
+      // triggerShake/gradeScore), decaying linearly to 0 -- applied before
+      // the pop-in transform below so it's a simple additive jolt, not
+      // touching input hit-testing which uses untransformed coordinates.
+      if(G.shakeUntil&&time<G.shakeUntil){
+        var sMag=G.shakeMag*(G.shakeUntil-time)/220;
+        ctx.translate((Math.random()-0.5)*2*sMag,(Math.random()-0.5)*2*sMag);
+      }
       ctx.translate(VW/2,VH/2); ctx.scale(scale,scale); ctx.translate(-VW/2,-VH/2);
 
       switch(G.st){
@@ -1664,6 +1760,7 @@ function createCookingGame(words, callbacks) {
 
       ctx.restore();
       drawTapFx(time); // drawn after restore so the ripple sits at the exact tap position, unaffected by the pop-in scale
+      drawBigFx(time);
     },
 
     onDown:function(x,y,now){
@@ -1706,7 +1803,8 @@ function createCookingGame(words, callbacks) {
         if(G.cuts>=2){if(hit(x,y,VW/2-80,402,160,50)){pressFx(x,y);setState(S.SAU_R);}return;}
         var cs=Math.round(Math.max(10,100-Math.abs(G.kY-CUT_TY[G.cuts])*2));
         G.cutSc.push(cs);G.cutY.push(G.kY);G.cutAt.push(now);G.cuts++;
-        if(G.cuts>=2){G.scores.sau=Math.round((G.cutSc[0]+G.cutSc[1])/2);G.total+=G.scores.sau;animateScore('sau',G.scores.sau);}
+        if(sc.sfxLand)sc.sfxLand.play();
+        if(G.cuts>=2){G.scores.sau=Math.round((G.cutSc[0]+G.cutSc[1])/2);G.total+=G.scores.sau;animateScore('sau',G.scores.sau);gradeScore(G.scores.sau);}
         return;
       }
       if(G.st===S.SAU_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(S.SAU_R,S.CMB);}return;}
@@ -1716,6 +1814,7 @@ function createCookingGame(words, callbacks) {
           var toY=CMB_BBY-22-G.dropped.length*20;
           G.dropped.push({ing:G.cList[G.cIdx],x:G.sX,acc:acc,dropStart:now,fromY:225,toY:toY});
           G.cIdx++;
+          if(sc.sfxLand)sc.sfxLand.play();
         }
         return;
       }
@@ -1724,12 +1823,12 @@ function createCookingGame(words, callbacks) {
         // no pressFx on either button -- resetG()/onFinish() both tear
         // this screen down immediately, so a ripple would never get a
         // frame to render before it's gone.
-        if(hit(x,y,FIN_BTN_X0,614,FIN_BTN_W,52)){
+        if(hit(x,y,FIN_BTN_X0,690,FIN_BTN_W,52)){
           callbacks.onPoints&&callbacks.onPoints(G.total);
           resetG();
           return;
         }
-        if(hit(x,y,FIN_BTN_X1,614,FIN_BTN_W,52)){
+        if(hit(x,y,FIN_BTN_X1,690,FIN_BTN_W,52)){
           // Bank this dish's points into the shared running total before
           // leaving -- same as the retry path -- so the shared finish
           // screen's total/leaderboard save isn't missing the dish that
@@ -1762,6 +1861,7 @@ function createCookingGame(words, callbacks) {
           G.cheeseTaps++;
           if(G.cheeseCount<CHEESE_TAPS_NEEDED)G.cheeseCount++;
           G.cheesePunch=now;
+          this.sfxChop.play();
           if(G.cheeseCount>=CHEESE_TAPS_NEEDED&&!G.cheeseDone)finishCheese();
         }
         return;
@@ -1773,6 +1873,7 @@ function createCookingGame(words, callbacks) {
           var tAcc=Math.max(0,1-Math.abs(G.toppingX-VW/2)/(VW/2-45));
           G.toppingDropped.push({kind:TOPPING_LIST[G.toppingIdx],acc:tAcc,droppedAt:now});
           G.toppingIdx++;
+          if(sc.sfxLand)sc.sfxLand.play();
         }
         return;
       }
@@ -1787,8 +1888,8 @@ function createCookingGame(words, callbacks) {
       }
       if(G.st===SP.BAKE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.BAKE_R,SP.FIN);}return;}
       if(G.st===SP.FIN){
-        if(hit(x,y,FIN_BTN_X0,664,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();return;}
-        if(hit(x,y,FIN_BTN_X1,664,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);callbacks.onFinish&&callbacks.onFinish();}
+        if(hit(x,y,FIN_BTN_X0,740,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();return;}
+        if(hit(x,y,FIN_BTN_X1,740,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);callbacks.onFinish&&callbacks.onFinish();}
         return;
       }
 
@@ -1801,6 +1902,7 @@ function createCookingGame(words, callbacks) {
           G.eggTaps++;
           if(G.eggCracks<EGG_TAPS_NEEDED)G.eggCracks++;
           G.eggPunch=now;
+          this.sfxChop.play();
           if(G.eggCracks>=EGG_TAPS_NEEDED&&!G.eggDone)finishEgg();
         }
         return;
@@ -1810,7 +1912,8 @@ function createCookingGame(words, callbacks) {
         if(G.baconCuts>=2){if(hit(x,y,VW/2-80,402,160,50)){pressFx(x,y);setState(SB.BACON_R);}return;}
         var bcs=Math.round(Math.max(10,100-Math.abs(G.baconY-BC_CUT_TY[G.baconCuts])*2));
         G.baconSc.push(bcs);G.baconCutY.push(G.baconY);G.baconAt.push(now);G.baconCuts++;
-        if(G.baconCuts>=2){G.scores.bacon=Math.round((G.baconSc[0]+G.baconSc[1])/2);G.total+=G.scores.bacon;animateScore('bacon',G.scores.bacon);}
+        if(sc.sfxLand)sc.sfxLand.play();
+        if(G.baconCuts>=2){G.scores.bacon=Math.round((G.baconSc[0]+G.baconSc[1])/2);G.total+=G.scores.bacon;animateScore('bacon',G.scores.bacon);gradeScore(G.scores.bacon);}
         return;
       }
       if(G.st===SB.BACON_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.BACON_R,SB.TOAST);}return;}
@@ -1828,13 +1931,14 @@ function createCookingGame(words, callbacks) {
           var pAcc=Math.max(0,1-Math.abs(G.plateX-VW/2)/(VW/2-45));
           G.plateDropped.push({ing:PLATE_LIST[G.plateIdx],acc:pAcc});
           G.plateIdx++;
+          if(sc.sfxLand)sc.sfxLand.play();
         }
         return;
       }
       if(G.st===SB.PLATE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.PLATE_R,SB.FIN);}return;}
       if(G.st===SB.FIN){
-        if(hit(x,y,FIN_BTN_X0,584,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();return;}
-        if(hit(x,y,FIN_BTN_X1,584,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);callbacks.onFinish&&callbacks.onFinish();}
+        if(hit(x,y,FIN_BTN_X0,660,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);resetG();return;}
+        if(hit(x,y,FIN_BTN_X1,660,FIN_BTN_W,52)){callbacks.onPoints&&callbacks.onPoints(G.total);callbacks.onFinish&&callbacks.onFinish();}
         return;
       }
     },
@@ -1886,6 +1990,7 @@ function createCookingGame(words, callbacks) {
       G.scores.bun=Math.round(Math.max(0,100-fromHoriz*2.2));
       G.total+=G.scores.bun; G.split=true;
       animateScore('bun',G.scores.bun);
+      gradeScore(G.scores.bun);
     }
   });
 
