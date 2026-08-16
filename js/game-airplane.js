@@ -19,10 +19,14 @@
 //      recording, and ramps the scroll speed up a notch on resume so it
 //      reads as "next leg is faster" rather than a mid-run jolt), rare
 //      tropical islands (an instant +15 ⭐ score-boost pickup, no
-//      practice gate -- just a bonus for grabbing it), and three hazard
-//      types -- jagged reef rocks, diving birds, and rising tentacles --
-//      any of which ends the run immediately on contact. An obstacle
-//      spawn always leaves at least one lane open.
+//      practice gate, PLUS a temporary obstacle-immune shield -- longer
+//      with owned air_shield_* upgrades), and three hazard types --
+//      jagged reef rocks, diving birds, and rising tentacles -- any of
+//      which ends the run immediately on contact (unless shielded). An
+//      obstacle spawn always leaves at least one lane open. Two more
+//      upgrade-gated pickups can also appear: a bomb (clears obstacles
+//      in a radius) and a magnet (auto-collects coins from any lane for
+//      a few seconds) -- neither spawns at all without its shop unlock.
 //    - Otherwise the round ends when the shared HUD countdown timer runs out
 // ============================================================
 
@@ -55,6 +59,22 @@ function createAirplaneGame(words, callbacks) {
   var SPAWN_Y = -50;        // items spawn just above the visible area
   var TOP_FADE = 90;        // items fade in over this many px of travel after spawning
 
+  // ── Shop upgrades (supabase/024_game_upgrades_migration.sql) --
+  // window.__airLoadout is set by game.html just before start(); empty
+  // for a guest/no-purchase player, giving the original baseline
+  // (base shield, no bomb/magnet pickups) unchanged. ──────────────
+  var loadout = window.__airLoadout || {};
+  var BASE_SHIELD_MS = 2500;                         // the island's shield is a base feature, not gated behind a purchase
+  var SHIELD_MS = BASE_SHIELD_MS + (loadout.shieldExtraMs || 0);
+  var HAS_BOMB = !!loadout.hasBomb;                  // bomb pickup doesn't spawn at all until air_bomb_1 is owned
+  var BOMB_RADIUS = loadout.bombRadius || 0;
+  var HAS_MAGNET = !!loadout.hasMagnet;              // same for the magnet pickup
+  var MAGNET_MS = loadout.magnetMs || 0;
+  var MAGNET_RADIUS = 220;                           // how far a coin can be from the plane and still get auto-pulled in while active
+  var BOMB_INTERVAL_MIN = 10000, BOMB_INTERVAL_MAX = 16000;
+  var MAGNET_INTERVAL_MIN = 11000, MAGNET_INTERVAL_MAX = 17000;
+  var BOMB_R = 26, MAGNET_R = 26; // pickup hitbox radius (same scale as ISLAND_R)
+
   var FlapScene = new Phaser.Class({
     Extends: Phaser.Scene,
 
@@ -68,18 +88,26 @@ function createAirplaneGame(words, callbacks) {
       this.islands        = [];
       this.obstacles      = [];
       this.clouds        = [];
+      this.bombs          = [];   // bomb pickups (only spawn if HAS_BOMB)
+      this.magnets        = [];   // magnet pickups (only spawn if HAS_MAGNET)
       this.score         = 0;
       this.scrollOff      = 0;
       this.coinTimer      = 0;
       this.wordTimer      = 0;
       this.islandTimer    = 0;
       this.obstacleTimer  = 0;
+      this.bombTimer      = 0;
+      this.magnetTimer    = 0;
       this.nextWordDelay  = WORD_INTERVAL_MIN + Math.random() * (WORD_INTERVAL_MAX - WORD_INTERVAL_MIN);
       this.nextIslandDelay = ISLAND_INTERVAL_MIN + Math.random() * (ISLAND_INTERVAL_MAX - ISLAND_INTERVAL_MIN);
       this.nextObstacleDelay = OBSTACLE_INTERVAL_MIN + Math.random() * (OBSTACLE_INTERVAL_MAX - OBSTACLE_INTERVAL_MIN);
+      this.nextBombDelay = BOMB_INTERVAL_MIN + Math.random() * (BOMB_INTERVAL_MAX - BOMB_INTERVAL_MIN);
+      this.nextMagnetDelay = MAGNET_INTERVAL_MIN + Math.random() * (MAGNET_INTERVAL_MAX - MAGNET_INTERVAL_MIN);
       this.speedLevel     = 0;    // +1 per word collected — ramps curSpeed()
       this.isPaused       = false; // true while the practice modal is open
       this.dead           = false; // true once an obstacle is hit — freezes play, then finishes
+      this.shieldUntil    = 0;    // obstacle-immune until this timestamp (island pickup)
+      this.magnetUntil    = 0;    // wide-radius auto-coin-collect until this timestamp
     },
 
     preload: function () {
@@ -207,6 +235,22 @@ function createAirplaneGame(words, callbacks) {
       this.islands.push({ lane: Math.floor(Math.random() * LANE_COUNT), y: SPAWN_Y, collected: false });
     },
 
+    // ── Bomb pickup (air_bomb_1+ upgrade) -- on collection, destroys
+    // every obstacle within BOMB_RADIUS of the plane. Never spawns
+    // without HAS_BOMB, but the call site still schedules the next timer
+    // regardless so no special-casing is needed there. ────────────────
+    spawnBomb: function () {
+      if (!HAS_BOMB) return;
+      this.bombs.push({ lane: Math.floor(Math.random() * LANE_COUNT), y: SPAWN_Y, collected: false });
+    },
+
+    // ── Magnet pickup (air_magnet_1+ upgrade) -- on collection, widens
+    // coin collection to any lane within MAGNET_RADIUS for MAGNET_MS. ──
+    spawnMagnet: function () {
+      if (!HAS_MAGNET) return;
+      this.magnets.push({ lane: Math.floor(Math.random() * LANE_COUNT), y: SPAWN_Y, collected: false });
+    },
+
     // ── [OBSTACLE] A row of 1-2 hazards — always leaves at least one
     // lane open so every row has a safe path through. Three visual/flavor
     // kinds (jagged reef rock, diving bird, rising tentacle) share the
@@ -259,6 +303,8 @@ function createAirplaneGame(words, callbacks) {
         this.drawWaves(g);
         this.drawLanes(g);
         this.drawIslands(g);
+        this.drawBombs(g);
+        this.drawMagnets(g);
         this.drawCoinsAndWords(g);
         this.drawObstacles(g, time);
         this.drawPlane(g, time);
@@ -297,6 +343,18 @@ function createAirplaneGame(words, callbacks) {
         this.nextObstacleDelay = OBSTACLE_INTERVAL_MIN + Math.random() * (OBSTACLE_INTERVAL_MAX - OBSTACLE_INTERVAL_MIN);
         this.spawnObstacle();
       }
+      this.bombTimer += delta;
+      if (this.bombTimer >= this.nextBombDelay) {
+        this.bombTimer -= this.nextBombDelay;
+        this.nextBombDelay = BOMB_INTERVAL_MIN + Math.random() * (BOMB_INTERVAL_MAX - BOMB_INTERVAL_MIN);
+        this.spawnBomb();
+      }
+      this.magnetTimer += delta;
+      if (this.magnetTimer >= this.nextMagnetDelay) {
+        this.magnetTimer -= this.nextMagnetDelay;
+        this.nextMagnetDelay = MAGNET_INTERVAL_MIN + Math.random() * (MAGNET_INTERVAL_MAX - MAGNET_INTERVAL_MIN);
+        this.spawnMagnet();
+      }
 
       // Move + cull coins (downward -- toward the fixed-position plane)
       this.coins.forEach(function (c) { c.y += speed * dt; });
@@ -314,11 +372,29 @@ function createAirplaneGame(words, callbacks) {
       this.obstacles.forEach(function (o) { o.y += speed * dt; });
       this.obstacles = this.obstacles.filter(function (o) { return o.y < H + 30; });
 
-      // Coin collection — same lane and close enough vertically
+      // Move + cull bombs/magnets
+      this.bombs.forEach(function (b) { b.y += speed * dt; });
+      this.bombs = this.bombs.filter(function (b) { return b.y < H + 30; });
+      this.magnets.forEach(function (m) { m.y += speed * dt; });
+      this.magnets = this.magnets.filter(function (m) { return m.y < H + 30; });
+
+      // Coin collection — normally same lane and close enough vertically;
+      // while a magnet buff is active, any lane within MAGNET_RADIUS
+      // counts too (checked with a real 2D distance, since the plane
+      // could be mid-lane-switch), so coins read as getting pulled in
+      // from other lanes instead of needing to line up first.
+      var magnetActive = time < this.magnetUntil;
       this.coins.forEach(function (c) {
-        if (c.collected || c.lane !== self.laneIdx) return;
-        var dy = PLANE_Y - c.y;
-        if (dy * dy < (PLANE_R + COIN_R) * (PLANE_R + COIN_R)) {
+        if (c.collected) return;
+        var inRange;
+        if (magnetActive) {
+          var mdx = LANE_X[c.lane] - self.planeX, mdy = PLANE_Y - c.y;
+          inRange = mdx * mdx + mdy * mdy < MAGNET_RADIUS * MAGNET_RADIUS;
+        } else {
+          var dy = PLANE_Y - c.y;
+          inRange = c.lane === self.laneIdx && dy * dy < (PLANE_R + COIN_R) * (PLANE_R + COIN_R);
+        }
+        if (inRange) {
           c.collected = true;
           self.score += COIN_PTS;
           self.scoreTxt.setText('' + self.score);
@@ -329,8 +405,10 @@ function createAirplaneGame(words, callbacks) {
       });
       this.coins = this.coins.filter(function (c) { return !c.collected; });
 
-      // Island collection — instant score boost, no practice gate (that's
-      // what the word bubbles are for).
+      // Island collection — instant score boost (no practice gate, that's
+      // what the word bubbles are for) plus a temporary obstacle-immune
+      // shield -- SHIELD_MS already includes any owned air_shield_*
+      // duration-extension tiers.
       this.islands.forEach(function (isl) {
         if (isl.collected || isl.lane !== self.laneIdx) return;
         var idy = PLANE_Y - isl.y;
@@ -340,10 +418,46 @@ function createAirplaneGame(words, callbacks) {
           self.scoreTxt.setText('' + self.score);
           callbacks.onPoints(ISLAND_BONUS_PTS);
           if (self.sfxCoin) self.sfxCoin.play();
-          self.showPop(LANE_X[isl.lane], isl.y - 24, '+' + ISLAND_BONUS_PTS + ' 🏝️ โบนัสเกาะ!');
+          self.shieldUntil = time + SHIELD_MS;
+          self.showPop(LANE_X[isl.lane], isl.y - 24, '+' + ISLAND_BONUS_PTS + ' 🏝️ โล่ป้องกัน!');
         }
       });
       this.islands = this.islands.filter(function (isl) { return !isl.collected; });
+
+      // Bomb collection — destroys every obstacle within BOMB_RADIUS of
+      // the plane (a real 2D distance, so it reaches into other lanes,
+      // not just the plane's own lane).
+      this.bombs.forEach(function (b) {
+        if (b.collected || b.lane !== self.laneIdx) return;
+        var bdy = PLANE_Y - b.y;
+        if (bdy * bdy < (PLANE_R + BOMB_R) * (PLANE_R + BOMB_R)) {
+          b.collected = true;
+          var cleared = 0;
+          self.obstacles.forEach(function (o) {
+            if (o.hit) return;
+            var odx = LANE_X[o.lane] - self.planeX, ody2 = o.y - PLANE_Y;
+            if (odx * odx + ody2 * ody2 < BOMB_RADIUS * BOMB_RADIUS) { o.hit = true; cleared++; }
+          });
+          if (self.sfxHit) self.sfxHit.play();
+          self.showPop(LANE_X[b.lane], b.y - 24, '💣 ระเบิด! เคลียร์ ' + cleared + ' จุด');
+        }
+      });
+      this.obstacles = this.obstacles.filter(function (o) { return !o.hit; });
+      this.bombs = this.bombs.filter(function (b) { return !b.collected; });
+
+      // Magnet collection — activates the wide-radius coin auto-collect
+      // used by the coin-collection block above.
+      this.magnets.forEach(function (m) {
+        if (m.collected || m.lane !== self.laneIdx) return;
+        var mdy2 = PLANE_Y - m.y;
+        if (mdy2 * mdy2 < (PLANE_R + MAGNET_R) * (PLANE_R + MAGNET_R)) {
+          m.collected = true;
+          self.magnetUntil = time + MAGNET_MS;
+          if (self.sfxCoin) self.sfxCoin.play();
+          self.showPop(LANE_X[m.lane], m.y - 24, '🧲 แม่เหล็ก!');
+        }
+      });
+      this.magnets = this.magnets.filter(function (m) { return !m.collected; });
 
       // Word bubble collection → pronunciation practice. The speed ramp is
       // applied only once paused/resumed here, not mid-run, so it reads
@@ -369,8 +483,10 @@ function createAirplaneGame(words, callbacks) {
       // Obstacle collision → game over. Skipped if a word bubble was just
       // collected this same frame (isPaused flips true above) — otherwise
       // an overlapping word+obstacle could trigger a game-over right as
-      // the practice modal is opening.
-      for (var i = 0; i < this.obstacles.length && !this.isPaused; i++) {
+      // the practice modal is opening. Also skipped entirely while
+      // shielded (island pickup) -- the plane just flies through.
+      var shielded = time < this.shieldUntil;
+      for (var i = 0; i < this.obstacles.length && !this.isPaused && !shielded; i++) {
         var o = this.obstacles[i];
         if (o.hit || o.lane !== this.laneIdx) continue;
         var ody = PLANE_Y - o.y;
@@ -384,6 +500,8 @@ function createAirplaneGame(words, callbacks) {
       this.drawWaves(g);
       this.drawLanes(g);
       this.drawIslands(g);
+      this.drawBombs(g);
+      this.drawMagnets(g);
       this.drawCoinsAndWords(g);
       this.drawObstacles(g, time);
       this.drawPlane(g, time);
@@ -497,6 +615,48 @@ function createAirplaneGame(words, callbacks) {
       });
     },
 
+    // Bomb pickup -- a simple round bomb with a lit fuse spark, styled to
+    // read instantly as "explosive" against the ocean background.
+    drawBombs: function (g) {
+      var self = this;
+      this.bombs.forEach(function (b) {
+        if (b.collected || b.y < -40 || b.y > H + 40) return;
+        var x = LANE_X[b.lane], a = self.fadeFor(b.y);
+        g.fillStyle(0xffffff, 0.2 * a);
+        g.fillEllipse(x, b.y + 14, 46, 16);
+        g.fillStyle(0x2b2438, a);
+        g.fillCircle(x, b.y, 18);
+        g.fillStyle(0x4a4458, 0.7 * a);
+        g.fillCircle(x - 5, b.y - 5, 6);
+        g.lineStyle(3, 0x8a5a2b, a);
+        g.beginPath();
+        g.moveTo(x + 8, b.y - 14);
+        g.lineTo(x + 14, b.y - 24);
+        g.strokePath();
+        var spark = 0.6 + 0.4 * Math.sin(self.time.now * 0.02);
+        g.fillStyle(0xffc107, spark * a);
+        g.fillCircle(x + 14, b.y - 24, 4);
+      });
+    },
+
+    // Magnet pickup -- a red-and-white horseshoe magnet.
+    drawMagnets: function (g) {
+      var self = this;
+      this.magnets.forEach(function (m) {
+        if (m.collected || m.y < -40 || m.y > H + 40) return;
+        var x = LANE_X[m.lane], a = self.fadeFor(m.y);
+        g.fillStyle(0xffffff, 0.2 * a);
+        g.fillEllipse(x, m.y + 14, 46, 16);
+        g.lineStyle(9, 0xe74c3c, a);
+        g.beginPath();
+        g.arc(x, m.y, 14, Math.PI * 0.15, Math.PI * 0.85, false, 0.05);
+        g.strokePath();
+        g.fillStyle(0xecf0f1, a);
+        g.fillRect(x - 17, m.y - 4, 8, 12);
+        g.fillRect(x + 9, m.y - 4, 8, 12);
+      });
+    },
+
     // ── [OBSTACLE] Dispatches to one of three hazard visuals by kind --
     // collision/spawn/movement is identical for all three (see spawnObstacle
     // and the update() collision loop), only the drawing differs. ───────
@@ -596,6 +756,16 @@ function createAirplaneGame(words, callbacks) {
 
       function rPt(lx, ly) {
         return { x: x + lx * cos - ly * sin, y: y + lx * sin + ly * cos };
+      }
+
+      // Shield glow (island pickup) -- a soft pulsing ring around the
+      // plane for as long as this.shieldUntil is in the future.
+      if (time < this.shieldUntil) {
+        var sPulse = 0.35 + 0.15 * Math.sin(time * 0.012);
+        g.fillStyle(0x2ec4b6, sPulse * 0.4);
+        g.fillCircle(x, y, PLANE_R + 14);
+        g.lineStyle(3, 0x2ec4b6, sPulse + 0.3);
+        g.strokeCircle(x, y, PLANE_R + 14);
       }
 
       // Shadow — offset down/right, sells "flying above the lane"

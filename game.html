@@ -441,8 +441,8 @@
      Safari (which caches far more aggressively than Chrome) is forced to
      fetch the new version instead of silently serving a stale copy. -->
 <script src="js/game-shooting.js?v=6"></script>
-<script src="js/game-airplane.js?v=10"></script>
-<script src="js/game-platformer.js?v=27"></script>
+<script src="js/game-airplane.js?v=12"></script>
+<script src="js/game-platformer.js?v=28"></script>
 <script src="js/game-matching.js?v=6"></script>
 <script src="js/game-flashcard.js?v=6"></script>
 <script src="js/game-crossy.js?v=6"></script>
@@ -450,7 +450,7 @@
 <script src="js/game-dressup.js?v=12"></script>
 <script src="js/game-towerdefense.js?v=6"></script>
 <script src="js/game-tetris.js?v=4"></script>
-<script src="js/game-rpg.js?v=3"></script>
+<script src="js/game-rpg.js?v=4"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
@@ -1239,6 +1239,13 @@ async function launchGame() {
     RpgGame.start(pool, GAME_CBS);        // Phaser game (procedural dungeon crawler)
   } else {
     document.getElementById('airplaneGame').style.display = 'block';
+    window.__airLoadout = {
+      shieldExtraMs: upgradeSumForPrefix('air_shield_'),
+      hasBomb: hasUpgrade('air_bomb_1'),
+      bombRadius: upgradeSumForPrefix('air_bomb_'),
+      hasMagnet: hasUpgrade('air_magnet_1'),
+      magnetMs: upgradeSumForPrefix('air_magnet_')
+    };
     AirplaneGame.start(pool, GAME_CBS);   // Phaser game
   }
 }
