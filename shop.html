@@ -152,30 +152,51 @@
           <div id="shopMsg" class="text-danger small ms-auto" style="display:none;"></div>
         </div>
 
-        <h2 class="h4 mb-3">ร้านของแต่งตัว</h2>
-        <div class="closet-tabs" id="closetTabs">
-          <button class="closet-tab active" data-slot="all">ทั้งหมด</button>
-          <button class="closet-tab" data-slot="hat">หมวก</button>
-          <button class="closet-tab" data-slot="shirt">เสื้อ</button>
-          <button class="closet-tab" data-slot="pants">กางเกง</button>
-          <button class="closet-tab" data-slot="shoes">รองเท้า</button>
-          <button class="closet-tab" data-slot="bag">กระเป๋า</button>
+        <!-- ── Shop sections are ordered one game per section (not tabbed
+             together) so each game's upgrades read as their own shop --
+             dress-up is deliberately LAST since it has by far the most
+             items (5 slots x many designs each). ── -->
+
+        <div class="wear-section" style="border-top:none;padding-top:0;margin-top:0;">
+          <h2 class="h4 mb-1">🃏 อัปเกรด: จับคู่ภาพ</h2>
+          <p class="text-secondary mb-3">ตัวคูณคะแนนถาวร — ใช้เหรียญเดียวกับด้านบน ซื้อครั้งเดียวใช้ได้ตลอดไป</p>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid_matching"></div>
         </div>
-        <div class="cosmetic-grid" id="cosmeticGrid"></div>
 
         <div class="wear-section">
-          <h2 class="h4 mb-1">แต่งตัวอวตารของคุณ</h2>
-          <p class="text-secondary mb-3">เลือกของที่ซื้อแล้วมาสวมใส่บนอวตารของคุณ — คนอื่นที่เห็นโปรไฟล์คุณจะเห็นชุดนี้</p>
-          <div class="closet-tabs" id="wearTabs">
-            <button class="closet-tab active" data-slot="all">ทั้งหมด</button>
-            <button class="closet-tab" data-slot="hat">หมวก</button>
-            <button class="closet-tab" data-slot="shirt">เสื้อ</button>
-            <button class="closet-tab" data-slot="pants">กางเกง</button>
-            <button class="closet-tab" data-slot="shoes">รองเท้า</button>
-            <button class="closet-tab" data-slot="bag">กระเป๋า</button>
-          </div>
-          <div id="wearEmpty" class="text-secondary" style="display:none;">คุณยังไม่มีของที่ซื้อเลย เลือกซื้อของด้านบนก่อนนะ</div>
-          <div class="cosmetic-grid" id="wearGrid"></div>
+          <h2 class="h4 mb-1">🧱 อัปเกรด: เตตริส</h2>
+          <p class="text-secondary mb-3">ตัวคูณคะแนนถาวร</p>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid_tetris"></div>
+        </div>
+
+        <div class="wear-section">
+          <h2 class="h4 mb-1">✈️ อัปเกรด: เครื่องบิน</h2>
+          <p class="text-secondary mb-3">ตัวคูณคะแนน โล่จากเกาะอยู่นานขึ้น ปลดล็อกไอเทมระเบิด/แม่เหล็ก</p>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid_airplane"></div>
+        </div>
+
+        <div class="wear-section">
+          <h2 class="h4 mb-1">🎯 อัปเกรด: ยิงเป้า</h2>
+          <p class="text-secondary mb-3">กระสุนเร็วขึ้น ลดเวลาโหลด ปลดล็อกสกิลหยุดเวลา</p>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid_shooting"></div>
+        </div>
+
+        <div class="wear-section">
+          <h2 class="h4 mb-1">🏰 อัปเกรด: ป้องกันฐาน</h2>
+          <p class="text-secondary mb-3">ปลดล็อกค่ายทหาร — ส่งทหารเดินไปปะทะศัตรูบนเส้นทาง</p>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid_towerdefense"></div>
+        </div>
+
+        <div class="wear-section">
+          <h2 class="h4 mb-1">🏃 อัปเกรด: วิ่งเก็บเหรียญ</h2>
+          <p class="text-secondary mb-3">ปลดล็อกไอเทมพลังกระโดด/ระเบิด/คะแนนคูณสอง</p>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid_platformer"></div>
+        </div>
+
+        <div class="wear-section">
+          <h2 class="h4 mb-1">🍳 อัปเกรด: ทำอาหาร</h2>
+          <p class="text-secondary mb-3">ปลดล็อกเมนูพิซซ่าและอาหารเช้า</p>
+          <div class="cosmetic-grid upgrade-grid" id="upgGrid_cooking"></div>
         </div>
 
         <!-- ── RPG shop: weapons/armor/skills for the dungeon crawler
@@ -200,24 +221,34 @@
           <div class="cosmetic-grid" id="rpgWearGrid"></div>
         </div>
 
-        <!-- ── Game upgrades shop: permanent gameplay upgrades for 7
-             other games -- a third catalog on the same coin balance.
-             No "wear"/equip step here: every owned upgrade for a game
-             is simply always active whenever that game is played. ── -->
+        <!-- ── Dress-up shop -- LAST on purpose: by far the biggest
+             catalog (5 slots x many designs each), so every smaller
+             per-game shop above is easy to find without scrolling past
+             this one first. ── -->
         <div class="wear-section">
-          <h2 class="h4 mb-1">🎮 ร้านอัปเกรดเกม</h2>
-          <p class="text-secondary mb-3">อัปเกรดถาวรสำหรับแต่ละเกม — ใช้เหรียญเดียวกับด้านบน ซื้อครั้งเดียวใช้ได้ตลอดไป</p>
-          <div class="closet-tabs" id="upgTabs">
-            <button class="closet-tab active" data-game="all">ทั้งหมด</button>
-            <button class="closet-tab" data-game="matching">🃏 จับคู่ภาพ</button>
-            <button class="closet-tab" data-game="tetris">🧱 เตตริส</button>
-            <button class="closet-tab" data-game="airplane">✈️ เครื่องบิน</button>
-            <button class="closet-tab" data-game="shooting">🎯 ยิงเป้า</button>
-            <button class="closet-tab" data-game="towerdefense">🏰 ป้องกันฐาน</button>
-            <button class="closet-tab" data-game="platformer">🏃 วิ่งเก็บเหรียญ</button>
-            <button class="closet-tab" data-game="cooking">🍳 ทำอาหาร</button>
+          <h2 class="h4 mb-3">👗 ร้านของแต่งตัว</h2>
+          <div class="closet-tabs" id="closetTabs">
+            <button class="closet-tab active" data-slot="all">ทั้งหมด</button>
+            <button class="closet-tab" data-slot="hat">หมวก</button>
+            <button class="closet-tab" data-slot="shirt">เสื้อ</button>
+            <button class="closet-tab" data-slot="pants">กางเกง</button>
+            <button class="closet-tab" data-slot="shoes">รองเท้า</button>
+            <button class="closet-tab" data-slot="bag">กระเป๋า</button>
           </div>
-          <div class="cosmetic-grid upgrade-grid" id="upgGrid"></div>
+          <div class="cosmetic-grid" id="cosmeticGrid"></div>
+
+          <h2 class="h4 mb-1 mt-4">แต่งตัวอวตารของคุณ</h2>
+          <p class="text-secondary mb-3">เลือกของที่ซื้อแล้วมาสวมใส่บนอวตารของคุณ — คนอื่นที่เห็นโปรไฟล์คุณจะเห็นชุดนี้</p>
+          <div class="closet-tabs" id="wearTabs">
+            <button class="closet-tab active" data-slot="all">ทั้งหมด</button>
+            <button class="closet-tab" data-slot="hat">หมวก</button>
+            <button class="closet-tab" data-slot="shirt">เสื้อ</button>
+            <button class="closet-tab" data-slot="pants">กางเกง</button>
+            <button class="closet-tab" data-slot="shoes">รองเท้า</button>
+            <button class="closet-tab" data-slot="bag">กระเป๋า</button>
+          </div>
+          <div id="wearEmpty" class="text-secondary" style="display:none;">คุณยังไม่มีของที่ซื้อเลย เลือกซื้อของด้านบนก่อนนะ</div>
+          <div class="cosmetic-grid" id="wearGrid"></div>
         </div>
       </div>
 
@@ -307,7 +338,6 @@
   var gameUpgrades = [];
   var gameUpgradesById = {};
   var ownedUpgradeIds = new Set();
-  var activeUpgGameFilter = 'all';
 
   function el(id) { return document.getElementById(id); }
 
@@ -393,7 +423,7 @@
     renderWearGrid();
     renderRpgGrid();
     renderRpgWearGrid();
-    renderUpgGrid();
+    renderUpgGrids();
   }
 
   // Locked items show their real art too (not a silhouette) -- you're
@@ -572,47 +602,44 @@
     }
   });
 
-  // Unlike cosmetics/RPG gear, an upgrade with a `requires` prerequisite
-  // that isn't owned yet shows a locked note instead of a buy button --
-  // buy_game_upgrade() would reject the purchase server-side anyway, but
-  // showing a disabled/priced button the tap can't actually complete
-  // would be confusing, so the card explains why instead.
-  function renderUpgGrid() {
-    var grid = el('upgGrid');
-    grid.innerHTML = '';
-    var list = gameUpgrades.filter(function (u) { return activeUpgGameFilter === 'all' || u.game === activeUpgGameFilter; });
-    list.forEach(function (u) {
-      var owned = ownedUpgradeIds.has(u.id);
-      var prereqMet = !u.requires || ownedUpgradeIds.has(u.requires);
-      var card = document.createElement('div');
-      card.className = 'cosmetic-card upgrade-card';
-      var actionHtml;
-      if (owned) {
-        actionHtml = '<div class="owned-badge"><i class="bi bi-check-circle-fill"></i>มีแล้ว</div>';
-      } else if (!prereqMet) {
-        actionHtml = '<div class="locked-note">🔒 ซื้อระดับก่อนหน้าก่อน</div>';
-      } else {
-        actionHtml = '<button class="upg-buy-btn" data-id="' + u.id + '"' + (coinBalance < u.price ? ' disabled' : '') + '>ซื้อ ' + u.price + ' 🪙</button>';
-      }
-      card.innerHTML =
-        '<div class="art" style="font-size:2rem;display:flex;align-items:center;justify-content:center;">' + (GAME_ICON[u.game] || '🎮') + '</div>' +
-        '<div class="name">' + u.name + '</div>' +
-        '<div class="desc">' + u.description + '</div>' +
-        actionHtml;
-      grid.appendChild(card);
+  // One section per game now (not tabbed together) -- GAME_ORDER matches
+  // the page's own top-to-bottom section order. Unlike cosmetics/RPG
+  // gear, an upgrade with a `requires` prerequisite that isn't owned yet
+  // shows a locked note instead of a buy button -- buy_game_upgrade()
+  // would reject the purchase server-side anyway, but showing a
+  // disabled/priced button the tap can't actually complete would be
+  // confusing, so the card explains why instead.
+  var GAME_ORDER = ['matching', 'tetris', 'airplane', 'shooting', 'towerdefense', 'platformer', 'cooking'];
+  function renderUpgGrids() {
+    GAME_ORDER.forEach(function (game) {
+      var grid = el('upgGrid_' + game);
+      if (!grid) return;
+      grid.innerHTML = '';
+      gameUpgrades.filter(function (u) { return u.game === game; }).forEach(function (u) {
+        var owned = ownedUpgradeIds.has(u.id);
+        var prereqMet = !u.requires || ownedUpgradeIds.has(u.requires);
+        var card = document.createElement('div');
+        card.className = 'cosmetic-card upgrade-card';
+        var actionHtml;
+        if (owned) {
+          actionHtml = '<div class="owned-badge"><i class="bi bi-check-circle-fill"></i>มีแล้ว</div>';
+        } else if (!prereqMet) {
+          actionHtml = '<div class="locked-note">🔒 ซื้อระดับก่อนหน้าก่อน</div>';
+        } else {
+          actionHtml = '<button class="upg-buy-btn" data-id="' + u.id + '"' + (coinBalance < u.price ? ' disabled' : '') + '>ซื้อ ' + u.price + ' 🪙</button>';
+        }
+        card.innerHTML =
+          '<div class="art" style="font-size:2rem;display:flex;align-items:center;justify-content:center;">' + (GAME_ICON[u.game] || '🎮') + '</div>' +
+          '<div class="name">' + u.name + '</div>' +
+          '<div class="desc">' + u.description + '</div>' +
+          actionHtml;
+        grid.appendChild(card);
+      });
     });
   }
 
-  el('upgTabs').addEventListener('click', function (e) {
-    var btn = e.target.closest('.closet-tab');
-    if (!btn) return;
-    document.querySelectorAll('#upgTabs .closet-tab').forEach(function (b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    activeUpgGameFilter = btn.getAttribute('data-game');
-    renderUpgGrid();
-  });
-
-  el('upgGrid').addEventListener('click', async function (e) {
+  // One delegated buy handler shared across all 7 per-game grids.
+  async function onUpgBuyClick(e) {
     var btn = e.target.closest('.upg-buy-btn');
     if (!btn || btn.disabled) return;
     var targetId = btn.getAttribute('data-id');
@@ -636,12 +663,16 @@
       el('buyResultArt').innerHTML = '<div style="font-size:3rem;">' + (GAME_ICON[result.game] || '🎮') + '</div>';
 
       new bootstrap.Modal(el('buyResultModal')).show();
-      renderUpgGrid();
+      renderUpgGrids();
     } catch (err) {
       msgEl.textContent = (err && err.message) || 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
       msgEl.style.display = 'block';
       btn.disabled = false;
     }
+  }
+  GAME_ORDER.forEach(function (game) {
+    var grid = el('upgGrid_' + game);
+    if (grid) grid.addEventListener('click', onUpgBuyClick);
   });
 
   el('closetTabs').addEventListener('click', function (e) {
