@@ -12,13 +12,13 @@
 //  a purchasable item there.
 // ============================================================
 //  How the game works:
-//    - This mini-game is independent of the shop and coin ownership --
-//      every cosmetic in the whole catalog (both art styles, 10 designs
-//      per slot) can be BROWSED here regardless of what's actually owned.
-//      It has nothing to do with what's bought or worn on your persistent
-//      profile avatar (that's shop.html + management.html) -- picking
-//      something here never touches ownership, coins, or the profile's
-//      equipped_* columns.
+//    - Only cosmetics you actually OWN (bought in shop.html, or the free
+//      starter shirt+pants every account gets) are wearable here -- this
+//      used to be free play across the whole catalog regardless of
+//      ownership, but now matches the rest of the shop system. Still
+//      separate from what's actually EQUIPPED on your persistent profile
+//      avatar (that's shop.html + management.html) -- picking something
+//      here never touches coins or the profile's equipped_* columns.
 //    - The avatar starts bare. Tap a slot's tab (hat/shirt/pants/shoes/bag)
 //      to see every design for it as real thumbnail art (sticker style top
 //      row, doll style bottom row), then tap a card to try to wear it --
@@ -35,8 +35,8 @@
 //               the practice word gating each equip attempt
 //   callbacks = { onPoints, onPractice, onFinish, onTime }
 //   closet    = { hat:[...], shirt:[...], pants:[...], shoes:[...], bag:[...] }
-//               every cosmetic for that slot (both styles) -- the whole
-//               catalog, not just what's owned -- each entry
+//               every cosmetic the player OWNS for that slot (both
+//               styles) -- each entry
 //               { id, name, rarity, style, variant, asset_path },
 //               sorted sticker-style-first then by variant
 function createDressupGame(words, callbacks, closet) {
@@ -139,11 +139,14 @@ function createDressupGame(words, callbacks, closet) {
       this.buildPieceImages();
       this.drawAvatar();
 
-      // Every slot always has the full catalog now -- this only fires if
-      // the catalog fetch itself genuinely failed (e.g. offline).
+      // The closet is now filtered down to owned cosmetics only (see
+      // loadCloset()) -- every logged-in account owns at least a starter
+      // shirt+pants (supabase/025_dressup_starter_outfit_migration.sql),
+      // so this should only ever fire for a guest (not logged in, so
+      // nothing can be owned) or a genuine fetch failure.
       var hasAnything = SLOTS.some(function (s) { return (closet[s.key] || []).length > 0; });
       if (!hasAnything) {
-        this.add.text(PANEL_X + PANEL_W / 2, H / 2, 'โหลดตู้เสื้อผ้าไม่สำเร็จ\nลองเปิดหน้านี้ใหม่อีกครั้ง', {
+        this.add.text(PANEL_X + PANEL_W / 2, H / 2, 'ยังไม่มีชุดที่เป็นเจ้าของ\nเข้าสู่ระบบแล้วซื้อชุดที่ร้านค้าก่อนนะ', {
           fontFamily: 'Prompt, sans-serif', fontSize: '18px', color: '#6b7280', align: 'center'
         }).setOrigin(0.5);
         return;
@@ -468,21 +471,37 @@ var DressupGame = (function () {
   var game = null;
   var STYLE_RANK = { sticker: 0, doll: 1 };
 
-  // Fetches the WHOLE cosmetics catalog (every design, both art styles,
-  // regardless of who owns what -- this game is free play, independent
-  // of the shop) grouped by slot, sorted sticker-style row first then
-  // doll-style row, each ordered by variant -- so renderItemGrid()'s
-  // 2-row wrap lines up with "row 1 = sticker, row 2 = doll". Public
-  // read-only data (cosmetics_select_all RLS policy), so no login is
-  // required to browse or try things on.
+  // Fetches the cosmetics catalog FILTERED down to what the logged-in
+  // player actually owns (owned_cosmetics) -- this game used to be free
+  // play across the whole catalog regardless of ownership, but now
+  // matches every other part of the shop system: only owned pieces are
+  // wearable here. A guest (no session) or an account somehow owning
+  // nothing gets an empty closet; every real logged-in account owns at
+  // least a starter shirt+pants (see
+  // supabase/025_dressup_starter_outfit_migration.sql), so the game is
+  // never truly unplayable once logged in. Grouped by slot, sorted
+  // sticker-style row first then doll-style row, each ordered by variant
+  // -- so renderItemGrid()'s 2-row wrap lines up with "row 1 = sticker,
+  // row 2 = doll".
   async function loadCloset() {
     var closet = { hat: [], shirt: [], pants: [], shoes: [], bag: [] };
     if (typeof sb === 'undefined' || !sb) return closet;
 
     var { data: rows, error: rowsErr } = await sb.from('cosmetics').select('*');
     if (rowsErr) { console.error('[dressup] failed to load cosmetics catalog:', rowsErr); return closet; }
+
+    var ownedIds = new Set();
+    try {
+      var session = (typeof Auth !== 'undefined' && Auth.getSession) ? await Auth.getSession() : null;
+      if (session) {
+        var { data: owned, error: ownedErr } = await sb.from('owned_cosmetics').select('cosmetic_id').eq('user_id', session.user.id);
+        if (ownedErr) console.error('[dressup] failed to load owned cosmetics:', ownedErr);
+        else ownedIds = new Set((owned || []).map(function (o) { return o.cosmetic_id; }));
+      }
+    } catch (e) { console.error('[dressup] failed to load session/ownership:', e); }
+
     (rows || []).forEach(function (item) {
-      if (closet[item.slot]) closet[item.slot].push(item);
+      if (closet[item.slot] && ownedIds.has(item.id)) closet[item.slot].push(item);
     });
     Object.keys(closet).forEach(function (slotKey) {
       closet[slotKey].sort(function (a, b) {
