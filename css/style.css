@@ -738,18 +738,49 @@ a {
 .word-set-item label { cursor:pointer; font-size:0.9rem; margin:0; }
 .setup-footer { display: flex; gap: 0.75rem; justify-content: flex-end; padding-top: 1rem; border-top: 1px solid #f0ebfc; }
 /* Sticks to the top of .setup-panel's own scroll area (not the viewport)
-   so Start/Cancel stay visible while scrolling through the options below
-   instead of only being reachable after scrolling all the way down. */
-.setup-footer-top {
+   so the title and Start/Cancel stay visible while scrolling through the
+   options below, instead of Start only being reachable after scrolling
+   all the way down.
+
+   The heading and the buttons are one sticky block on purpose. Making
+   the button row its own sticky element (with a negative top margin to
+   bleed to the panel edge) pulled it up over the heading and covered
+   it -- a sticky child can't be pinned "under" a sibling that isn't
+   pinned with it.
+
+   Negative side/top margins cancel .setup-panel's 2rem padding so the
+   bar spans the panel's full width and sits flush against its top.
+
+   top is -2rem, not 0, because a sticky offset resolves against the
+   scrollport's PADDING box -- top:0 would pin the bar 2rem below the
+   panel's visible top edge, leaving a gap with content scrolling
+   through it. -2rem cancels that padding, so the bar's resting and
+   pinned positions are identical and nothing shifts when scrolling
+   starts. Must stay in step with .setup-panel's padding (incl. the
+   mobile override below). */
+.setup-head {
   position: sticky;
-  top: -2rem; /* cancels .setup-panel's own padding so this sits flush at its actual scroll-top */
+  top: -2rem;
+  z-index: 3;
   margin: -2rem -2rem 1.2rem;
-  padding: 1rem 2rem;
-  border-top: none;
-  border-bottom: 1px solid #f0ebfc;
+  padding: 1.25rem 2rem 0.9rem;
   background: #fff;
-  z-index: 2;
+  border-bottom: 1px solid #f0ebfc;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.setup-head h4 {
+  margin: 0 0 0.7rem;
+  font-size: 1.12rem;
+  /* Long mode names ("ตั้งค่าเกม — ผจญภัยดันเจี้ยน ⚔️") must wrap inside
+     the bar rather than widen it and push the buttons off-panel. */
+  overflow-wrap: anywhere;
+}
+/* Inside .setup-head the bar is a plain row again -- the sticky
+   positioning, background and bleed all live on the parent now. */
+.setup-footer-top {
+  margin: 0;
+  padding: 0;
+  border-top: none;
 }
 
 /* ============ Active game screen ============ */
@@ -1645,10 +1676,16 @@ section.bg-soft-yellow {
   .setup-panel     { padding: 1rem 1rem 1.2rem; }
   .setup-footer    { flex-direction: column; }
   .setup-footer .btn { width: 100%; }
-  /* Re-matches .setup-footer-top's bleed-to-edge offsets to this
-     breakpoint's own smaller .setup-panel padding (1rem instead of 2rem),
-     otherwise it'd sit misaligned against the panel's edges/top. */
-  .setup-footer-top { top: -1rem; margin: -1rem -1rem 1rem; padding: 0.75rem 1rem; }
+  /* Re-matches .setup-head's bleed-to-edge offsets to this breakpoint's
+     own smaller .setup-panel padding (1rem instead of 2rem), otherwise
+     it'd sit misaligned against the panel's edges/top. */
+  .setup-head    { top: -1rem; margin: -1rem -1rem 1rem; padding: 0.85rem 1rem 0.7rem; }
+  .setup-head h4 { font-size: 1rem; margin-bottom: 0.55rem; }
+  /* The base .setup-footer rule stacks buttons vertically at this
+     breakpoint; in the sticky header they must stay side by side, or the
+     header eats most of the panel's height. */
+  .setup-head .setup-footer { flex-direction: row; }
+  .setup-head .setup-footer .btn { width: auto; flex: 1; }
 
   /* Practice modal: boxes shrink so 2 fit side-by-side on a 375px screen */
   .mouth-animation-box,
