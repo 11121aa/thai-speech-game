@@ -881,7 +881,29 @@ a {
   max-width: 800px;
   margin: 0 auto;
   cursor: crosshair;
+  /* Never taller than the room actually left on screen. --game-max-h is
+     measured and set by fitGameToViewport() in game.html whenever a game
+     starts or the window resizes. Paired with the aspect-ratio rules
+     below, capping the height shrinks the width to match, so the whole
+     game stays on screen -- which is what makes locking page scroll
+     during play safe instead of hiding the controls off the bottom. */
+  max-height: var(--game-max-h, none);
 }
+
+/* ===== In-game page lock =====
+   While a game is running the page must not scroll: the play area is
+   sized to fit, and any scroll only drags the canvas out from under the
+   child's fingers mid-game (and the tall site footer below it was pure
+   dead space to fall into). Applied to BOTH html and body because
+   either one alone still scrolls on some mobile browsers. */
+html.in-game, body.in-game {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+/* Header/footer are dead weight during play -- hiding them frees the
+   vertical room the game needs to fit in the first place. */
+body.in-game .site-header,
+body.in-game .site-footer { display: none; }
 /* Phaser.Scale.FIT handles canvas sizing — just cap it and block overflow.
    touch-action:none stops mobile browsers from treating a finger-drag over
    the canvas as a page scroll/pull gesture (which otherwise swallows the
@@ -1270,6 +1292,18 @@ a {
   .rpg-skill-btn.is-ready { animation: none; }
 }
 
+/* Short viewports -- mainly a phone held in landscape. The joystick and
+   skill button are sized for a portrait screen with room to spare; left
+   at that size they'd eat most of a 350-400px-tall window and push the
+   dungeon off the bottom of a page that can no longer scroll. */
+@media (max-height: 520px) {
+  .rpg-controls   { padding: 6px 14px 2px; gap: 8px; }
+  .rpg-stick      { width: 84px; height: 84px; }
+  .rpg-stick-knob { width: 38px; height: 38px; margin: -19px 0 0 -19px; }
+  .rpg-stick-hint { font-size: 0.6rem; line-height: 2.2; }
+  .rpg-skill-btn  { width: 58px; height: 58px; font-size: 0.8rem; }
+}
+
 /* ============ Flashcard game ============ */
 .flashcard-arena {
   max-width: 480px;
@@ -1635,6 +1669,10 @@ section.bg-soft-yellow {
    container/canvas circular sizing from growing on repeated resize events. */
 #matchingGame  { aspect-ratio: 800 / 500; }
 #flashcardGame { aspect-ratio: 800 / 460; }
+/* Same viewport cap as .game-canvas-wrap -- these two don't use that
+   class, so they need it spelled out or they'd overflow a locked page. */
+#matchingGame,
+#flashcardGame { max-height: var(--game-max-h, none); }
 #matchingGame canvas,
 #flashcardGame canvas {
   display: block;
