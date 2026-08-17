@@ -1064,14 +1064,23 @@ function formatMatchTime(ms) {
   return m + ':' + (s < 10 ? '0' : '') + s;
 }
 
+// Every game that reports a score. Keep this in step with game.html's
+// GAME_NAMES_LB (same keys, same order as the game-select screen) --
+// a game missing here still records scores, it just silently never gets
+// a leaderboard card, which is how cooking/tower defense/tetris/rpg went
+// unlisted after they were added.
 var MGMT_GAMES = [
-  { key: 'matching',  name: 'จับคู่ภาพ',     icon: '🃏', color: 'var(--color-accent-purple)' },
-  { key: 'shooting',  name: 'ยิงเป้า',         icon: '🎯', color: 'var(--color-danger)' },
-  { key: 'airplane',  name: 'ขับเครื่องบิน',  icon: '✈️', color: 'var(--color-primary-dark)' },
-  { key: 'flashcard', name: 'ไพ่คำศัพท์',     icon: '🎴', color: 'var(--color-secondary-dark)' },
-  { key: 'platformer',name: 'วิ่งเก็บเหรียญ', icon: '🍄', color: '#4caf50' },
-  { key: 'crossy',    name: 'ข้ามถนน',         icon: '🚗', color: '#ff9f1c' },
-  { key: 'dressup',   name: 'แต่งตัวตุ๊กตา',   icon: '👗', color: '#B1568C' },
+  { key: 'matching',    name: 'จับคู่ภาพ',        icon: '🃏', color: 'var(--color-accent-purple)' },
+  { key: 'shooting',    name: 'ยิงเป้า',           icon: '🎯', color: 'var(--color-danger)' },
+  { key: 'airplane',    name: 'ขับเครื่องบิน',    icon: '✈️', color: 'var(--color-primary-dark)' },
+  { key: 'flashcard',   name: 'ไพ่คำศัพท์',       icon: '🎴', color: 'var(--color-secondary-dark)' },
+  { key: 'platformer',  name: 'วิ่งเก็บเหรียญ',   icon: '🍄', color: '#4caf50' },
+  { key: 'crossy',      name: 'ข้ามถนน',           icon: '🚗', color: '#ff9f1c' },
+  { key: 'cooking',     name: 'ทำอาหาร',           icon: '🌭', color: '#d35400' },
+  { key: 'dressup',     name: 'แต่งตัวตุ๊กตา',     icon: '👗', color: '#B1568C' },
+  { key: 'towerdefense',name: 'ป้องกันฐาน',       icon: '🏹', color: '#2e8b57' },
+  { key: 'tetris',      name: 'เตตริส',            icon: '🧩', color: '#3f51b5' },
+  { key: 'rpg',         name: 'ผจญภัยดันเจี้ยน',  icon: '⚔️', color: '#6d28d9' },
 ];
 
 async function loadUserGameLeaderboards() {
