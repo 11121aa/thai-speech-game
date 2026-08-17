@@ -165,10 +165,36 @@ function createCrossyGame(words, callbacks) {
       wire(bRight, this._rightFn);
       wire(bDown, this._downFn);
 
+      // ── Swipe anywhere on the field ──
+      // The four buttons stay for anyone who wants them, but young kids
+      // reliably swipe and don't reliably find a button. Whichever axis
+      // moved further wins, so a sloppy diagonal still resolves to the
+      // direction the child obviously meant. A swipe shorter than
+      // SWIPE_MIN_PX is treated as a tap and ignored, so resting a finger
+      // on the screen doesn't nudge the player.
+      var SWIPE_MIN_PX = 30;
+      var swX = 0, swY = 0, swiped = false;
+      this.input.on('pointerdown', function (ptr) { swX = ptr.x; swY = ptr.y; swiped = false; });
+      this.input.on('pointermove', function (ptr) {
+        if (!ptr.isDown || swiped) return;
+        var dx = ptr.x - swX, dy = ptr.y - swY;
+        if (Math.hypot(dx, dy) < SWIPE_MIN_PX) return;
+        // Fire once per swipe, mid-gesture, so it feels instant rather
+        // than waiting for the finger to lift.
+        swiped = true;
+        if (Math.abs(dx) > Math.abs(dy)) self.tryMove(dx > 0 ? 1 : -1, 0);
+        else                             self.tryMove(0, dy > 0 ? 1 : -1);
+      });
+      // A clean tap (no swipe) hops forward -- the move kids want most.
+      this.input.on('pointerup', function (ptr) {
+        if (swiped) return;
+        if (Math.hypot(ptr.x - swX, ptr.y - swY) < SWIPE_MIN_PX) self.tryMove(0, -1);
+      });
+
       this.events.on('shutdown', this.shutdown, this);
 
       var hint = this.add.text(W / 2, H - 14,
-        '↑ เดินหน้า   ← → หลบซ้าย/ขวา   หลีกรถ 🚗', {
+        'ปัดนิ้วเพื่อเดิน — แตะเพื่อไปข้างหน้า   หลีกรถ 🚗', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px',
           color: '#eeeeee', backgroundColor: '#00000044',
           padding: { x: 8, y: 3 }

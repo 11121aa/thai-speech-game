@@ -146,6 +146,44 @@ function createTetrisGame(words, callbacks) {
       wire(bRight, this._rightFn);
       wire(bDrop, this._dropFn);
 
+      // ── Touch gestures on the board ──
+      // Tap = rotate, swipe left/right = move, swipe down = hard drop.
+      // The buttons stay for anyone who prefers them.
+      //
+      // Horizontal swipes move one column per SWIPE_STEP_PX travelled
+      // rather than one per gesture, so dragging a piece across the board
+      // is one continuous motion instead of many separate flicks. The
+      // origin advances with each step consumed, which is what keeps a
+      // long drag from re-triggering off its original start point.
+      var SWIPE_STEP_PX = 26;   // horizontal distance per column moved
+      var SWIPE_DROP_PX = 46;   // vertical distance that counts as a drop
+      var TAP_SLOP_PX   = 14;   // movement below this still counts as a tap
+      var tX = 0, tY = 0, tMoved = false, tDropped = false;
+      this.input.on('pointerdown', function (ptr) {
+        tX = ptr.x; tY = ptr.y; tMoved = false; tDropped = false;
+      });
+      this.input.on('pointermove', function (ptr) {
+        if (!ptr.isDown || tDropped) return;
+        var dx = ptr.x - tX, dy = ptr.y - tY;
+        // Vertical intent wins outright so a downward flick drops rather
+        // than smearing the piece sideways on the way down.
+        if (dy > SWIPE_DROP_PX && Math.abs(dy) > Math.abs(dx)) {
+          tDropped = true; tMoved = true;
+          self.hardDrop();
+          return;
+        }
+        while (Math.abs(dx) >= SWIPE_STEP_PX) {
+          if (dx > 0) { self.moveRight(); tX += SWIPE_STEP_PX; }
+          else        { self.moveLeft();  tX -= SWIPE_STEP_PX; }
+          dx = ptr.x - tX;
+          tMoved = true;
+        }
+      });
+      this.input.on('pointerup', function (ptr) {
+        if (tMoved) return;
+        if (Math.hypot(ptr.x - tX, ptr.y - tY) <= TAP_SLOP_PX) self.rotate();
+      });
+
       this.events.on('shutdown', this.shutdown, this);
 
       this.nextKey = this.drawFromBag();

@@ -10,9 +10,10 @@
 //    [POP]     Score pop style                      (~showPop)
 // ============================================================
 //  How the game works:
-//    - A cannon at the bottom sweeps its aim left and right
-//    - Tap (or SPACE) to fire — a real cannonball flies across the screen
-//    - Watch where the ball lands — timing + aim angle both matter
+//    - A cannon sits at the bottom; drag anywhere and pull AWAY from
+//      your target, slingshot-style, then release to launch
+//    - A dotted arc previews exactly where the ball will fly, and the
+//      shot obeys gravity, so lobbing over/short is the core skill
 //    - Hit a bullseye → break effect + pronunciation practice modal
 //    - Each target has a countdown timer — miss it and it expires
 //    - Targets oscillate left-right so the game never feels static
@@ -33,7 +34,6 @@ var _shootTimeStopBtnFn = null;
 function createShootingGame(words, callbacks) {
 
   // ── [TUNE] Difficulty knobs ────────────────────────────────────
-  var AIM_SPEED   = 1.6;   // aim sweep speed (radians/second)
   var TIMEOUT_MS  = 7000;  // ms before a target expires
   var MAX_TARGETS = 3;     // max targets on screen at once
   var W = 800, H = 450;
@@ -52,6 +52,21 @@ function createShootingGame(words, callbacks) {
   var loadout = window.__shootLoadout || {};
   var PROJ_SPD   = 9 * (1 + (loadout.speedBonus || 0));       // cannonball speed (px/frame at 60fps)
   var PROJ_HIT_R = 26;   // hit radius (px)
+
+  // ── [AIM] Pull-back slingshot control ──────────────────────────
+  // Drag anywhere and pull AWAY from where you want the ball to go, the
+  // way a slingshot works; the shot fires on release. Aiming used to be
+  // an automatic left-right sweep you tapped to interrupt, which meant
+  // the only real input was timing -- young kids couldn't aim at all,
+  // they just tapped and hoped. Pulling is direct: the arc you see is
+  // the arc you get.
+  var GRAVITY     = 0.26;  // px/frame^2, applied to shots AND the preview
+  var MIN_PULL    = 18;    // shorter than this is a stray tap, not a shot
+  var MAX_PULL    = 150;   // pulling further doesn't add power
+  var MIN_SPD     = PROJ_SPD * 0.70;  // a barely-pulled shot still leaves the barrel
+  var MAX_SPD     = PROJ_SPD * 1.85;  // upgrades scale both ends, so they still matter
+  var AIM_MIN_ANG = -Math.PI + 0.05;  // clamp to the upward hemisphere so you
+  var AIM_MAX_ANG = -0.05;            // can't fire into the ground at your feet
 
   var RELOAD_MS  = Math.max(500, 1500 - (loadout.cooldownReductionMs || 0)); // reload between shots
   var TIMESTOP_COOLDOWN_MS = 15000; // how often the time-stop ability can be reused, once owned
@@ -73,8 +88,9 @@ function createShootingGame(words, callbacks) {
       this.projectiles = [];  // cannonballs in flight: { x, y, vx, vy }
       this.particles   = [];  // break effect particles: { x, y, vx, vy, life, color, r }
       this.wordIdx     = 0;
-      this.aimAngle    = -Math.PI / 2; // starts pointing straight up
-      this.aimDir      = 1;            // +1 sweeping right, -1 sweeping left
+      this.aimAngle    = -Math.PI / 2; // barrel rests pointing straight up
+      this.aimPower    = 1;            // 0..1, set by how far the last pull went
+      this.drag        = null;         // { sx, sy, cx, cy } while a pull is in progress
       this.isPaused    = false;
       this.trail       = null;          // { angle, life } — fading shot line
       this.reloadUntil = 0;            // timestamp when reload finishes
@@ -102,11 +118,37 @@ function createShootingGame(words, callbacks) {
       // Dynamic layer cleared and redrawn every frame
       this.gfx = this.add.graphics();
 
-      this.input.on('pointerdown', function () {
-        if (!self.isPaused) self.fire();
+      // ── Pull-back aiming ──
+      // The pull is measured from wherever the finger went down, not from
+      // the cannon: a child dragging from the middle of the screen still
+      // aims, instead of having to find and grab a small barrel first.
+      this.input.on('pointerdown', function (ptr) {
+        if (self.isPaused) return;
+        if (self.time.now < self.reloadUntil) return; // still reloading -- ignore so no half-aim sticks
+        self.drag = { sx: ptr.x, sy: ptr.y, cx: ptr.x, cy: ptr.y };
       });
+      this.input.on('pointermove', function (ptr) {
+        if (!self.drag) return;
+        self.drag.cx = ptr.x; self.drag.cy = ptr.y;
+        var a = self.aimFromDrag();
+        if (a) { self.aimAngle = a.angle; self.aimPower = a.power; }
+      });
+      var release = function () {
+        if (!self.drag) return;
+        var a = self.aimFromDrag();
+        self.drag = null;
+        // Too short to be a deliberate pull -- treat as a stray tap and
+        // don't waste the shot (and the reload) on a random direction.
+        if (!a) return;
+        self.aimAngle = a.angle; self.aimPower = a.power;
+        if (!self.isPaused) self.fire(a.angle, a.speed);
+      };
+      this.input.on('pointerup', release);
+      this.input.on('pointerupoutside', release);
+      // Keyboard keeps the old one-key behaviour for desktop: fires along
+      // the barrel's current angle at whatever power was last pulled.
       this.input.keyboard.on('keydown-SPACE', function () {
-        if (!self.isPaused) self.fire();
+        if (!self.isPaused) self.fire(self.aimAngle, MIN_SPD + (MAX_SPD - MIN_SPD) * self.aimPower);
       });
 
       // Time-stop ability -- a real DOM button (like the RPG game's skill
@@ -125,7 +167,7 @@ function createShootingGame(words, callbacks) {
       }
 
       var hint = this.add.text(W / 2, 22,
-        '🎯 เล็งให้ตรงแล้วแตะเพื่อยิง! — ลูกปืนใช้เวลาเดินทาง!', {
+        '🎯 ลากถอยหลังแล้วปล่อยเพื่อยิง! — เล็งตามเส้นประ', {
           fontFamily: 'Prompt, sans-serif', fontSize: '15px', fontStyle: 'bold',
           color: '#2b2438', backgroundColor: '#ffffffbb',
           padding: { x: 10, y: 4 }
@@ -270,21 +312,49 @@ function createShootingGame(words, callbacks) {
       });
     },
 
+    // ── Turn the current pull into an angle + launch speed ────────
+    // Returns null for a pull too short to be deliberate. The ball flies
+    // OPPOSITE the drag (pull down-left to lob up-right), which is the
+    // slingshot convention kids already know from Angry Birds.
+    aimFromDrag: function () {
+      var d = this.drag;
+      if (!d) return null;
+      var pullX = d.sx - d.cx, pullY = d.sy - d.cy;
+      var pull = Math.hypot(pullX, pullY);
+      if (pull < MIN_PULL) return null;
+      var angle = Math.atan2(pullY, pullX);
+      // Normalise into (-PI, PI], then clamp to the upward hemisphere.
+      if (angle > 0) angle = angle > Math.PI / 2 ? AIM_MIN_ANG : AIM_MAX_ANG;
+      angle = Math.max(AIM_MIN_ANG, Math.min(AIM_MAX_ANG, angle));
+      var power = Math.min(1, (pull - MIN_PULL) / (MAX_PULL - MIN_PULL));
+      return { angle: angle, power: power, speed: MIN_SPD + (MAX_SPD - MIN_SPD) * power };
+    },
+
+    // Muzzle point for a given angle -- where a shot starts, and where
+    // the preview arc must start so the two agree.
+    muzzle: function (angle) {
+      return {
+        x: CANNON_X + Math.cos(angle) * (BARREL_LEN + 9),
+        y: CANNON_Y + Math.sin(angle) * (BARREL_LEN + 9)
+      };
+    },
+
     // ── Fire the cannon ───────────────────────────────────────────
-    fire: function () {
+    fire: function (angle, speed) {
       if (this.time.now < this.reloadUntil) return;
+      if (angle === undefined) angle = this.aimAngle;
+      if (speed === undefined) speed = MAX_SPD;
 
       this.sfxCannon.play();
       this.reloadUntil = this.time.now + RELOAD_MS;
-      this.trail = { angle: this.aimAngle, life: 1.0 };
+      this.trail = { angle: angle, life: 1.0 };
 
-      var cos = Math.cos(this.aimAngle);
-      var sin = Math.sin(this.aimAngle);
+      var m = this.muzzle(angle);
       this.projectiles.push({
-        x:  CANNON_X + cos * (BARREL_LEN + 9),
-        y:  CANNON_Y + sin * (BARREL_LEN + 9),
-        vx: cos * PROJ_SPD,
-        vy: sin * PROJ_SPD
+        x:  m.x,
+        y:  m.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed
       });
     },
 
@@ -353,11 +423,6 @@ function createShootingGame(words, callbacks) {
         });
       }
 
-      // Sweep aim angle back and forth
-      this.aimAngle += this.aimDir * AIM_SPEED * dt;
-      if (this.aimAngle > -0.05)           { this.aimAngle = -0.05;           this.aimDir = -1; }
-      if (this.aimAngle < -Math.PI + 0.05) { this.aimAngle = -Math.PI + 0.05; this.aimDir =  1; }
-
       // Fade shot trail
       if (this.trail) {
         this.trail.life -= dt * 3.5;
@@ -374,10 +439,15 @@ function createShootingGame(words, callbacks) {
 
       // Move projectiles and check collisions
       this.projectiles = this.projectiles.filter(function (proj) {
-        proj.x += proj.vx;
-        proj.y += proj.vy;
+        // Same integration order the preview arc uses (see previewArc), so
+        // the dotted path a player aims along is the path the ball takes.
+        proj.vy += GRAVITY;
+        proj.x  += proj.vx;
+        proj.y  += proj.vy;
 
-        if (proj.x < -20 || proj.x > W + 20 || proj.y < -20 || proj.y > H + 20) return false;
+        // Only cull downward past the ground -- a high lob legitimately
+        // leaves the top of the screen and must be allowed to fall back in.
+        if (proj.x < -20 || proj.x > W + 20 || proj.y > H + 20) return false;
 
         for (var i = 0; i < self.targets.length; i++) {
           var tgt = self.targets[i];
@@ -429,30 +499,39 @@ function createShootingGame(words, callbacks) {
         ? Math.min(1, (time - (this.reloadUntil - RELOAD_MS)) / RELOAD_MS)
         : 1;
 
-      // Dashed aim line (dimmed while reloading)
-      var aimAlpha = reloading ? 0.25 : 0.65;
-      var aimLen   = 360;
-      var aex = CANNON_X + Math.cos(this.aimAngle) * aimLen;
-      var aey = CANNON_Y + Math.sin(this.aimAngle) * aimLen;
-      for (var s = 0; s < 12; s++) {
-        if (s % 2 === 0) {
-          var t0 = s / 12, t1 = (s + 0.65) / 12;
-          g.lineStyle(2, 0xffffff, aimAlpha);
-          g.lineBetween(
-            CANNON_X + (aex - CANNON_X) * t0, CANNON_Y + (aey - CANNON_Y) * t0,
-            CANNON_X + (aex - CANNON_X) * t1, CANNON_Y + (aey - CANNON_Y) * t1
-          );
+      // Trajectory preview -- only while actually pulling, so the screen
+      // stays clean the rest of the time. Dots thin out toward the end of
+      // the arc so the near part (which the player is actually aiming
+      // with) reads strongest.
+      var aim = this.aimFromDrag();
+      if (aim && !reloading) {
+        var arc = this.previewArc(aim.angle, aim.speed);
+        for (var i = 0; i < arc.length; i++) {
+          var fade = 1 - (i / arc.length) * 0.75;
+          g.fillStyle(0xffffff, 0.72 * fade);
+          g.fillCircle(arc[i].x, arc[i].y, 4 * fade + 1);
         }
-      }
+        // Landing marker at the arc's end
+        if (arc.length) {
+          var end = arc[arc.length - 1];
+          g.lineStyle(2.5, 0xff4444, 0.85);
+          g.strokeCircle(end.x, end.y, 11);
+          g.lineBetween(end.x - 15, end.y, end.x + 15, end.y);
+          g.lineBetween(end.x, end.y - 15, end.x, end.y + 15);
+        }
+        // Pull band from the cannon back to the finger, like a drawn sling
+        g.lineStyle(5, 0x8d6e63, 0.75);
+        g.lineBetween(CANNON_X, CANNON_Y, this.drag.cx, this.drag.cy);
+        g.fillStyle(0x5d4037, 0.9);
+        g.fillCircle(this.drag.cx, this.drag.cy, 9);
 
-      // Crosshair (grey while reloading, red when ready)
-      var chColor = reloading ? 0x888888 : 0xff4444;
-      var chAlpha = reloading ? 0.4 : 0.92;
-      g.lineStyle(2.5, chColor, chAlpha);
-      g.lineBetween(aex - 10, aey, aex + 10, aey);
-      g.lineBetween(aex, aey - 10, aex, aey + 10);
-      g.fillStyle(chColor, reloading ? 0.12 : 0.3);
-      g.fillCircle(aex, aey, 8);
+        // Power meter above the cannon
+        var pw = 90, ph = 9, pxm = CANNON_X - pw / 2, pym = CANNON_Y - 62;
+        g.fillStyle(0x000000, 0.35); g.fillRect(pxm, pym, pw, ph);
+        var pcol = aim.power > 0.8 ? 0xe74c3c : aim.power > 0.45 ? 0xf1c40f : 0x2ecc71;
+        g.fillStyle(pcol, 0.95); g.fillRect(pxm, pym, pw * aim.power, ph);
+        g.lineStyle(1.5, 0xffffff, 0.7); g.strokeRect(pxm, pym, pw, ph);
+      }
 
       this.drawCannon(g);
 
@@ -521,6 +600,27 @@ function createShootingGame(words, callbacks) {
       ], true);
       g.fillStyle(0x212121);
       g.fillCircle(CANNON_X + cos * len, CANNON_Y + sin * len, 9);
+    },
+
+    // Steps the exact same physics the real projectile uses, sampling
+    // every few frames, and stops at the ground/edges. Deliberately NOT a
+    // closed-form parabola: reusing the integration is what guarantees
+    // the dotted arc and the actual shot can't drift apart.
+    previewArc: function (angle, speed) {
+      var pts = [];
+      var x = this.muzzle(angle).x, y = this.muzzle(angle).y;
+      var vx = Math.cos(angle) * speed, vy = Math.sin(angle) * speed;
+      for (var step = 0; step < 220; step++) {
+        vy += GRAVITY; x += vx; y += vy;
+        // Same cull bounds as the live projectile, NOT the grass line:
+        // the cannon stands in front of the grass (CANNON_Y is below
+        // GROUND_Y), so stopping at GROUND_Y aborted the arc on step one
+        // and drew nothing at all.
+        if (x < -20 || x > W + 20 || y > H + 20) break;
+        if (step % 5 === 0 && y > 0) pts.push({ x: x, y: y });
+        if (pts.length >= 26) break;
+      }
+      return pts;
     },
 
     // ── Draw one bullseye target ──────────────────────────────────

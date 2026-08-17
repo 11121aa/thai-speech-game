@@ -308,21 +308,31 @@ function createPlatformerGame(words, callbacks, difficulty) {
       // A swipe-down holds the slide for SWIPE_SLIDE_MS, standing in for
       // a held key/button since a swipe itself is a single instant
       // gesture rather than something you can "hold".
-      var swipeStartX = 0, swipeStartY = 0;
-      this.input.on('pointerdown', function (ptr) {
-        swipeStartX = ptr.x; swipeStartY = ptr.y;
-      });
-      this.input.on('pointerup', function (ptr) {
-        if (self.isPaused) return;
+      var swipeStartX = 0, swipeStartY = 0, swipeFired = false;
+      // Resolved mid-gesture (on pointermove), not on release. Firing on
+      // pointerup meant the jump only happened once the finger LIFTED --
+      // in a runner where a spike arrives on a deadline, that lag was the
+      // difference between clearing it and not. `swipeFired` latches so
+      // one continuous drag can't jump repeatedly.
+      var trySwipe = function (ptr) {
+        if (self.isPaused || swipeFired) return;
         var dx = ptr.x - swipeStartX, dy = ptr.y - swipeStartY;
         if (Math.abs(dy) < SWIPE_MIN_PX || Math.abs(dy) <= Math.abs(dx)) return;
+        swipeFired = true;
         if (dy < 0) {
           self.doJump();
         } else {
           self.slideHeld = true;
           self.time.delayedCall(SWIPE_SLIDE_MS, function () { self.slideHeld = false; });
         }
+      };
+      this.input.on('pointerdown', function (ptr) {
+        swipeStartX = ptr.x; swipeStartY = ptr.y; swipeFired = false;
       });
+      this.input.on('pointermove', function (ptr) { if (ptr.isDown) trySwipe(ptr); });
+      // Still checked on release so a very fast flick, which can produce a
+      // pointerup with no intervening pointermove, isn't dropped.
+      this.input.on('pointerup', trySwipe);
 
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
