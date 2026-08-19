@@ -1470,7 +1470,7 @@ async function openPatientDetail(u) {
 
   // Load full practice records for this patient (with file_path + score)
   var { data } = await sb.from('practice')
-    .select('id, score, parent_marked_correct, practiced_at, file_path, user_id, words(word, letter_category, level, emoji)')
+    .select('id, score, parent_marked_correct, specialist_marked_correct, practiced_at, file_path, user_id, words(word, letter_category, level, emoji)')
     .eq('user_id', u.userId)
     .order('practiced_at', { ascending: false });
   currentDetailData = data || [];
@@ -1602,8 +1602,12 @@ function renderDetailPracticeList(rows, filter) {
       '<div class="recording-time" style="min-width:56px;">' + time + '</div>' +
       judged +
       (row.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 btn-play-audio" style="flex-shrink:0;">▶ เล่น</button>' : '') +
-      '<input type="number" min="0" max="100" class="form-control form-control-sm" style="width:68px;flex-shrink:0;" value="' + (row.score === null || row.score === undefined ? '' : row.score) + '" placeholder="คะแนน">' +
-      '<button class="btn btn-sm btn-warning py-0 btn-save-score" style="flex-shrink:0;">บันทึก</button>';
+      // Specialist's own verdict, separate from the ⏳/✅/❌ badge above,
+      // which is the parent's in-the-moment judgment.
+      '<span class="sp-check" data-value="' + (row.specialist_marked_correct === true ? 'true' : row.specialist_marked_correct === false ? 'false' : '') + '" style="flex-shrink:0;white-space:nowrap;">' +
+        '<button class="btn btn-sm py-0 px-2 btn-sp-mark ' + (row.specialist_marked_correct === true ? 'btn-success' : 'btn-outline-success') + '" data-mark="true">✓ ถูก</button>' +
+        '<button class="btn btn-sm py-0 px-2 btn-sp-mark ' + (row.specialist_marked_correct === false ? 'btn-danger' : 'btn-outline-danger') + '" data-mark="false" style="margin-left:3px;">✗ ยังไม่ถูก</button>' +
+      '</span>';
 
     if (row.file_path) {
       item.querySelector('.btn-play-audio').addEventListener('click', async function () {
@@ -1622,9 +1626,29 @@ function renderDetailPracticeList(rows, filter) {
       });
     }
     var rowId = row.id;
-    item.querySelector('.btn-save-score').addEventListener('click', function () {
-      var val = item.querySelector('input').value;
-      sb.from('practice').update({ score: val === '' ? null : parseFloat(val) }).eq('id', rowId);
+    var holder = item.querySelector('.sp-check');
+    holder.querySelectorAll('.btn-sp-mark').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var want = btn.getAttribute('data-mark');
+        // Tapping the already-active verdict clears it back to unreviewed.
+        var next = holder.getAttribute('data-value') === want ? null : (want === 'true');
+        var pair = holder.querySelectorAll('.btn-sp-mark');
+        pair.forEach(function (b) { b.disabled = true; });
+        var res = await sb.from('practice')
+          .update({ specialist_marked_correct: next })
+          .eq('id', rowId);
+        pair.forEach(function (b) { b.disabled = false; });
+        if (res && res.error) { alert('บันทึกไม่สำเร็จ: ' + res.error.message); return; }
+        holder.setAttribute('data-value', next === null ? '' : String(next));
+        pair.forEach(function (b) {
+          var isYes = b.getAttribute('data-mark') === 'true';
+          var on = (next === true && isYes) || (next === false && !isYes);
+          b.className = 'btn btn-sm py-0 px-2 btn-sp-mark ' +
+            (on ? (isYes ? 'btn-success' : 'btn-danger')
+                : (isYes ? 'btn-outline-success' : 'btn-outline-danger'));
+          if (!isYes) b.style.marginLeft = '3px';
+        });
+      });
     });
     list.appendChild(item);
   });
@@ -2269,7 +2293,7 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
   var words = (results[0].data || []);
@@ -2293,29 +2317,54 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
 
 var PASS_THRESHOLD_PCT = 80;
 
-// Recomputes the overall score from every .hw-score-input currently in the
-// DOM (one per recorded attempt, editable by the specialist, read-only for
-// the patient) and shows a pass/fail badge — average of all *entered*
-// scores (blanks don't count against it) ≥80 is a pass.
+// Tallies every reviewed attempt currently in the DOM and shows a
+// pass/fail badge. Each attempt is now a plain correct / not-correct
+// check rather than a 0-100 grade, so the pass rule is "at least
+// PASS_THRESHOLD_PCT of the CHECKED attempts were correct" -- attempts
+// the specialist hasn't got to yet don't count either way, same as
+// blank scores didn't before.
 function updateHwScoreSummary(containerId) {
   var wrap = document.getElementById(containerId);
   var scoreEl = document.getElementById(containerId + '-score');
   if (!wrap || !scoreEl) return;
-  var scores = [];
-  wrap.querySelectorAll('.hw-score-input').forEach(function (inp) {
-    var v = parseFloat(inp.value);
-    if (!isNaN(v)) scores.push(v);
+  var checked = 0, correct = 0;
+  wrap.querySelectorAll('.hw-check').forEach(function (el) {
+    var v = el.getAttribute('data-value');
+    if (v === 'true') { checked++; correct++; }
+    else if (v === 'false') { checked++; }
   });
-  if (!scores.length) {
-    scoreEl.innerHTML = '<span class="text-secondary small">ยังไม่มีคะแนน</span>';
+  if (!checked) {
+    scoreEl.innerHTML = '<span class="text-secondary small">ยังไม่ได้ตรวจ</span>';
     return;
   }
-  var avg = scores.reduce(function (a, b) { return a + b; }, 0) / scores.length;
-  var pass = avg >= PASS_THRESHOLD_PCT;
+  var pct = (correct / checked) * 100;
+  var pass = pct >= PASS_THRESHOLD_PCT;
   scoreEl.innerHTML =
-    '<strong>คะแนนเฉลี่ย: ' + avg.toFixed(1) + '</strong> ' +
-    '<span class="text-secondary small">(' + scores.length + ' ครั้งที่ให้คะแนนแล้ว)</span> ' +
+    '<strong>ถูก ' + correct + ' จาก ' + checked + ' ครั้ง</strong> ' +
+    '<span class="text-secondary small">(' + pct.toFixed(0) + '%)</span> ' +
     '<span class="badge ' + (pass ? 'bg-success' : 'bg-danger') + ' ms-2">' + (pass ? 'ผ่าน ✅' : 'ไม่ผ่าน') + '</span>';
+}
+
+// One attempt's correct / not-correct control. For a specialist it's a
+// pair of toggle buttons (tapping the active one clears back to
+// unreviewed); for the patient/parent it's the same verdict read-only,
+// so they can see what the therapist decided without being able to
+// change it.
+function hwCheckCell(rec, isSpecialist) {
+  var v = rec.specialist_marked_correct;
+  var state = v === true ? 'true' : v === false ? 'false' : '';
+  if (!isSpecialist) {
+    var label = v === true ? '<span class="badge bg-success">✅ ถูก</span>'
+              : v === false ? '<span class="badge bg-danger">❌ ยังไม่ถูก</span>'
+              : '<span class="badge bg-secondary">ยังไม่ตรวจ</span>';
+    return '<span class="hw-check" data-prac-id="' + rec.id + '" data-value="' + state + '">' + label + '</span>';
+  }
+  return '<span class="hw-check" data-prac-id="' + rec.id + '" data-value="' + state + '">' +
+    '<button class="btn btn-sm py-0 px-1 btn-hw-mark ' + (v === true ? 'btn-success' : 'btn-outline-success') +
+      '" data-prac-id="' + rec.id + '" data-mark="true" title="ถูก" style="font-size:0.75rem;">✓</button>' +
+    '<button class="btn btn-sm py-0 px-1 btn-hw-mark ' + (v === false ? 'btn-danger' : 'btn-outline-danger') +
+      '" data-prac-id="' + rec.id + '" data-mark="false" title="ยังไม่ถูก" style="font-size:0.75rem;margin-left:2px;">✗</button>' +
+    '</span>';
 }
 
 function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, repeatCount, isSpecialist, feedbackTable, fkColumn) {
@@ -2344,11 +2393,9 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, 
     for (var i = 0; i < maxCols; i++) {
       var rec = recs[i];
       if (rec) {
-        var scoreVal = (rec.score === null || rec.score === undefined) ? '' : rec.score;
         html += '<td style="text-align:center;white-space:nowrap;">' +
           (rec.file_path ? '<button class="btn btn-sm btn-outline-primary py-0 px-1 btn-hw-play" data-path="' + rec.file_path + '" style="font-size:0.7rem;margin-right:3px;">▶</button>' : '') +
-          '<input type="number" min="0" max="100" class="hw-score-input" data-prac-id="' + rec.id + '" value="' + scoreVal + '" placeholder="คะแนน" style="width:56px;font-size:0.8rem;padding:1px 4px;' + (isSpecialist ? '' : 'background:#f5f3fa;') + '"' + (isSpecialist ? '' : ' readonly') + '>' +
-          (isSpecialist ? '<button class="btn btn-sm btn-warning py-0 px-1 btn-hw-save-score" data-prac-id="' + rec.id + '" style="font-size:0.7rem;margin-left:2px;">บันทึก</button>' : '') +
+          hwCheckCell(rec, isSpecialist) +
           '</td>';
       } else {
         html += '<td style="color:#d0cce0;text-align:center;">—</td>';
@@ -2383,18 +2430,31 @@ function renderHwDetailTable(containerId, words, practices, feedbacks, groupId, 
   });
 
   if (isSpecialist) {
-    wrap.querySelectorAll('.btn-hw-save-score').forEach(function (btn) {
+    // Saves on tap -- there's no separate "save" step for a two-way
+    // check the way there was for typing a number. Tapping the button
+    // that's already active clears the verdict back to unreviewed, so a
+    // misclick is undoable.
+    wrap.querySelectorAll('.btn-hw-mark').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         var practiceId = parseInt(btn.getAttribute('data-prac-id'));
-        var inp = wrap.querySelector('.hw-score-input[data-prac-id="' + practiceId + '"]');
-        var raw = inp.value.trim();
-        var score = raw === '' ? null : Math.max(0, Math.min(100, parseFloat(raw)));
-        btn.disabled = true;
-        await sb.from('practice').update({ score: score }).eq('id', practiceId);
-        inp.value = score === null ? '' : score;
-        btn.disabled = false;
-        btn.textContent = 'บันทึกแล้ว';
-        setTimeout(function () { btn.textContent = 'บันทึก'; }, 900);
+        var holder = wrap.querySelector('.hw-check[data-prac-id="' + practiceId + '"]');
+        var want = btn.getAttribute('data-mark');           // 'true' | 'false'
+        var next = holder.getAttribute('data-value') === want ? null : (want === 'true');
+        var pair = holder.querySelectorAll('.btn-hw-mark');
+        pair.forEach(function (b) { b.disabled = true; });
+        var res = await sb.from('practice')
+          .update({ specialist_marked_correct: next })
+          .eq('id', practiceId);
+        pair.forEach(function (b) { b.disabled = false; });
+        if (res && res.error) { alert('บันทึกไม่สำเร็จ: ' + res.error.message); return; }
+        holder.setAttribute('data-value', next === null ? '' : String(next));
+        pair.forEach(function (b) {
+          var isYes = b.getAttribute('data-mark') === 'true';
+          var on = (next === true && isYes) || (next === false && !isYes);
+          b.className = 'btn btn-sm py-0 px-1 btn-hw-mark ' +
+            (on ? (isYes ? 'btn-success' : 'btn-danger')
+                : (isYes ? 'btn-outline-success' : 'btn-outline-danger'));
+        });
         updateHwScoreSummary(containerId);
       });
     });
@@ -2606,7 +2666,7 @@ async function openDetailHwDetail(assignmentId, hw, patient) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', hw.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
   var words = results[0].data || [];
@@ -2698,7 +2758,7 @@ async function openDetailWsDetail(progressRow, ws, patient) {
 
   var results = await Promise.all([
     sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
   var words = results[0].data || [];
@@ -2732,7 +2792,7 @@ async function openUserHwDetail(assignment) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignment.id)
   ]);
   var words = results[0].data || [];
@@ -2835,7 +2895,7 @@ async function openUserWorksheetDetail(progressRow, ws) {
 
   var results = await Promise.all([
     sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
+    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
   var words = results[0].data || [];

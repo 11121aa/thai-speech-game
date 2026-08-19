@@ -77,6 +77,12 @@ create index if not exists idx_practice_word_id on public.practice (word_id);
 -- judgment, kept separate from `score` (which only a specialist sets).
 alter table public.practice add column if not exists parent_marked_correct boolean;
 
+-- specialist_marked_correct: the specialist's own verdict, and what the
+-- review screens actually use now -- `score` is the retired 0-100 grade,
+-- kept only so historical numbers stay readable. true/false/null =
+-- correct / not correct / not reviewed. See 027_specialist_marked_correct.sql.
+alter table public.practice add column if not exists specialist_marked_correct boolean;
+
 create table if not exists public.activity (
   id bigserial primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -239,6 +245,7 @@ as $$
 begin
   if not public.is_specialist(auth.uid()) then
     new.score := old.score;
+    new.specialist_marked_correct := old.specialist_marked_correct;
     new.word_id := old.word_id;
     new.user_id := old.user_id;
     new.file_path := old.file_path;
