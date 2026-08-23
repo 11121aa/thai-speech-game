@@ -120,7 +120,13 @@
           <span class="mode-title">เตตริส</span>
           <span class="mode-desc">ต่อบล็อกให้เต็มแถว ฝึกพูดคำทุก 1,000 คะแนน</span>
         </div>
-        <div class="game-mode-card" id="cardRpg">
+        <!-- ARCHIVED: the dungeon crawler is hidden from the game list --
+             it played too hard for the children this app is for. Hidden
+             rather than deleted: js/game-rpg.js, its shop items and its
+             leaderboard history are all still here, so bringing it back
+             is just removing this style="display:none" (and the matching
+             guard on its click handler below). -->
+        <div class="game-mode-card" id="cardRpg" style="display:none;">
           <span class="mode-icon">⚔️</span>
           <span class="mode-title">ผจญภัยดันเจี้ยน</span>
           <span class="mode-desc">สำรวจดันเจี้ยนสุ่มใหม่ทุกครั้ง ปราบบอส ฝึกพูดที่แท่นเรืองแสง</span>
@@ -450,15 +456,15 @@
 <script src="js/game-platformer.js?v=36"></script>
 <script src="js/game-matching.js?v=8"></script>
 <script src="js/game-flashcard.js?v=6"></script>
-<script src="js/game-crossy.js?v=7"></script>
+<script src="js/game-crossy.js?v=8"></script>
 <script src="js/game-cooking.js?v=20"></script>
-<script src="js/game-dressup.js?v=14"></script>
+<script src="js/game-dressup.js?v=15"></script>
 <script src="js/game-towerdefense.js?v=11"></script>
 <script src="js/game-tetris.js?v=5"></script>
-<script src="js/game-rpg.js?v=8"></script>
+<script src="js/game-rpg.js?v=9"></script>
 <script src="js/config.js?v=2-free"></script>
 <script src="js/supabase-client.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/auth.js?v=2"></script>
 <script src="js/words-api.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/recorder.js?v=8"></script>
@@ -1365,6 +1371,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardDressup').addEventListener('click', function () { openSetup('dressup'); });
   document.getElementById('cardTowerdefense').addEventListener('click', function () { openSetup('towerdefense'); });
   document.getElementById('cardTetris').addEventListener('click', function () { openSetup('tetris'); });
+  // ARCHIVED (see #cardRpg above) -- the card is hidden, so this can only
+  // fire if something unhides it; left wired so un-archiving is a one-line
+  // change rather than needing this rebuilt.
   document.getElementById('cardRpg').addEventListener('click', function () { openSetup('rpg'); });
 
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (btn) {

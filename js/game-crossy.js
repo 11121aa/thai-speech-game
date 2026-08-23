@@ -176,14 +176,26 @@ function createCrossyGame(words, callbacks) {
       var swX = 0, swY = 0, swiped = false;
       this.input.on('pointerdown', function (ptr) { swX = ptr.x; swY = ptr.y; swiped = false; });
       this.input.on('pointermove', function (ptr) {
-        if (!ptr.isDown || swiped) return;
+        if (!ptr.isDown) return;
         var dx = ptr.x - swX, dy = ptr.y - swY;
         if (Math.hypot(dx, dy) < SWIPE_MIN_PX) return;
-        // Fire once per swipe, mid-gesture, so it feels instant rather
-        // than waiting for the finger to lift.
-        swiped = true;
+        // Fire mid-gesture (not on release) so it feels instant, and
+        // re-anchor after each hop so the child can keep the finger DOWN
+        // and just keep dragging -- one hop per SWIPE_MIN_PX of travel,
+        // in whatever direction they're currently heading. Requiring a
+        // lift between hops is what made this awkward: kids don't take
+        // their finger off the screen.
+        var beforeCol = self.charCol, beforeRow = self.worldRow;
         if (Math.abs(dx) > Math.abs(dy)) self.tryMove(dx > 0 ? 1 : -1, 0);
         else                             self.tryMove(0, dy > 0 ? 1 : -1);
+        // Only consume the travel if the hop was actually accepted.
+        // tryMove bails silently mid-hop (and at the grid/backtrack
+        // limits); re-anchoring anyway would swallow the drag and the
+        // child would have to start the gesture over.
+        if (self.charCol !== beforeCol || self.worldRow !== beforeRow) {
+          swX = ptr.x; swY = ptr.y;
+          swiped = true;   // suppresses the tap-to-hop on release
+        }
       });
       // A clean tap (no swipe) hops forward -- the move kids want most.
       this.input.on('pointerup', function (ptr) {
@@ -194,7 +206,7 @@ function createCrossyGame(words, callbacks) {
       this.events.on('shutdown', this.shutdown, this);
 
       var hint = this.add.text(W / 2, H - 14,
-        'ปัดนิ้วเพื่อเดิน — แตะเพื่อไปข้างหน้า   หลีกรถ 🚗', {
+        'ลากนิ้วค้างไว้เพื่อเดินต่อเนื่อง — แตะเพื่อไปข้างหน้า   หลีกรถ 🚗', {
           fontFamily: 'Prompt, sans-serif', fontSize: '13px',
           color: '#eeeeee', backgroundColor: '#00000044',
           padding: { x: 8, y: 3 }
