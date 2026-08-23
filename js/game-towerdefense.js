@@ -55,7 +55,7 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   // player, same as the original 2-troop game unchanged.
   var loadout = window.__tdLoadout || {};
   var HAS_BARRACK = !!loadout.hasBarrack;
-  var ALLY_CONTACT_RANGE = 22; // how close an ally + enemy need to be to start trading hits
+  var ALLY_CONTACT_RANGE = 22; // how close an ally + enemy need to be for their HP pools to cancel
 
   var HUD_H = 40, FIELD_Y0 = HUD_H, FIELD_Y1 = 378, PAL_Y0 = 378;
 
@@ -247,18 +247,29 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
     // Unlocked by the td_barrack shop upgrade -- a fundamentally
     // different troop shape than archer/sword: it doesn't attack in
     // place. Instead it periodically SPAWNS a mobile ally that walks the
-    // road upstream (toward the portal) to meet enemies head-on and
-    // trades hits until one side dies (see spawnAlly()/allyTick()).
-    // tierDef fields are spawnMs/allyHp/allyDmg/allyAtkMs/allySpd instead
-    // of range/dmg/atkMs -- towerAttack()/drawField()/drawInfoPanel() all
+    // road upstream (toward the portal) to meet enemies head-on.
+    //
+    // A soldier deals NO damage over time. On contact its HP and the
+    // enemy's cancel out in one shot, and whichever side has HP left
+    // survives and keeps moving (see allyTick()). So a soldier is a
+    // one-use block of HP thrown in front of the wave -- it can absorb a
+    // big enemy or delete a small one, but it can never grind a lane
+    // down on its own the way a damage-per-second unit could.
+    //
+    // tierDef fields are spawnMs/allyHp/allySpd instead of
+    // range/dmg/atkMs -- towerAttack()/drawField()/drawInfoPanel() all
     // branch on tower.kind === 'barrack' to use these instead.
     barrack: {
       name: 'ค่ายทหาร', emoji: '🏰', color: 0x6D4C41,
-      costs: [50, 70, 100],
+      // Dearer than archer/sword at every tier: one barrack covers a
+      // whole lane on its own, so it shouldn't also be the cheap pick.
+      costs: [90, 130, 190],
       tiers: [
-        { spawnMs: 6000, allyHp: 40, allyDmg: 6,  allyAtkMs: 700, allySpd: 70 },
-        { spawnMs: 5000, allyHp: 55, allyDmg: 9,  allyAtkMs: 650, allySpd: 75 },
-        { spawnMs: 4200, allyHp: 75, allyDmg: 13, allyAtkMs: 550, allySpd: 80 }
+        // spawnMs is milliseconds internally; the info panel divides by
+        // 1000 so the player only ever reads seconds (20/15/12 วิ).
+        { spawnMs: 20000, allyHp: 40, allySpd: 70 },
+        { spawnMs: 15000, allyHp: 55, allySpd: 75 },
+        { spawnMs: 12000, allyHp: 75, allySpd: 80 }
       ]
     }
   };
@@ -299,7 +310,7 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       Phaser.Scene.call(this, { key: 'towerdefense' });
       this.towers = [];       // { col, row, kind, tier, x, y, nextAtkAt, nextRageAt, ragingUntil, icon }
       this.enemies = [];      // { type, hp, maxHp, travel, x, y, icon, hpBg, hpFg }
-      this.allies = [];       // barrack-spawned units: { x, y, travel, hp, maxHp, dmg, atkMs, spd, nextAtkAt, target, icon }
+      this.allies = [];       // barrack-spawned units: { x, y, travel, hp, maxHp, spd, target, icon }
       this.fx = [];           // { kind:'text'|'slash'|'beam', ... startedAt }
       this.gold = START_GOLD;
       this.lives = START_LIVES;
@@ -526,33 +537,40 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       var icon = this.add.text(p.x, p.y, '💂', { fontSize: '16px' }).setOrigin(0.5).setDepth(4);
       this.allies.push({
         x: p.x, y: p.y, travel: travel,
-        hp: tierDef.allyHp, maxHp: tierDef.allyHp, dmg: tierDef.allyDmg,
-        atkMs: tierDef.allyAtkMs, spd: tierDef.allySpd, nextAtkAt: 0, target: null, icon: icon
+        hp: tierDef.allyHp, maxHp: tierDef.allyHp,
+        spd: tierDef.allySpd, target: null, icon: icon
       });
     },
-    // ── Allies: walk upstream (toward the portal) until an enemy is
-    // within ALLY_CONTACT_RANGE, then both sides stop moving and trade
-    // hits every allyAtkMs/enemy-melee tick until one dies. A winning
-    // ally resumes walking to look for its next target. ─────────────
+    // ── Allies: walk upstream (toward the portal) until an enemy comes
+    // within ALLY_CONTACT_RANGE, then the two HP pools cancel out in a
+    // single exchange -- no damage-per-second, no trading blows over
+    // time, and no blocking. Whichever side has HP left carries on
+    // moving with the remainder; equal HP kills both.
+    //
+    // Because one clash always resolves to at most one survivor, the
+    // loser is gone before the next tick and the pair can never re-clash
+    // -- a surviving ally simply meets whatever enemy is next. ───────
     allyTick: function (time, dt) {
       var self = this;
-      var claimed = []; // enemies already targeted by an earlier ally this same tick, so two allies can't both engage (and double-damage) the same one
+      var claimed = []; // enemies already hit by an earlier ally this same tick, so two allies can't both cancel against the same one
       this.allies.forEach(function (a) {
+        if (a.hp <= 0) return; // already spent in an earlier clash this tick
         var target = null, bestD = ALLY_CONTACT_RANGE;
         self.enemies.forEach(function (e) {
-          if (claimed.indexOf(e) !== -1) return;
+          if (e.hp <= 0 || claimed.indexOf(e) !== -1) return;
           var d = Math.abs(e.travel - a.travel);
           if (d < bestD) { bestD = d; target = e; }
         });
-        if (target) claimed.push(target);
         a.target = target;
         if (target) {
-          if (time >= a.nextAtkAt) {
-            a.nextAtkAt = time + a.atkMs;
-            target.hp -= a.dmg;
-            a.hp -= (target.type.meleeDmg || target.type.dmg);
-            if (target.hp <= 0) self.killEnemy(target);
-          }
+          claimed.push(target);
+          // Snapshot both sides first: subtracting in sequence would let
+          // the second subtraction use an already-reduced value, so the
+          // trade wouldn't actually be symmetric.
+          var allyHp = a.hp, enemyHp = target.hp;
+          a.hp -= enemyHp;
+          target.hp -= allyHp;
+          if (target.hp <= 0) self.killEnemy(target);
         } else {
           a.travel = Math.max(0, a.travel - a.spd * dt);
           var p = pointAtDistance(a.travel);
@@ -661,12 +679,12 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
         this.nextSpawnAt = time + SPAWN_GAP_MS;
       }
 
-      // Move enemies -- blocked (frozen in place) while engaged in melee
-      // with a barrack ally, so the ally actually reads as holding the
-      // line rather than enemies just walking through it.
+      // Move enemies. Barrack allies no longer hold the line: a clash is
+      // resolved instantly as an HP cancel (see allyTick), so an enemy
+      // that survives one keeps walking without pausing. Freezing them
+      // here would stack a second, much stronger effect -- a stall -- on
+      // top of the HP trade.
       this.enemies.forEach(function (e) {
-        var blocked = self.allies.some(function (a) { return a.target === e; });
-        if (blocked) return;
         e.travel += e.type.spd * dt;
         if (e.travel >= PATH_META.total) { self.enemyReachedBase(e); return; }
         var p = pointAtDistance(e.travel);
@@ -883,7 +901,7 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       var lines = [def.emoji + ' ' + def.name + '  (ระดับ ' + (tower.tier + 1) + '/3)'];
       if (tower.kind === 'barrack') {
         lines.push('💂 พลังชีวิตทหาร: ' + tierDef.allyHp);
-        lines.push('⚔️ ดาเมจทหาร: ' + tierDef.allyDmg);
+        lines.push('🛡 หักพลังชีวิตกับศัตรู (ไม่ทำดาเมจ)');
         lines.push('⏱ ส่งทหารทุก: ' + (tierDef.spawnMs / 1000) + ' วิ');
       } else {
         lines.push('⚔️ ดาเมจ: ' + tierDef.dmg);
