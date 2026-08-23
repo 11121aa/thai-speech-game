@@ -58,10 +58,13 @@ const Auth = (function () {
     const navSelf = document.getElementById("navSelf");
     const navShop = document.getElementById("navShop");
 
+    // FREE_MODE: nothing is for sale, so the shop link never appears.
+    const showShop = !(typeof isFreeMode === "function" && isFreeMode());
+
     if (session) {
       if (navGuest) navGuest.style.display = "none";
       if (navSelf) navSelf.style.display = "list-item";
-      if (navShop) navShop.style.display = "list-item";
+      if (navShop) navShop.style.display = showShop ? "list-item" : "none";
       await logActivity("page_view", pageNameFromPath());
     } else {
       if (navGuest) navGuest.style.display = "list-item";

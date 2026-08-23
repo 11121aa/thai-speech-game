@@ -456,7 +456,7 @@
 <script src="js/game-towerdefense.js?v=11"></script>
 <script src="js/game-tetris.js?v=5"></script>
 <script src="js/game-rpg.js?v=8"></script>
-<script src="js/config.js"></script>
+<script src="js/config.js?v=2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/words-api.js"></script>
@@ -620,6 +620,16 @@ function upgradeSumForPrefix(prefix) {
 }
 async function loadOwnedGameUpgrades() {
   try {
+    // FREE_MODE: every upgrade counts as owned, so the whole catalog is
+    // loaded instead of the purchased subset. Deliberately skips the
+    // session check too -- with nothing to buy there's no reason a guest
+    // should play a weaker game than a logged-in child.
+    if (typeof isFreeMode === 'function' && isFreeMode()) {
+      var { data: all, error: allErr } = await sb.from('game_upgrades').select('*');
+      if (allErr) throw allErr;
+      _ownedUpgrades = all || [];
+      return;
+    }
     var session = await Auth.getSession();
     if (!session) { _ownedUpgrades = []; return; }
     var { data: owned, error: ownedErr } = await sb.from('owned_game_upgrades').select('upgrade_id').eq('user_id', session.user.id);

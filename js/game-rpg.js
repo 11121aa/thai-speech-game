@@ -832,6 +832,24 @@ var RpgGame = (function () {
     var loadout = {};
     if (typeof sb === 'undefined' || !sb) return loadout;
     try {
+      // FREE_MODE: there's no shop to equip from, so just take the
+      // strongest item in each category. Highest `power` wins; for the
+      // skill, ties break toward the shorter cooldown.
+      if (typeof isFreeMode === 'function' && isFreeMode()) {
+        var { data: allItems } = await sb.from('rpg_items').select('*');
+        (allItems || []).forEach(function (item) {
+          if (item.category === 'weapon') {
+            if (loadout.weaponPower === undefined || item.power > loadout.weaponPower) loadout.weaponPower = item.power;
+          } else if (item.category === 'armor') {
+            if (loadout.armorPower === undefined || item.power > loadout.armorPower) loadout.armorPower = item.power;
+          } else if (item.category === 'skill') {
+            var better = !loadout.skill || item.power > loadout.skill.power ||
+              (item.power === loadout.skill.power && (item.cooldown_ms || 0) < (loadout.skill.cooldownMs || 0));
+            if (better) loadout.skill = { power: item.power, cooldownMs: item.cooldown_ms, effect: item.effect, name: item.name };
+          }
+        });
+        return loadout;
+      }
       var session = await Auth.getSession();
       if (!session) return loadout;
       var { data: profile } = await sb.from('profiles')

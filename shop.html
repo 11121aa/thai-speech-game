@@ -145,6 +145,17 @@
         <a href="login.html?redirect=shop.html" class="btn btn-primary btn-bouncy">เข้าสู่ระบบ</a>
       </div>
 
+      <!-- FREE_MODE: the nav link is hidden, but the URL still resolves
+           (bookmarks, the footer link, someone typing it). Rather than a
+           broken-looking empty shop, say plainly that there's nothing to
+           buy because it's all unlocked. -->
+      <div id="shopFreeMode" class="text-center" style="display:none;">
+        <div style="font-size:3.4rem;line-height:1;">🎁</div>
+        <h2 class="mt-3">ทุกอย่างฟรีแล้ว!</h2>
+        <p class="hero-lead">ไม่ต้องซื้ออะไรเลย — ปลดล็อกทุกเกม ทุกไอเทม และทุกชุดให้เรียบร้อยแล้ว</p>
+        <a href="game.html" class="btn btn-primary btn-bouncy mt-2">ไปเล่นเกมกันเลย 🎮</a>
+      </div>
+
       <div id="shopContent" style="display:none;">
         <div class="shop-hero d-flex flex-wrap align-items-center gap-3 mb-4">
           <div class="coin-pill"><span>🪙</span><span id="coinBalance">0</span></div>
@@ -300,7 +311,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js"></script>
+<script src="js/config.js?v=2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
@@ -757,6 +768,13 @@
 
   document.addEventListener('DOMContentLoaded', async function () {
     await Auth.initNav();
+    // FREE_MODE: checked before the login gate on purpose -- there's
+    // nothing here to log in FOR, so a guest shouldn't be told to sign in
+    // just to be told everything is already free.
+    if (typeof isFreeMode === 'function' && isFreeMode()) {
+      el('shopFreeMode').style.display = 'block';
+      return;
+    }
     session = await Auth.getSession();
     if (!session) {
       el('shopLoggedOut').style.display = 'block';

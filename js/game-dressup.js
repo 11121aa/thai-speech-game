@@ -490,18 +490,23 @@ var DressupGame = (function () {
     var { data: rows, error: rowsErr } = await sb.from('cosmetics').select('*');
     if (rowsErr) { console.error('[dressup] failed to load cosmetics catalog:', rowsErr); return closet; }
 
+    // FREE_MODE: the whole catalogue is wearable, so ownership isn't
+    // consulted at all (and a guest gets the full closet too).
+    var freeMode = (typeof isFreeMode === 'function' && isFreeMode());
     var ownedIds = new Set();
-    try {
-      var session = (typeof Auth !== 'undefined' && Auth.getSession) ? await Auth.getSession() : null;
-      if (session) {
-        var { data: owned, error: ownedErr } = await sb.from('owned_cosmetics').select('cosmetic_id').eq('user_id', session.user.id);
-        if (ownedErr) console.error('[dressup] failed to load owned cosmetics:', ownedErr);
-        else ownedIds = new Set((owned || []).map(function (o) { return o.cosmetic_id; }));
-      }
-    } catch (e) { console.error('[dressup] failed to load session/ownership:', e); }
+    if (!freeMode) {
+      try {
+        var session = (typeof Auth !== 'undefined' && Auth.getSession) ? await Auth.getSession() : null;
+        if (session) {
+          var { data: owned, error: ownedErr } = await sb.from('owned_cosmetics').select('cosmetic_id').eq('user_id', session.user.id);
+          if (ownedErr) console.error('[dressup] failed to load owned cosmetics:', ownedErr);
+          else ownedIds = new Set((owned || []).map(function (o) { return o.cosmetic_id; }));
+        }
+      } catch (e) { console.error('[dressup] failed to load session/ownership:', e); }
+    }
 
     (rows || []).forEach(function (item) {
-      if (closet[item.slot] && ownedIds.has(item.id)) closet[item.slot].push(item);
+      if (closet[item.slot] && (freeMode || ownedIds.has(item.id))) closet[item.slot].push(item);
     });
     Object.keys(closet).forEach(function (slotKey) {
       closet[slotKey].sort(function (a, b) {
