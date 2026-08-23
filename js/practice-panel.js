@@ -20,6 +20,60 @@ const PracticePanel = (function () {
     return document.getElementById(id);
   }
 
+  /* ── Recording feedback ────────────────────────────────────────
+     A child pressing record shouldn't have to read a hint to know it
+     worked. Three non-visual cues fire together on start/stop: a short
+     vibration, a soft tone, and (while recording) the button swelling
+     in time with their own voice. All three degrade silently on
+     browsers or devices that don't support them. */
+
+  // Android/Chrome honour this; iOS Safari has no vibration API at all,
+  // so this is a bonus, never the only signal that something happened.
+  function buzz(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+
+  // Short synthesized earcons rather than audio files -- no extra network
+  // request, no load-order dependency, and they can't be missing. Rising
+  // two-note = "go", falling = "done", which reads as start/stop without
+  // words. Its own AudioContext, created lazily inside the user gesture
+  // so autoplay policy lets it through, and reused thereafter.
+  let cueCtx = null;
+  function cue(kind) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!cueCtx) cueCtx = new AC();
+      if (cueCtx.state === "suspended") cueCtx.resume();
+      const notes = kind === "start" ? [660, 880] : [660, 440];
+      notes.forEach(function (hz, i) {
+        const t0 = cueCtx.currentTime + i * 0.09;
+        const osc = cueCtx.createOscillator();
+        const gain = cueCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = hz;
+        // Quick fade in/out -- a raw gate on a sine pops audibly.
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.16, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+        osc.connect(gain); gain.connect(cueCtx.destination);
+        osc.start(t0); osc.stop(t0 + 0.14);
+      });
+    } catch (e) {}
+  }
+
+  // Drives the button's live "hearing you" swell. rms is roughly 0..0.3
+  // for normal speech, so it's scaled up and clamped; the CSS reads
+  // --level to grow the ring (see .mic-btn in css/style.css).
+  function setMicLevel(btn, rms) {
+    if (!btn) return;
+    const lvl = Math.max(0, Math.min(1, (rms || 0) * 7));
+    btn.style.setProperty("--level", lvl.toFixed(3));
+  }
+  function clearMicLevel(btn) {
+    if (btn) btn.style.setProperty("--level", "0");
+  }
+
   function ensureModal() {
     if (!modalEl) {
       modalEl = el("practiceModal");
@@ -42,6 +96,19 @@ const PracticePanel = (function () {
         if (isRecording) onSingleHoldEnd(e); else onSingleHoldStart(e);
       });
       el("ppBtnMic").addEventListener("pointercancel", onSingleHoldEnd);
+      // The waveform strip sits directly above the button and has no other
+      // job, so it acts as extra target area -- roughly doubling what a
+      // child can hit. It drives the SINGLE-rep flow only: it's hidden
+      // during multi-rep capture, so there's no ambiguity about which
+      // recorder a tap belongs to.
+      const wave = el("ppWaveCanvas");
+      if (wave) {
+        wave.style.cursor = "pointer";
+        wave.addEventListener("pointerdown", function (e) {
+          if (el("ppMultiCapture") && el("ppMultiCapture").style.display !== "none") return;
+          if (isRecording) onSingleHoldEnd(e); else onSingleHoldStart(e);
+        });
+      }
       el("ppBtnCorrect").addEventListener("click", markCorrect);
       el("ppBtnRetry").addEventListener("click", resetForRetry);
       el("ppBtnSkip").addEventListener("click", function () { modal.hide(); });
@@ -227,6 +294,7 @@ const PracticePanel = (function () {
     if (!btn) return;
     btn.classList.remove("recording");
     btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+    clearMicLevel(btn);
     el("ppMultiHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด";
   }
 
@@ -296,8 +364,9 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMicHold");
     btn.classList.add("recording");
     btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-    el("ppMultiHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเมื่อพูดเสร็จ";
+    el("ppMultiHint").textContent = "กำลังฟังอยู่... พูดได้เลย! 🎤";
     el("ppErrorMsg").style.display = "none";
+    buzz(18); cue("start"); clearMicLevel(btn);
 
     // getUserMedia() can resolve well after this call returns (notably,
     // while a permission prompt is up). If the modal moved on to a
@@ -330,13 +399,16 @@ const PracticePanel = (function () {
         resetMultiMicButton();
         showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
       },
-      estimateSilenceGapMs(heldWord)
+      estimateSilenceGapMs(heldWord),
+      function (rms) { setMicLevel(el("ppBtnMicHold"), rms); }
     );
   }
 
   function onMultiHoldEnd(e) {
     if (e) e.preventDefault();
     if (!multiIsHolding) return;
+    buzz([12, 40, 12]); cue("stop");
+    clearMicLevel(el("ppBtnMicHold"));
     if (multiHoldController) multiHoldController.stop();
   }
 
@@ -458,6 +530,7 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMic");
     btn.classList.remove("recording");
     btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+    clearMicLevel(btn);
     el("ppRecordHint").textContent = "กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด";
   }
 
@@ -500,8 +573,9 @@ const PracticePanel = (function () {
     const btn = el("ppBtnMic");
     btn.classList.add("recording");
     btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
-    el("ppRecordHint").textContent = "กำลังอัดเสียง... กดอีกครั้งเมื่อพูดเสร็จ";
+    el("ppRecordHint").textContent = "กำลังฟังอยู่... พูดได้เลย! 🎤";
     el("ppErrorMsg").style.display = "none";
+    buzz(18); cue("start"); clearMicLevel(btn);
 
     // Same reasoning as onMultiHoldStart's heldWord: getUserMedia() can
     // resolve after the modal has already moved on to a different word
@@ -549,13 +623,16 @@ const PracticePanel = (function () {
         resetMicButton();
         showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
       },
-      estimateSilenceGapMs(heldWord)
+      estimateSilenceGapMs(heldWord),
+      function (rms) { setMicLevel(el("ppBtnMic"), rms); }
     );
   }
 
   function onSingleHoldEnd(e) {
     if (e) e.preventDefault();
     if (!isRecording) return;
+    buzz([12, 40, 12]); cue("stop");
+    clearMicLevel(el("ppBtnMic"));
     if (recordController) recordController.stop();
   }
 

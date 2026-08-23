@@ -201,7 +201,12 @@ const Recorder = (function () {
   // samples back out programmatically. Capturing them as they arrive
   // sidesteps that decoder (and the whole blob/mimeType/decode step)
   // entirely, and makes slicing a synchronous array operation afterward.
-  function startHoldRecording(canvas, onStop, onError, silenceGapMs) {
+  // onLevel (optional): called each animation frame with the current mic
+  // loudness as 0..1-ish RMS. The loop already computes this for speech
+  // detection, so handing it out costs nothing -- the practice panel uses
+  // it to make the record button swell with the child's voice, which is
+  // the main "it's listening to ME" feedback they get.
+  function startHoldRecording(canvas, onStop, onError, silenceGapMs, onLevel) {
     const rafHolder = { id: null };
     let audioCtx = null;
     let mediaStream = null;
@@ -367,6 +372,7 @@ const Recorder = (function () {
           }
           const rms = Math.sqrt(sum / dataArray.length);
           const now = Date.now();
+          if (onLevel) onLevel(rms);
 
           if (rms > SPEECH_THRESH) {
             if (!speechStartedAt) { speechStartedAt = now; speechStartedSample = capturedSamples; }
