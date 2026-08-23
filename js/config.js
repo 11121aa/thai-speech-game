@@ -20,7 +20,15 @@ const APP_CONFIG = {
   //   game.html             -- treats the whole upgrade catalog as owned
   //   js/game-dressup.js    -- treats every cosmetic as owned
   //   js/game-rpg.js        -- equips the best weapon/armor/skill
-  FREE_MODE: false
+  //
+  // NOTE (free-all branch): the pages here load this file as
+  // `config.js?v=2-free`, deliberately a different cache key from
+  // master's `?v=2`. Both branches deploy to the SAME GitHub Pages URL,
+  // so without that a returning visitor would keep the previously
+  // cached config.js -- same URL, opposite flag -- and silently get the
+  // wrong version of the site. Keep the two suffixes distinct whenever
+  // either branch bumps it.
+  FREE_MODE: true
 };
 
 // Convenience reader -- config.js loads before everything else on every
