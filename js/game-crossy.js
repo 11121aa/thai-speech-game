@@ -344,9 +344,15 @@ function createCrossyGame(words, callbacks) {
 
     updateGoalLabel: function () {
       if (!this.currentWord || !this.goalLabel) return;
-      var wEmoji = (this.currentWord.emoji && this.currentWord.emoji !== this.currentWord.word) ? this.currentWord.emoji : this.currentWord.word;
+      // Word rows have no `reading` field -- reading it printed a literal
+      // "undefined" in the middle of the banner. Show the word itself,
+      // flanked by its emoji only when it actually has one distinct from
+      // the word (otherwise the word would just repeat three times).
+      var w = this.currentWord;
+      var hasEmoji = w.emoji && w.emoji !== w.word;
       this.goalLabel.setText(
-        wEmoji + '  ข้ามถนน → ' + this.currentWord.reading + '  ' + wEmoji
+        hasEmoji ? (w.emoji + '  ข้ามถนน → ' + w.word + '  ' + w.emoji)
+                 : ('ข้ามถนน → ' + w.word)
       );
     },
 
