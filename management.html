@@ -1080,6 +1080,34 @@ function formatMatchTime(ms) {
 // a game missing here still records scores, it just silently never gets
 // a leaderboard card, which is how cooking/tower defense/tetris/rpg went
 // unlisted after they were added.
+// ── practice queries: tolerate a missing specialist_marked_correct ──
+// That column arrives with supabase/027_specialist_marked_correct.sql.
+// Until that migration is run, ASKING for it makes the entire query fail
+// -- and every caller does `data || []`, so the failure turned into a
+// silent empty result: the therapist's patient dashboard, homework
+// review and worksheet review all rendered "ไม่มีข้อมูล" with every
+// recording apparently gone and nothing in the console to explain it.
+//
+// Callers pass the column list WITHOUT the new column; it's appended
+// only while it's known to exist. The first failure flips the flag and
+// retries, so at most one query pays the cost, and the review controls
+// simply show as "not yet reviewed" until the migration lands.
+var _specialistColMissing = false;
+async function selectPractice(cols, applyFilters) {
+  var sel = _specialistColMissing ? cols : cols + ', specialist_marked_correct';
+  var res = await applyFilters(sb.from('practice').select(sel));
+  if (res.error && String(res.error.message).indexOf('specialist_marked_correct') !== -1) {
+    _specialistColMissing = true;
+    console.warn('[management] practice.specialist_marked_correct is missing — run ' +
+                 'supabase/027_specialist_marked_correct.sql to enable correct/incorrect review. ' +
+                 'Loading without it for now.');
+    res = await applyFilters(sb.from('practice').select(cols));
+  }
+  // Anything else (RLS, network) used to vanish into `data || []` too.
+  if (res.error) console.error('[management] practice query failed:', res.error.message);
+  return res;
+}
+
 var MGMT_GAMES = [
   { key: 'matching',    name: 'จับคู่ภาพ',        icon: '🃏', color: 'var(--color-accent-purple)' },
   { key: 'shooting',    name: 'ยิงเป้า',           icon: '🎯', color: 'var(--color-danger)' },
@@ -1480,10 +1508,9 @@ async function openPatientDetail(u) {
   document.getElementById('patientDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // Load full practice records for this patient (with file_path + score)
-  var { data } = await sb.from('practice')
-    .select('id, score, parent_marked_correct, specialist_marked_correct, practiced_at, file_path, user_id, words(word, letter_category, level, emoji)')
-    .eq('user_id', u.userId)
-    .order('practiced_at', { ascending: false });
+  var { data } = await selectPractice(
+    'id, score, parent_marked_correct, practiced_at, file_path, user_id, words(word, letter_category, level, emoji)',
+    function (q) { return q.eq('user_id', u.userId).order('practiced_at', { ascending: false }); });
   currentDetailData = data || [];
 
   drawDetailDailyChart(currentDetailData);
@@ -2304,7 +2331,8 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    selectPractice('id, word_id, practiced_at, parent_marked_correct, file_path, score',
+      function (q) { return q.eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }); }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
   var words = (results[0].data || []);
@@ -2677,7 +2705,8 @@ async function openDetailHwDetail(assignmentId, hw, patient) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', hw.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }),
+    selectPractice('id, word_id, practiced_at, parent_marked_correct, file_path, score',
+      function (q) { return q.eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }); }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
   var words = results[0].data || [];
@@ -2769,7 +2798,8 @@ async function openDetailWsDetail(progressRow, ws, patient) {
 
   var results = await Promise.all([
     sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
+    selectPractice('id, word_id, practiced_at, parent_marked_correct, file_path, score',
+      function (q) { return q.eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }); }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
   var words = results[0].data || [];
@@ -2803,7 +2833,8 @@ async function openUserHwDetail(assignment) {
 
   var results = await Promise.all([
     sb.from('homework_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('homework_id', homeworkId),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }),
+    selectPractice('id, word_id, practiced_at, parent_marked_correct, file_path, score',
+      function (q) { return q.eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }); }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignment.id)
   ]);
   var words = results[0].data || [];
@@ -2906,7 +2937,8 @@ async function openUserWorksheetDetail(progressRow, ws) {
 
   var results = await Promise.all([
     sb.from('worksheet_words').select('word_id, words(id, word, emoji, level, letter_category)').eq('worksheet_id', ws.id),
-    sb.from('practice').select('id, word_id, practiced_at, parent_marked_correct, specialist_marked_correct, file_path, score').eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }),
+    selectPractice('id, word_id, practiced_at, parent_marked_correct, file_path, score',
+      function (q) { return q.eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }); }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
   var words = results[0].data || [];
