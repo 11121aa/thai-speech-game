@@ -1108,6 +1108,31 @@ async function selectPractice(cols, applyFilters) {
   return res;
 }
 
+// ── Unwrap a PostgREST result without hiding failures ───────────────
+// `data || []` treats "the query failed" and "there are genuinely no
+// rows" as the same thing. That's what made the missing
+// specialist_marked_correct column look like a patient with no
+// recordings at all -- every homework/worksheet review table went blank
+// with nothing logged. rows() keeps the same empty-array fallback so
+// callers can't crash, but the failure is at least on the record.
+function rows(res, what) {
+  if (res && res.error) console.error('[management] ' + (what || 'query') + ' failed:', res.error.message);
+  return (res && res.data) || [];
+}
+// True if ANY of a review screen's queries failed, so the table can say
+// "couldn't load" rather than silently implying the work was never done
+// -- a therapist reading an empty homework table would otherwise assume
+// the child never recorded anything.
+function anyFailed(results) {
+  return results.some(function (r) { return r && r.error; });
+}
+function showLoadError(wrapId) {
+  var el = document.getElementById(wrapId);
+  if (el) el.innerHTML = '<p class="text-danger text-center py-3 small">' +
+    'โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้าอีกครั้ง<br>' +
+    '<span class="text-secondary">(ดูรายละเอียดข้อผิดพลาดใน Console)</span></p>';
+}
+
 var MGMT_GAMES = [
   { key: 'matching',    name: 'จับคู่ภาพ',        icon: '🃏', color: 'var(--color-accent-purple)' },
   { key: 'shooting',    name: 'ยิงเป้า',           icon: '🎯', color: 'var(--color-danger)' },
@@ -2335,9 +2360,10 @@ async function openHwDetail(assignmentId, homeworkId, hw, patient) {
       function (q) { return q.eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }); }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
-  var words = (results[0].data || []);
-  var practices = (results[1].data || []);
-  var feedbacks = (results[2].data || []);
+  if (anyFailed(results)) { showLoadError('hwDetailTableWrap'); return; }
+  var words = rows(results[0], 'homework_words');
+  var practices = rows(results[1], 'practice');
+  var feedbacks = rows(results[2], 'homework_word_feedback');
   var repeatCount = hw.repeat_count || 5;
 
   var allDone = words.length > 0 && words.every(function (w) {
@@ -2709,9 +2735,10 @@ async function openDetailHwDetail(assignmentId, hw, patient) {
       function (q) { return q.eq('homework_assignment_id', assignmentId).order('practiced_at', { ascending: true }); }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignmentId)
   ]);
-  var words = results[0].data || [];
-  var practices = results[1].data || [];
-  var feedbacks = results[2].data || [];
+  if (anyFailed(results)) { showLoadError('detailHwDetailTableWrap'); return; }
+  var words = rows(results[0], 'homework_words');
+  var practices = rows(results[1], 'practice');
+  var feedbacks = rows(results[2], 'homework_word_feedback');
   var repeatCount = hw.repeat_count || 5;
 
   var allDone = words.length > 0 && words.every(function (w) {
@@ -2802,9 +2829,10 @@ async function openDetailWsDetail(progressRow, ws, patient) {
       function (q) { return q.eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }); }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
-  var words = results[0].data || [];
-  var practices = results[1].data || [];
-  var feedbacks = results[2].data || [];
+  if (anyFailed(results)) { showLoadError('detailWsDetailTableWrap'); return; }
+  var words = rows(results[0], 'worksheet_words');
+  var practices = rows(results[1], 'practice');
+  var feedbacks = rows(results[2], 'worksheet_word_feedback');
   var repeatCount = ws.repeat_count || 5;
 
   var allDone = words.length > 0 && words.every(function (w) {
@@ -2837,9 +2865,10 @@ async function openUserHwDetail(assignment) {
       function (q) { return q.eq('homework_assignment_id', assignment.id).order('practiced_at', { ascending: true }); }),
     sb.from('homework_word_feedback').select('*').eq('homework_assignment_id', assignment.id)
   ]);
-  var words = results[0].data || [];
-  var practices = results[1].data || [];
-  var feedbacks = results[2].data || [];
+  if (anyFailed(results)) { showLoadError('userHwDetailTableWrap'); return; }
+  var words = rows(results[0], 'homework_words');
+  var practices = rows(results[1], 'practice');
+  var feedbacks = rows(results[2], 'homework_word_feedback');
   var repeatCount = (hw && hw.repeat_count) || 5;
 
   var allDone = words.length > 0 && words.every(function (w) {
@@ -2941,9 +2970,10 @@ async function openUserWorksheetDetail(progressRow, ws) {
       function (q) { return q.eq('worksheet_progress_id', progressRow.id).order('practiced_at', { ascending: true }); }),
     sb.from('worksheet_word_feedback').select('*').eq('worksheet_progress_id', progressRow.id)
   ]);
-  var words = results[0].data || [];
-  var practices = results[1].data || [];
-  var feedbacks = results[2].data || [];
+  if (anyFailed(results)) { showLoadError('userWorksheetDetailTableWrap'); return; }
+  var words = rows(results[0], 'worksheet_words');
+  var practices = rows(results[1], 'practice');
+  var feedbacks = rows(results[2], 'worksheet_word_feedback');
   var repeatCount = ws.repeat_count || 5;
 
   var allDone = words.length > 0 && words.every(function (w) {
