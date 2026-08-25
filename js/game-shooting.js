@@ -30,6 +30,12 @@
 // leak a listener (and the wrap div) on every restart. ShootingGame.stop()
 // below does this cleanup directly and unconditionally instead.
 var _shootTimeStopBtnFn = null;
+// Window-level pull tracking (see the comment in create()). Held here so
+// ShootingGame.stop() can remove them -- they're on window, not the
+// canvas, so they would otherwise outlive the scene and keep aiming a
+// destroyed game on every later drag anywhere on the page.
+var _shootMoveFn = null;
+var _shootUpFn = null;
 
 function createShootingGame(words, callbacks) {
 
@@ -127,14 +133,33 @@ function createShootingGame(words, callbacks) {
         if (self.time.now < self.reloadUntil) return; // still reloading -- ignore so no half-aim sticks
         self.drag = { sx: ptr.x, sy: ptr.y, cx: ptr.x, cy: ptr.y };
       });
-      this.input.on('pointermove', function (ptr) {
+      // Tracking the pull is done on WINDOW, not through Phaser's own
+      // pointermove, because Phaser only reports moves while the finger is
+      // still over the canvas. To lob at a target high on the screen you
+      // pull straight down -- and the cannon sits ~30px from the canvas
+      // bottom, so on a phone the finger left the canvas almost
+      // immediately, the aim froze at whatever tiny pull had registered,
+      // and the shot was then rejected as a stray tap. Listening on the
+      // window lets the pull continue past the bottom edge (and off any
+      // other edge), which is what makes mid-screen targets reachable.
+      var canvasEl = this.sys.game.canvas;
+      var toCanvas = function (e) {
+        var r = canvasEl.getBoundingClientRect();
+        return {
+          x: (e.clientX - r.left) * (W / r.width),
+          y: (e.clientY - r.top) * (H / r.height)
+        };
+      };
+      _shootMoveFn = function (e) {
         if (!self.drag) return;
-        self.drag.cx = ptr.x; self.drag.cy = ptr.y;
+        var p = toCanvas(e);
+        self.drag.cx = p.x; self.drag.cy = p.y;
         var a = self.aimFromDrag();
         if (a) { self.aimAngle = a.angle; self.aimPower = a.power; }
-      });
-      var release = function () {
+      };
+      _shootUpFn = function (e) {
         if (!self.drag) return;
+        if (e) { var p = toCanvas(e); self.drag.cx = p.x; self.drag.cy = p.y; }
         var a = self.aimFromDrag();
         self.drag = null;
         // Too short to be a deliberate pull -- treat as a stray tap and
@@ -143,8 +168,9 @@ function createShootingGame(words, callbacks) {
         self.aimAngle = a.angle; self.aimPower = a.power;
         if (!self.isPaused) self.fire(a.angle, a.speed);
       };
-      this.input.on('pointerup', release);
-      this.input.on('pointerupoutside', release);
+      window.addEventListener('pointermove', _shootMoveFn);
+      window.addEventListener('pointerup', _shootUpFn);
+      window.addEventListener('pointercancel', _shootUpFn);
       // Keyboard keeps the old one-key behaviour for desktop: fires along
       // the barrel's current angle at whatever power was last pulled.
       this.input.keyboard.on('keydown-SPACE', function () {
@@ -699,6 +725,16 @@ var ShootingGame = (function () {
     }
     var wrap = document.getElementById('shootBtnWrap');
     if (wrap) wrap.style.display = 'none';
+    // These live on window, so unlike canvas listeners they survive the
+    // canvas being destroyed -- without this every restart would stack
+    // another pair, and a drag anywhere on the page would keep poking a
+    // dead scene.
+    if (_shootMoveFn) { window.removeEventListener('pointermove', _shootMoveFn); _shootMoveFn = null; }
+    if (_shootUpFn) {
+      window.removeEventListener('pointerup', _shootUpFn);
+      window.removeEventListener('pointercancel', _shootUpFn);
+      _shootUpFn = null;
+    }
   }
   return { start: start, stop: stop };
 }());

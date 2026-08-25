@@ -952,6 +952,27 @@ html.in-game, body.in-game {
    vertical room the game needs to fit in the first place. */
 body.in-game .site-header,
 body.in-game .site-footer { display: none; }
+
+/* Centre the game in the viewport. Hiding the header/footer left the
+   play area pinned to the top with a large dead gap underneath it on a
+   phone, which is what made it look broken. The page can't scroll during
+   play, so filling the viewport and centring costs nothing. */
+body.in-game main { padding: 0 !important; }
+body.in-game #screenGame {
+  min-height: 100vh;
+  min-height: 100dvh;   /* dvh accounts for mobile browser chrome; vh above is the fallback */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* The HUD is sticky with a 72px offset so it clears the site header
+   while scrolling -- but in-game the header is gone and the page doesn't
+   scroll, so that offset only pushed the bar down over the canvas. */
+body.in-game .game-hud-bar {
+  position: static;
+  top: auto;
+  margin-bottom: 0.5rem;
+}
 /* Phaser.Scale.FIT handles canvas sizing — just cap it and block overflow.
    touch-action:none stops mobile browsers from treating a finger-drag over
    the canvas as a page scroll/pull gesture (which otherwise swallows the

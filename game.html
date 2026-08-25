@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<link href="css/style.css?v=16" rel="stylesheet">
+<link href="css/style.css?v=17" rel="stylesheet">
 </head>
 <body class="kid-page">
 
@@ -162,14 +162,13 @@
         </div>
       </div>
       <div id="airplaneGame" class="game-canvas-wrap" style="display:none;"></div>
-      <!-- Platformer: Phaser canvas + DOM control buttons -->
+      <!-- Platformer: canvas only -- swipe up to jump, down to slide.
+           The on-screen buttons were removed once the swipe controls
+           landed: they covered part of the play area and kids were using
+           the gestures anyway. -->
       <div id="platformerGame" style="display:none;">
         <div class="platformer-wrap">
           <div id="platformerCanvas" class="game-canvas-wrap"></div>
-          <div class="platformer-btns">
-            <button class="pf-btn" id="pfBtnJump">↑<br><small>กระโดด</small></button>
-            <button class="pf-btn" id="pfBtnSlide">↙<br><small>สไลด์</small></button>
-          </div>
         </div>
       </div>
       <!-- Flashcard Game — Phaser renders here -->
@@ -180,44 +179,20 @@
       <div id="dressupGame" class="game-canvas-wrap" style="display:none;"></div>
       <!-- Tower Defense — Phaser canvas (troop palette + everything else is drawn in-canvas, no DOM controls) -->
       <div id="towerdefenseGame" class="game-canvas-wrap" style="display:none;"></div>
-      <!-- Crossy Road: Phaser canvas + 4-directional DOM buttons -->
+      <!-- Crossy Road: canvas only -- press and drag a finger to hop
+           continuously (see js/game-crossy.js). The 4-way button cluster
+           was removed: it sat on top of the road and the drag control
+           replaced it. -->
       <div id="crossyGame" style="display:none;">
         <div class="platformer-wrap">
           <div id="crossyCanvas" class="game-canvas-wrap"></div>
-          <div class="platformer-btns" style="flex-direction:column;gap:4px;align-items:flex-end;justify-content:flex-end;">
-            <button class="pf-btn" id="cryBtnUp"
-              style="background:rgba(39,174,96,0.88);border-color:rgba(39,174,96,0.95);color:#fff;">
-              ↑<br><small>หน้า</small>
-            </button>
-            <div style="display:flex;gap:4px;">
-              <button class="pf-btn" id="cryBtnLeft">←<br><small>ซ้าย</small></button>
-              <button class="pf-btn" id="cryBtnDown"
-                style="background:rgba(231,76,60,0.82);border-color:rgba(231,76,60,0.95);color:#fff;">
-                ↓<br><small>หลัง</small>
-              </button>
-              <button class="pf-btn" id="cryBtnRight">→<br><small>ขวา</small></button>
-            </div>
-          </div>
         </div>
       </div>
-      <!-- Tetris: Phaser canvas + rotate/left/right/drop DOM buttons -->
+      <!-- Tetris: canvas only -- tap to rotate, swipe left/right to
+           move, swipe down to hard-drop. Buttons removed with the rest. -->
       <div id="tetrisGame" style="display:none;">
         <div class="platformer-wrap">
           <div id="tetrisCanvas" class="game-canvas-wrap"></div>
-          <div class="platformer-btns" style="flex-direction:column;gap:4px;align-items:center;justify-content:flex-end;">
-            <button class="pf-btn" id="tetBtnRotate"
-              style="background:rgba(39,174,96,0.88);border-color:rgba(39,174,96,0.95);color:#fff;">
-              ↻<br><small>หมุน</small>
-            </button>
-            <div style="display:flex;gap:4px;">
-              <button class="pf-btn" id="tetBtnLeft">←<br><small>ซ้าย</small></button>
-              <button class="pf-btn" id="tetBtnDrop"
-                style="background:rgba(231,76,60,0.82);border-color:rgba(231,76,60,0.95);color:#fff;">
-                ▼<br><small>ตกเลย</small>
-              </button>
-              <button class="pf-btn" id="tetBtnRight">→<br><small>ขวา</small></button>
-            </div>
-          </div>
         </div>
       </div>
       <!-- RPG dungeon crawler: Phaser canvas (also drag-to-move) + an
@@ -451,16 +426,16 @@
      ?v= is a cache-buster: bump it whenever a game-*.js file changes so
      Safari (which caches far more aggressively than Chrome) is forced to
      fetch the new version instead of silently serving a stale copy. -->
-<script src="js/game-shooting.js?v=7"></script>
+<script src="js/game-shooting.js?v=8"></script>
 <script src="js/game-airplane.js?v=17"></script>
-<script src="js/game-platformer.js?v=36"></script>
+<script src="js/game-platformer.js?v=37"></script>
 <script src="js/game-matching.js?v=8"></script>
 <script src="js/game-flashcard.js?v=6"></script>
-<script src="js/game-crossy.js?v=8"></script>
+<script src="js/game-crossy.js?v=9"></script>
 <script src="js/game-cooking.js?v=20"></script>
 <script src="js/game-dressup.js?v=15"></script>
 <script src="js/game-towerdefense.js?v=12"></script>
-<script src="js/game-tetris.js?v=5"></script>
+<script src="js/game-tetris.js?v=6"></script>
 <script src="js/game-rpg.js?v=9"></script>
 <script src="js/config.js?v=2-free"></script>
 <script src="js/supabase-client.js"></script>
@@ -549,25 +524,43 @@ function fitGameToViewport() {
     if (boxes[i].offsetParent !== null) { box = boxes[i]; break; }
   }
   if (!box) return;
-  // Clear the previous cap first: with it still applied, the element's
-  // own top is fine but a stale smaller cap would never grow back when
-  // the window is enlarged.
+  // Clear the previous cap first: with it still applied, a stale smaller
+  // cap would never grow back when the window is enlarged.
   screen.style.removeProperty('--game-max-h');
-  var top = box.getBoundingClientRect().top;
-  // Controls that sit BELOW the canvas in normal flow (the RPG's joystick
-  // row) eat real height. Other games' .platformer-btns are absolutely
-  // positioned over the canvas, so they add none.
-  var below = 0;
-  var flowCtrls = screen.querySelector('.rpg-controls');
-  if (flowCtrls && flowCtrls.offsetParent !== null) below = flowCtrls.getBoundingClientRect().height;
+  // Measure the chrome around the canvas as HEIGHTS, never from the
+  // canvas's position on screen: the screen is vertically centred now
+  // (body.in-game #screenGame), so a position-based measure would feed
+  // back on itself -- capping the canvas moves the block, which moves the
+  // top, which changes the cap.
+  //
+  // #screenGame's own height can't be used either: it's min-height:100vh
+  // for the centring, so "screen height minus canvas" would count the
+  // centring gap as chrome and shrink the canvas a little more on every
+  // single call. Only the HUD and whatever shares the canvas's own
+  // container (the RPG's joystick row) are real chrome; the other games'
+  // .platformer-btns are absolutely positioned and take no height.
+  var hud = screen.querySelector('.game-hud-bar');
+  var chrome = 0;
+  if (hud) {
+    var hs = getComputedStyle(hud);
+    chrome += hud.getBoundingClientRect().height + (parseFloat(hs.marginBottom) || 0);
+  }
+  var container = box;
+  while (container.parentElement && container.parentElement !== screen) container = container.parentElement;
+  chrome += container.getBoundingClientRect().height - box.getBoundingClientRect().height;
   // Small breathing margin so the game never sits flush to the bottom edge.
-  var avail = Math.max(60, window.innerHeight - top - below - 12);
+  var avail = Math.max(60, window.innerHeight - chrome - 12);
   screen.style.setProperty('--game-max-h', avail + 'px');
 }
 
 function showScreen(id) {
   ['screenMode','screenGame','screenFinish'].forEach(function (s) {
-    document.getElementById(s).style.display = s === id ? 'block' : 'none';
+    // screenGame is a flex column so it can centre the play area in the
+    // viewport (see body.in-game #screenGame). It has to be set here:
+    // this inline style beats the stylesheet, so writing 'block' would
+    // silently cancel the centring.
+    var shown = s === 'screenGame' ? 'flex' : 'block';
+    document.getElementById(s).style.display = s === id ? shown : 'none';
   });
   // Page scroll is locked for exactly as long as a game is on screen.
   // Doing it here (rather than at each call site) means every route into
