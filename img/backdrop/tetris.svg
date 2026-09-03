@@ -1,0 +1,25 @@
+<svg viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <!-- Hover backdrop for the game-select screen. Deliberately low
+       detail and low contrast: it sits behind the whole page at partial
+       opacity, so it has to read as atmosphere at a glance and never
+       compete with the cards or text on top of it. -->
+  <rect width="1200" height="700" fill="#1e2a40"/>
+  <g opacity="0.10" stroke="#ffffff" stroke-width="2">
+    <path d="M200 0 V700 M400 0 V700 M600 0 V700 M800 0 V700 M1000 0 V700"/>
+    <path d="M0 140 H1200 M0 280 H1200 M0 420 H1200 M0 560 H1200"/>
+  </g>
+  <g opacity="0.55">
+    <rect x="140" y="470" width="70" height="70" rx="10" fill="#2EC4B6"/>
+    <rect x="210" y="470" width="70" height="70" rx="10" fill="#2EC4B6"/>
+    <rect x="280" y="470" width="70" height="70" rx="10" fill="#F0A500"/>
+    <rect x="280" y="400" width="70" height="70" rx="10" fill="#F0A500"/>
+    <rect x="560" y="180" width="70" height="70" rx="10" fill="#8A5CF6"/>
+    <rect x="490" y="250" width="70" height="70" rx="10" fill="#8A5CF6"/>
+    <rect x="560" y="250" width="70" height="70" rx="10" fill="#8A5CF6"/>
+    <rect x="630" y="250" width="70" height="70" rx="10" fill="#8A5CF6"/>
+    <rect x="850" y="540" width="70" height="70" rx="10" fill="#E53935"/>
+    <rect x="920" y="540" width="70" height="70" rx="10" fill="#27AE60"/>
+    <rect x="990" y="540" width="70" height="70" rx="10" fill="#2196F3"/>
+    <rect x="1060" y="540" width="70" height="70" rx="10" fill="#FF9F1C"/>
+  </g>
+</svg>

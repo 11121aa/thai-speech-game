@@ -1,0 +1,24 @@
+<svg viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <!-- Hover backdrop for the game-select screen. Deliberately low
+       detail and low contrast: it sits behind the whole page at partial
+       opacity, so it has to read as atmosphere at a glance and never
+       compete with the cards or text on top of it. -->
+  <rect width="1200" height="700" fill="#9fd8ec"/>
+  <rect width="1200" height="700" fill="#7fc9e4" opacity="0.35"/>
+  <g fill="#ffffff" opacity="0.28">
+    <path d="M-40 180 q160 -26 320 0 t320 0 t320 0 t320 0 v40 H-40z"/>
+    <path d="M-40 430 q160 -26 320 0 t320 0 t320 0 t320 0 v40 H-40z"/>
+  </g>
+  <g opacity="0.75">
+    <ellipse cx="300" cy="300" rx="86" ry="34" fill="#E9C46A"/>
+    <rect x="294" y="256" width="10" height="46" rx="5" fill="#8B5A2B"/>
+    <circle cx="282" cy="250" r="22" fill="#2E9E5B"/><circle cx="318" cy="250" r="22" fill="#2E9E5B"/>
+    <circle cx="300" cy="232" r="22" fill="#2E9E5B"/>
+    <ellipse cx="900" cy="520" rx="70" ry="28" fill="#E9C46A"/>
+    <rect x="895" y="486" width="9" height="36" rx="4" fill="#8B5A2B"/>
+    <circle cx="884" cy="480" r="18" fill="#2E9E5B"/><circle cx="914" cy="480" r="18" fill="#2E9E5B"/>
+  </g>
+  <g fill="#FFD700" opacity="0.6">
+    <circle cx="620" cy="210" r="15"/><circle cx="620" cy="260" r="15"/><circle cx="620" cy="310" r="15"/>
+  </g>
+</svg>

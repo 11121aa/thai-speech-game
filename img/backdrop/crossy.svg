@@ -1,0 +1,20 @@
+<svg viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <!-- Hover backdrop for the game-select screen. Deliberately low
+       detail and low contrast: it sits behind the whole page at partial
+       opacity, so it has to read as atmosphere at a glance and never
+       compete with the cards or text on top of it. -->
+  <rect width="1200" height="700" fill="#4caf50"/>
+  <rect y="90" width="1200" height="130" fill="#616161"/>
+  <rect y="330" width="1200" height="130" fill="#616161"/>
+  <rect y="560" width="1200" height="120" fill="#616161"/>
+  <g stroke="#e8e8e8" stroke-width="8" stroke-dasharray="46 46" opacity="0.85">
+    <path d="M0 155 H1200"/><path d="M0 395 H1200"/><path d="M0 620 H1200"/>
+  </g>
+  <g opacity="0.8">
+    <rect x="180" y="112" width="150" height="60" rx="16" fill="#ff5252"/>
+    <rect x="760" y="112" width="150" height="60" rx="16" fill="#fff176"/>
+    <rect x="420" y="352" width="150" height="60" rx="16" fill="#ffb300"/>
+    <rect x="960" y="580" width="150" height="60" rx="16" fill="#42a5f5"/>
+  </g>
+  <rect y="250" width="1200" height="50" fill="#00bcd4" opacity="0.55"/>
+</svg>
