@@ -375,32 +375,43 @@ const PracticePanel = (function () {
     // actually belongs to and bail if it no longer matches.
     const heldWord = currentWord;
 
+    // Cards used to appear all at once when the hold ended, so a child
+    // saying five repetitions got no sign any of them had registered until
+    // they let go. Each one is now added the moment the recorder confirms
+    // it, which also keeps the N / total counter and the ✓ button live.
+    let heardThisHold = 0;
+
     multiHoldController = Recorder.startHoldRecording(
       el("ppWaveCanvas"),
-      function (samples, sampleRate, segments) {
+      function () {
         resetMultiMicButton();
         if (currentWord !== heldWord) return; // modal moved on to a different word while this hold was pending
-        if (!segments.length) return; // held the button but never actually spoke -- nothing to add
-        // Synchronous -- sliceSamplesToWavSegments works directly on the
-        // already-captured PCM, no decode step (see recorder.js for why
-        // that step was removed).
-        try {
-          const wavBlobs = Recorder.sliceSamplesToWavSegments(samples, sampleRate, segments);
-          wavBlobs.forEach(function (wavBlob) {
-            multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false, practiceId: null });
-          });
-          renderMultiCards();
-        } catch (err) {
-          console.error("[multi-rep] sliceSamplesToWavSegments failed:", err, "sample count:", samples && samples.length, "sampleRate:", sampleRate, "segments:", segments);
-          showError("เกิดข้อผิดพลาดในการประมวลผลเสียง กรุณาลองใหม่");
-        }
+        // Segments were already added as they arrived; nothing to slice here.
+        if (!heardThisHold) el("ppMultiHint").textContent = "ไม่ได้ยินเสียงพูด ลองกดค้างแล้วพูดอีกครั้ง";
       },
       function () {
         resetMultiMicButton();
         showError("ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้ไมโครโฟน");
       },
       estimateSilenceGapMs(heldWord),
-      function (rms) { setMicLevel(el("ppBtnMicHold"), rms); }
+      function (rms) { setMicLevel(el("ppBtnMicHold"), rms); },
+      function (wavBlob) {
+        // Same guard as the finish callback: a hold whose permission
+        // prompt outlived the word must not attribute audio to the new one.
+        if (currentWord !== heldWord) return;
+        heardThisHold++;
+        multiSegments.push({ blob: wavBlob, url: URL.createObjectURL(wavBlob), uploaded: false, practiceId: null });
+        renderMultiCards();
+        buzz(10);
+        if (multiIsHolding) {
+          // Extras aren't dropped -- overshooting still leaves the ✓ button
+          // disabled and the existing per-card delete is the way back, the
+          // same as before. The live count is what makes that unlikely now.
+          el("ppMultiHint").textContent = multiSegments.length >= multiTotal
+            ? "ครบแล้ว! ปล่อยนิ้วได้เลย 🎉"
+            : "ได้ยินแล้ว " + multiSegments.length + "/" + multiTotal + " — พูดต่อได้เลย!";
+        }
+      }
     );
   }
 
