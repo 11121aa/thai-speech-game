@@ -1,0 +1,22 @@
+<svg viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <!-- Hover backdrop for the game-select screen. Deliberately low
+       detail and low contrast: it sits behind the whole page at partial
+       opacity, so it has to read as atmosphere at a glance and never
+       compete with the cards or text on top of it. -->
+  <rect width="1200" height="700" fill="#ffe8f0"/>
+  <rect y="560" width="1200" height="140" fill="#f7d3e0" opacity="0.9"/>
+  <rect x="120" y="180" width="960" height="12" rx="6" fill="#c98aa6" opacity="0.8"/>
+  <g opacity="0.55">
+    <path d="M250 192 v40" stroke="#c98aa6" stroke-width="6"/>
+    <rect x="190" y="232" width="120" height="140" rx="18" fill="#ff6b9d"/>
+    <path d="M520 192 v40" stroke="#c98aa6" stroke-width="6"/>
+    <rect x="465" y="232" width="110" height="150" rx="18" fill="#8a5cf6"/>
+    <path d="M800 192 v40" stroke="#c98aa6" stroke-width="6"/>
+    <rect x="740" y="232" width="120" height="130" rx="18" fill="#2ec4b6"/>
+    <path d="M1000 192 v40" stroke="#c98aa6" stroke-width="6"/>
+    <rect x="945" y="232" width="110" height="145" rx="18" fill="#ff9f1c"/>
+  </g>
+  <g fill="#ffffff" opacity="0.5">
+    <circle cx="140" cy="430" r="26"/><circle cx="1080" cy="470" r="34"/><circle cx="620" cy="500" r="22"/>
+  </g>
+</svg>

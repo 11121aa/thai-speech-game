@@ -24,22 +24,60 @@ html, body {
   font-size: 1.05rem;
   scroll-behavior: smooth;
 }
-/* Soft colour wash behind everything -- four wide, very light radial
-   blooms in the brand colours. Flat cream was what made the site read
-   as "bland"; this keeps text contrast untouched (nothing above 0.30
-   alpha) while giving the page some life. Fixed and non-scrolling so it
-   costs nothing to repaint. */
+/* Colour wash behind everything. Flat cream was what made the site read
+   as bland, so this layers four brand-colour blooms over a warm vertical
+   tint, plus a faint polka grid for texture -- the dots are what stop it
+   looking like a plain gradient. Text contrast is untouched: nothing here
+   goes above 0.34 alpha. Fixed and non-scrolling so it never repaints. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background-color: #fdf6ec;
+  background-image:
+    radial-gradient(rgba(43,36,56,0.055) 2px, transparent 2px),
+    radial-gradient(42rem 34rem at 6% 2%,   rgba(46,196,182,0.34), transparent 70%),
+    radial-gradient(38rem 30rem at 98% 10%, rgba(255,159,28,0.30), transparent 70%),
+    radial-gradient(36rem 30rem at 2% 94%,  rgba(138,92,246,0.28), transparent 70%),
+    radial-gradient(34rem 28rem at 96% 92%, rgba(255,107,157,0.26), transparent 70%),
+    linear-gradient(160deg, #eafaf8 0%, #fdf6ec 45%, #fff2e4 100%);
+  background-size: 26px 26px, auto, auto, auto, auto, auto;
+}
+
+/* ── Game hover backdrop ───────────────────────────────────────────
+   Hovering a game card fades that game's own scene in behind the whole
+   page (kitchen for cooking, ocean for airplane, road for crossy...),
+   so the choice previews what you're about to play. Sits above the
+   colour wash but below all content, and is driven by JS setting
+   --bd + .is-on (see game.html's wireBackdropHover). Never shown on
+   touch, where there is no hover to leave. */
+#gameBackdrop {
+  position: fixed;
+  inset: 0;
   z-index: -2;
   pointer-events: none;
-  background:
-    radial-gradient(38rem 30rem at 8% 4%,   rgba(46,196,182,0.26), transparent 70%),
-    radial-gradient(34rem 28rem at 96% 12%, rgba(255,159,28,0.24), transparent 70%),
-    radial-gradient(32rem 26rem at 4% 92%,  rgba(138,92,246,0.22), transparent 70%),
-    radial-gradient(30rem 26rem at 92% 88%, rgba(255,107,157,0.20), transparent 70%);
+  opacity: 0;
+  background-image: var(--bd, none);
+  background-size: cover;
+  background-position: center;
+  transition: opacity 0.35s ease;
+}
+#gameBackdrop.is-on { opacity: 0.4; }
+/* A light scrim keeps card text readable over the darker scenes
+   (tetris and rpg are near-navy). */
+#gameBackdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(253, 246, 236, 0.45);
+}
+@media (hover: none) {
+  #gameBackdrop { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #gameBackdrop { transition: none; }
 }
 
 h1, h2, h3, h4, h5, h6 {
