@@ -231,6 +231,7 @@ function createCookingGame(words, callbacks) {
       sauceRun:false, sauceStart:0, sauceDone:false, sauceCv:null, sauceMc:null, sauceLast:null, sauceCover:0,
       cheeseTaps:0, cheeseCount:0, cheeseRun:false, cheeseDone:false, cheeseStart:0,
       chAnim:0, chAnimStart:0, chFlakes:[],
+      toolAnim:0, toolAt:0,
       cheesePunch:0, cheeseFinalPct:0,
       bakeHeld:0, bakeHoldAt:0, bakeHolding:false, bakeDoneAt:0, bakeDone:false, bakeVal:0, bakeTapVal:0,
       // pzCuts: one {ang, sc, at} per completed slice; pzDrag holds the
@@ -545,16 +546,52 @@ function createCookingGame(words, callbacks) {
      whole, 1 is fully diced. Chopping reveals VEG_CELLS regions one at
      a time (see vegCellRect) rather than the whole vegetable flipping
      between fixed looks, so progress reads directly on the shape. ── */
+  /* Chopping used to reveal six big outlined rectangles of the same grid
+     the pizza sauce used, so a "diced" tomato came out as a red circle
+     with squares stamped on it. Both vegetables now break into a scatter
+     of small irregular pieces, revealed a few at a time. Positions come
+     from a fixed hash, not Math.random() -- a function redrawn every
+     frame would re-place every piece 60 times a second. */
+  function dicedPieces(n,seed0,wLo,wHi,hLo,hHi){
+    var out=[], seed=seed0;
+    function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
+    for(var i=0;i<n;i++)
+      out.push({a:rnd()*Math.PI*2, rad:Math.sqrt(rnd())*0.9, rot:(rnd()-0.5)*Math.PI,
+                w:wLo+rnd()*(wHi-wLo), h:hLo+rnd()*(hHi-hLo), pale:rnd()<0.4});
+    return out;
+  }
+  var TOM_DICE=dicedPieces(96,20260905,0.17,0.28,0.14,0.22);
+  var CAB_SHRED=dicedPieces(88,19981231,0.34,0.58,0.06,0.10);
+  function drawDiced(cx,cy,r,pct,pieces,squash,col,colPale,edge){
+    var n=Math.round(Math.max(0,Math.min(1,pct))*pieces.length);
+    for(var i=0;i<n;i++){
+      var d=pieces[i];
+      var px=cx+Math.cos(d.a)*d.rad*r, py=cy+Math.sin(d.a)*d.rad*r*squash;
+      var w=d.w*r, h=d.h*r;
+      ctx.save();
+      ctx.translate(px,py); ctx.rotate(d.rot);
+      fillRR(-w/2,-h/2,w,h,Math.min(w,h)*0.35, d.pale?colPale:col);
+      if(edge){
+        ctx.strokeStyle=edge; ctx.lineWidth=1.5;
+        rr(-w/2,-h/2,w,h,Math.min(w,h)*0.35); ctx.stroke();
+      }
+      ctx.fillStyle='rgba(255,255,255,.22)';
+      fillRR(-w/2+w*0.12,-h/2+h*0.16,w*0.34,h*0.3,h*0.15,'rgba(255,255,255,.22)');
+      ctx.restore();
+    }
+  }
   function sTomato(cx,cy,r,pct){
     pct=pct||0;
-    var choppedN=Math.round(pct*VEG_CELLS);
     ctx.save();
     ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
-    ctx.fillStyle=C.tom; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    // The body darkens as it is chopped, so the pieces read on top of it.
+    ctx.fillStyle=pct>0.05?C.tomD:C.tom;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
     ctx.shadowColor='transparent';
-    if(choppedN<VEG_CELLS){
+    if(pct<1){
       // whole-tomato character (calyx + shine) fades out as it gets chopped
-      ctx.globalAlpha=1-pct*.7;
+      ctx.globalAlpha=1-pct*.85;
+      ctx.fillStyle=C.tom; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
       ctx.fillStyle=C.tomLeaf;
       for(var k=0;k<5;k++){
         var a0=(k/5)*Math.PI*2-Math.PI/2;
@@ -565,20 +602,11 @@ function createCookingGame(words, callbacks) {
       ctx.beginPath(); ctx.arc(cx,cy-r*.86,r*.13,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='rgba(255,255,255,.4)';
       ctx.beginPath(); ctx.ellipse(cx-r*.28,cy-r*.3,r*.22,r*.15,-0.5,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle=C.tomHi; ctx.globalAlpha=.75*(1-pct*.7);
-      ctx.beginPath(); ctx.ellipse(cx-r*.22,cy-r*.32,r*.1,r*.06,-0.5,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
     }
-    if(choppedN>0){
-      ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
-      for(var i=0;i<choppedN;i++){
-        var c=vegCellRect(cx,cy,r,i);
-        ctx.fillStyle=C.tomD; ctx.fillRect(c.x,c.y,c.w,c.h);
-        ctx.fillStyle='rgba(255,255,255,.28)';
-        ctx.beginPath(); ctx.ellipse(c.cx-c.w*.15,c.cy-c.h*.12,c.w*.2,c.h*.15,0,0,Math.PI*2); ctx.fill();
-        ctx.strokeStyle=C.outline; ctx.lineWidth=1.5; ctx.globalAlpha=.5;
-        ctx.strokeRect(c.x,c.y,c.w,c.h); ctx.globalAlpha=1;
-      }
+    if(pct>0){
+      ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r-2,0,Math.PI*2); ctx.clip();
+      drawDiced(cx,cy,r,pct,TOM_DICE,1,C.tomD,C.tom,'rgba(120,26,18,.55)');
       ctx.restore();
     }
     ctx.strokeStyle=C.outline; ctx.lineWidth=3;
@@ -587,28 +615,19 @@ function createCookingGame(words, callbacks) {
   }
   function sCabbage(cx,cy,r,pct){
     pct=pct||0;
-    var choppedN=Math.round(pct*VEG_CELLS);
     ctx.save();
     ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
     for(var i=4;i>=0;i--){ctx.fillStyle=i%2===0?C.cab:C.cabD;ctx.beginPath();ctx.ellipse(cx,cy+i*4,r-i*7,(r-i*7)*.85,0,0,Math.PI*2);ctx.fill();}
     ctx.shadowColor='transparent';
-    if(choppedN<VEG_CELLS){
-      ctx.fillStyle=C.cabHi; ctx.globalAlpha=.5*(1-pct*.7);
+    if(pct<1){
+      ctx.fillStyle=C.cabHi; ctx.globalAlpha=.5*(1-pct*.85);
       ctx.beginPath(); ctx.ellipse(cx-r*.22,cy-r*.28,r*.26,r*.16,-0.4,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
     }
-    if(choppedN>0){
-      ctx.save(); ctx.beginPath(); ctx.ellipse(cx,cy,r,r*.85,0,0,Math.PI*2); ctx.clip();
-      for(var i2=0;i2<choppedN;i2++){
-        var c=vegCellRect(cx,cy,r*.9,i2);
-        ctx.fillStyle=C.cab; ctx.fillRect(c.x,c.y,c.w,c.h);
-        ctx.strokeStyle=C.cabD; ctx.lineWidth=1.5;
-        ctx.beginPath(); ctx.moveTo(c.x,c.cy); ctx.lineTo(c.x+c.w,c.cy); ctx.stroke();
-        ctx.fillStyle='rgba(255,255,255,.22)';
-        ctx.beginPath(); ctx.ellipse(c.cx-c.w*.15,c.cy-c.h*.15,c.w*.16,c.h*.1,0,0,Math.PI*2); ctx.fill();
-        ctx.strokeStyle=C.outline; ctx.lineWidth=1.5; ctx.globalAlpha=.4;
-        ctx.strokeRect(c.x,c.y,c.w,c.h); ctx.globalAlpha=1;
-      }
+    if(pct>0){
+      ctx.save(); ctx.beginPath(); ctx.ellipse(cx,cy,r-2,(r-2)*.85,0,0,Math.PI*2); ctx.clip();
+      // Long thin strips rather than dice -- shredded cabbage, not cubed.
+      drawDiced(cx,cy,r,pct,CAB_SHRED,0.85,C.cab,C.cabHi,'rgba(70,110,52,.5)');
       ctx.restore();
     }
     ctx.strokeStyle=C.outline; ctx.lineWidth=3;
@@ -636,37 +655,68 @@ function createCookingGame(words, callbacks) {
     rr(cx-w/2,topY,w,botY-topY,w/2); ctx.stroke();
     ctx.restore();
   }
-  function sSausageFull(cuts){
-    sSausageBody(STOP,SAU_BOT,SCX,LW);
-    // A precise tap (score >= 70, same threshold as the "🎯 ตรง!" label
-    // below) draws as a clean glowing line; a sloppy tap draws jagged with
-    // a bit of exposed pink "meat" showing through the torn cut.
-    for(var ci=0;ci<Math.min(cuts,G.cutY.length);ci++){
-      var ty=G.cutY[ci], good=(G.cutSc[ci]||0)>=70;
-      ctx.save();
-      if(good){
-        ctx.strokeStyle='#fff'; ctx.lineWidth=3.5;
-        ctx.shadowColor=C.acc; ctx.shadowBlur=10;
-        ctx.beginPath(); ctx.moveTo(SCX-LW/2-10,ty); ctx.lineTo(SCX+LW/2+10,ty); ctx.stroke();
-      }else{
-        ctx.fillStyle='#F2A79E';
-        ctx.beginPath(); ctx.ellipse(SCX,ty+3,LW*.32,7,0,0,Math.PI*2); ctx.fill();
-        ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.lineCap='round';
-        ctx.beginPath();
-        var zx=SCX-LW/2-8, zStep=(LW+16)/6, zDir=1;
-        ctx.moveTo(zx,ty);
-        for(var zi=0;zi<6;zi++){zx+=zStep; ctx.lineTo(zx,ty+zDir*5); zDir*=-1;}
-        ctx.stroke();
+  /* Cuts were a white glowing line drawn across an intact sausage -- the
+     same "scratch on top of the food" the pizza had. The sausage is now
+     genuinely divided: each piece is the whole body clipped to its own
+     span and slid apart, so the flat ends are real cut faces. */
+  function cutFace(cx,y,halfW,good){
+    ctx.save();
+    ctx.fillStyle='#F2A79E';
+    ctx.beginPath(); ctx.ellipse(cx,y,halfW,5,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.3)';
+    ctx.beginPath(); ctx.ellipse(cx-halfW*.25,y-1,halfW*.3,2,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=2.5;
+    if(good){
+      ctx.beginPath(); ctx.ellipse(cx,y,halfW,5,0,0,Math.PI*2); ctx.stroke();
+    }else{
+      // A sloppy cut leaves a torn, uneven face instead of a clean oval.
+      ctx.beginPath();
+      for(var i=0;i<=10;i++){
+        var t=i/10, ang=Math.PI*t;
+        var wob=1+((i%2)?0.16:-0.16);
+        var px=cx-Math.cos(ang)*halfW, py=y+Math.sin(ang)*5*wob;
+        if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);
       }
-      ctx.restore();
+      for(var j=10;j>=0;j--){
+        var t2=j/10, ang2=Math.PI*t2, wob2=1+((j%2)?-0.16:0.16);
+        ctx.lineTo(cx-Math.cos(ang2)*halfW, y-Math.sin(ang2)*5*wob2);
+      }
+      ctx.closePath(); ctx.stroke();
     }
-    if(cuts>=2){
-      var y0=Math.min(G.cutY[0],G.cutY[1]), y1=Math.max(G.cutY[0],G.cutY[1]);
+    ctx.restore();
+  }
+  function sSausageFull(cuts){
+    var n=Math.min(cuts,G.cutY.length);
+    if(n<=0){ sSausageBody(STOP,SAU_BOT,SCX,LW); return; }
+    // Pair each cut with its own score before sorting by position -- cuts
+    // are recorded in the order they were made, not top to bottom, so
+    // indexing scores by segment would mislabel a clean cut as a torn one.
+    var cs=[];
+    for(var i=0;i<n;i++) cs.push({y:G.cutY[i], sc:G.cutSc[i]||0});
+    cs.sort(function(a,b){return a.y-b.y;});
+    var bounds=[STOP];
+    cs.forEach(function(c){ bounds.push(c.y); });
+    bounds.push(SAU_BOT);
+    var segs=bounds.length-1;
+    for(var k=0;k<segs;k++){
+      var y0=bounds[k], y1=bounds[k+1], off=(k-(segs-1)/2)*6;
+      ctx.save();
+      ctx.translate(0,off);
+      // Clipping the whole body keeps its shading and outline intact while
+      // giving each piece flat ends exactly where the knife landed.
+      ctx.beginPath(); ctx.rect(SCX-LW/2-8,y0,LW+16,y1-y0); ctx.clip();
+      sSausageBody(STOP,SAU_BOT,SCX,LW);
+      ctx.restore();
+      if(k>0)      cutFace(SCX,y0+off,LW/2-2,cs[k-1].sc>=70);
+      if(k<segs-1) cutFace(SCX,y1+off,LW/2-2,cs[k].sc>=70);
+    }
+    if(n>=2){
+      var a=Math.min(G.cutY[0],G.cutY[1]), b=Math.max(G.cutY[0],G.cutY[1]);
       ctx.save();
       ctx.fillStyle='rgba(240,165,0,0.2)';
-      ctx.fillRect(SCX-LW/2-5,y0,LW+10,y1-y0);
+      ctx.fillRect(SCX-LW/2-5,a,LW+10,b-a);
       ctx.strokeStyle=C.gold; ctx.lineWidth=2; ctx.setLineDash([4,3]);
-      ctx.strokeRect(SCX-LW/2-5,y0,LW+10,y1-y0);
+      ctx.strokeRect(SCX-LW/2-5,a,LW+10,b-a);
       ctx.setLineDash([]); ctx.restore();
     }
   }
@@ -876,6 +926,47 @@ function createCookingGame(words, callbacks) {
   // The canister the player shakes over the pizza. bob (0..1) drops it and
   // tips it forward, so every tap is a visible shake instead of a number
   // quietly going up -- the same read as the knife swinging on each chop.
+  /* Chopping had a knife that swung on every tap; cracking, pressing,
+     peeling and salting had nothing at all, so those taps only nudged a
+     counter. They now all drive a tool through the same 0..1 bob: down on
+     the strike, back up after. Only one of these steps is ever on screen,
+     so they share one pair of fields. */
+  function toolBob(ts){
+    if(!G.toolAnim)return 0;
+    var e=ts-G.toolAt, d=280;
+    if(e>=d){ G.toolAnim=0; return 0; }
+    return e<d/2 ? e/(d/2) : (d-e)/(d/2);
+  }
+  // A burger press: flat plate on a stem, shoved down onto the patty.
+  function sPressPlate(cx,cy,bob){
+    ctx.save();
+    ctx.translate(cx,cy+bob*46);
+    ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    fillRR(-70,0,140,16,8,'#C3C8D0');
+    ctx.shadowColor='transparent';
+    fillRR(-70,0,140,6,3,'rgba(255,255,255,.6)');
+    fillRR(-11,-34,22,36,8,'#8E949E');
+    fillRR(-30,-50,60,19,9,'#5C626B');
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    rr(-70,0,140,16,8); ctx.stroke();
+    rr(-30,-50,60,19,9); ctx.stroke();
+    ctx.restore();
+  }
+  // A straight peeler, drawn stroking down the side of the potato.
+  function sPeeler(cx,cy,bob){
+    ctx.save();
+    ctx.translate(cx,cy+bob*54); ctx.rotate(0.22);
+    ctx.shadowColor=C.sh; ctx.shadowBlur=7; ctx.shadowOffsetY=3;
+    fillRR(-9,-52,18,62,9,'#4B5058');            // handle
+    ctx.shadowColor='transparent';
+    fillRR(-6,-48,6,54,3,'rgba(255,255,255,.35)');
+    fillRR(-13,8,26,10,4,'#AEB4BD');             // yoke
+    fillRR(-11,16,22,7,3,'#E9EDF2');             // blade
+    ctx.strokeStyle=C.outline; ctx.lineWidth=2.5;
+    rr(-9,-52,18,62,9); ctx.stroke();
+    rr(-13,8,26,10,4); ctx.stroke();
+    ctx.restore();
+  }
   function sCheeseShaker(cx,cy,bob){
     ctx.save();
     ctx.translate(cx,cy+bob*26); ctx.rotate(-0.32-bob*0.5);
@@ -986,25 +1077,85 @@ function createCookingGame(words, callbacks) {
     rr(bx-bw/2,BC_TOP,bw,BC_BOT-BC_TOP,18); ctx.stroke();
     ctx.restore();
   }
-  // Mirrors sSausageFull's clean-vs-jagged cut-mark convention exactly
-  // (score >= 70 = clean glow line, else a jagged zigzag) -- same visual
-  // language, re-themed as bacon "flip" marks instead of sausage cuts.
+  // Same treatment as the sausage: real strips that come apart, with a
+  // cut face at each end, rather than lines drawn over an intact rasher.
   function sBaconFull(cuts){
-    sBaconStrip();
     var bx=VW/2, bw=70;
-    for(var ci=0;ci<Math.min(cuts,G.baconCutY.length);ci++){
-      var ty=G.baconCutY[ci], good=(G.baconSc[ci]||0)>=70;
+    var n=Math.min(cuts,G.baconCutY.length);
+    if(n<=0){ sBaconStrip(); return; }
+    var cs=[];
+    for(var i=0;i<n;i++) cs.push({y:G.baconCutY[i], sc:G.baconSc[i]||0});
+    cs.sort(function(a,b){return a.y-b.y;});
+    var bounds=[BC_TOP];
+    cs.forEach(function(c){ bounds.push(c.y); });
+    bounds.push(BC_BOT);
+    var segs=bounds.length-1;
+    for(var k=0;k<segs;k++){
+      var y0=bounds[k], y1=bounds[k+1], off=(k-(segs-1)/2)*6;
       ctx.save();
-      if(good){
-        ctx.strokeStyle='#fff'; ctx.lineWidth=3.5;
-        ctx.shadowColor=C.acc; ctx.shadowBlur=10;
-        ctx.beginPath(); ctx.moveTo(bx-bw/2-10,ty); ctx.lineTo(bx+bw/2+10,ty); ctx.stroke();
-      }else{
-        ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.translate(0,off);
+      ctx.beginPath(); ctx.rect(bx-bw/2-8,y0,bw+16,y1-y0); ctx.clip();
+      sBaconStrip();
+      ctx.restore();
+      if(k>0)      cutFace(bx,y0+off,bw/2-3,cs[k-1].sc>=70);
+      if(k<segs-1) cutFace(bx,y1+off,bw/2-3,cs[k].sc>=70);
+    }
+  }
+  /* Toasting was a slice of bread floating on the worktop with a timing
+     bar -- the same "where is the appliance?" gap the oven filled for the
+     pizza. The bread now sits down in a real toaster while it is held,
+     glowing from the slot, and pops up when the finger comes off. */
+  var TSTR={x:94,y:318,w:292,h:142};
+  var TSLOT={x:128,y:328,w:224,h:20};
+  function drawToaster(ts,frac,hot,popT){
+    var flick=0.9+0.1*Math.sin(ts*0.023)+0.05*Math.sin(ts*0.051);
+    var heat=Math.min(1,frac*1.3)*(hot?flick:0.68);
+    fillRR(TSTR.x+5,TSTR.y+9,TSTR.w,TSTR.h,26,'rgba(0,0,0,.32)');
+    fillRR(TSTR.x,TSTR.y,TSTR.w,TSTR.h,26,'#C7CDD5');
+    fillRR(TSTR.x+14,TSTR.y+TSTR.h*0.4,TSTR.w-28,TSTR.h*0.34,14,'rgba(255,255,255,.26)');
+    fillRR(TSTR.x+14,TSTR.y+TSTR.h*0.4,TSTR.w-28,7,4,'rgba(255,255,255,.5)');
+    // Slot, and the elements glowing down inside it.
+    fillRR(TSLOT.x,TSLOT.y,TSLOT.w,TSLOT.h,11,'#200F06');
+    ctx.save();
+    ctx.beginPath(); rr(TSLOT.x,TSLOT.y,TSLOT.w,TSLOT.h,11); ctx.clip();
+    var gg=ctx.createLinearGradient(0,TSLOT.y+TSLOT.h,0,TSLOT.y);
+    gg.addColorStop(0,'rgba(255,138,32,'+(0.25+0.65*heat)+')');
+    gg.addColorStop(1,'rgba(255,80,10,0)');
+    ctx.fillStyle=gg; ctx.fillRect(TSLOT.x,TSLOT.y,TSLOT.w,TSLOT.h);
+    ctx.restore();
+    // Bread, clipped so it reads as rising out of the slot.
+    var peek=70+(122-70)*popT;
+    var breadCY=TSLOT.y+75-peek;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,0,VW,TSLOT.y+TSLOT.h*0.5); ctx.clip();
+    sToastSlice(VW/2,breadCY,frac);
+    ctx.restore();
+    // Front lip drawn over the bread's base, sealing it into the slot.
+    fillRR(TSLOT.x-3,TSLOT.y+TSLOT.h*0.5,TSLOT.w+6,9,4,'#AEB5BE');
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    rr(TSLOT.x,TSLOT.y,TSLOT.w,TSLOT.h,11); ctx.stroke();
+    // Lever: down while toasting, sprung up once it pops.
+    var lvX=TSTR.x+TSTR.w-15, lvY=TSTR.y+40+(1-popT)*52;
+    fillRR(lvX-7,TSTR.y+34,14,92,7,'#9AA1AA');
+    fillRR(lvX-15,lvY,30,17,8,'#4C525C');
+    ctx.strokeStyle=C.outline; ctx.lineWidth=2.5; rr(lvX-15,lvY,30,17,8); ctx.stroke();
+    // Browning dial, sweeping with the toast.
+    var dX=TSTR.x+44, dY=TSTR.y+TSTR.h-40;
+    ctx.fillStyle='#565C66'; ctx.beginPath(); ctx.arc(dX,dY,16,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#EEF1F5'; ctx.lineWidth=3.5; ctx.lineCap='round';
+    var da=-Math.PI*0.75+frac*Math.PI*1.5;
+    ctx.beginPath(); ctx.moveTo(dX,dY); ctx.lineTo(dX+Math.cos(da)*11,dY+Math.sin(da)*11); ctx.stroke();
+    ctx.fillStyle=hot?'#FF5A3C':'#5B6069';
+    ctx.beginPath(); ctx.arc(dX+56,dY,7,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3; rr(TSTR.x,TSTR.y,TSTR.w,TSTR.h,26); ctx.stroke();
+    if(hot){
+      ctx.save();
+      ctx.strokeStyle='rgba(255,196,140,.28)'; ctx.lineWidth=4; ctx.lineCap='round';
+      for(var i=0;i<2;i++){
+        var wx=VW/2-46+i*92, ph=ts*0.0037+i*1.9;
         ctx.beginPath();
-        var zx=bx-bw/2-8, zStep=(bw+16)/6, zDir=1;
-        ctx.moveTo(zx,ty);
-        for(var zi=0;zi<6;zi++){zx+=zStep; ctx.lineTo(zx,ty+zDir*5); zDir*=-1;}
+        ctx.moveTo(wx,TSLOT.y-8);
+        ctx.quadraticCurveTo(wx+Math.sin(ph)*12,TSLOT.y-28,wx+Math.sin(ph+0.9)*7,TSLOT.y-46);
         ctx.stroke();
       }
       ctx.restore();
@@ -1836,6 +1987,8 @@ function createCookingGame(words, callbacks) {
     if(G.eggCracks>=EGG_TAPS_NEEDED) sEggBroken(EGG_CX,EGG_CY,EGG_R);
     else sEggCracked(EGG_CX,EGG_CY,EGG_R,G.eggCracks);
     ctx.restore();
+    // The knife swings in on each tap, the same read as the chopping step.
+    sKnife(EGG_CX+EGG_R+48,EGG_CY-26,-toolBob(ts)*Math.PI/2);
     ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.4)';
     T('ตอก '+G.eggTaps+' ครั้ง',VW/2,EGG_CY+EGG_R+40,'center');
     if(G.eggDone){
@@ -1899,7 +2052,10 @@ function createCookingGame(words, callbacks) {
     var frac=G.toastDone?G.toastTapVal:holdFrac('toast',TOAST_DUR,ts);
     G.toastVal=frac;
     if(!G.toastDone&&frac>=1) finishToast(1);
-    sToastSlice(VW/2,340,frac);
+    if(G.toastDone&&!G.toastDoneAt)G.toastDoneAt=ts;
+    // Pops up once the finger comes off, over about a third of a second.
+    var popT=G.toastDone?Math.min(1,(ts-G.toastDoneAt)/340):0;
+    drawToaster(ts,frac,holding('toast')&&!G.toastDone,popT);
     fillRR(40,470,VW-80,20,10,'#2A1D14');
     var goodX0=40+(VW-80)*TOAST_GOOD[0], goodX1=40+(VW-80)*TOAST_GOOD[1];
     ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(goodX0,470,goodX1-goodX0,20);
@@ -1926,10 +2082,15 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='#EDEDED'; ctx.beginPath(); ctx.ellipse(VW/2,460,150,90,0,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle=C.outline; ctx.lineWidth=3; ctx.beginPath(); ctx.ellipse(VW/2,460,150,90,0,0,Math.PI*2); ctx.stroke();
     ctx.restore();
-    var plateSpots=[{dx:-70,dy:-10},{dx:20,dy:20},{dx:60,dy:-25}];
-    G.plateDropped.forEach(function(d,i){
-      var sp=plateSpots[i%plateSpots.length];
-      sPlateItem(d.ing,VW/2+sp.dx,460+sp.dy,90);
+    G.plateDropped.forEach(function(d){
+      var t=Math.min(1,(ts-d.dropStart)/DROP_DUR), ease=1-(1-t)*(1-t);
+      var cy=d.fromY+(d.toY-d.fromY)*ease;
+      var landT=ts-(d.dropStart+DROP_DUR), sq=1;
+      if(landT>=0&&landT<180){ var lt=landT/180; sq=1-0.08*Math.sin(lt*Math.PI)*(1-lt); }
+      ctx.save();
+      ctx.translate(d.x,cy); ctx.scale(1/sq,sq); ctx.translate(-d.x,-cy);
+      sPlateItem(d.ing,d.x,cy,90);
+      ctx.restore();
     });
     if(G.plateIdx<PLATE_LIST.length){
       ctx.strokeStyle='rgba(46,196,182,.38)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
@@ -2087,6 +2248,7 @@ function createCookingGame(words, callbacks) {
     ctx.save(); ctx.translate(BG_CX,BG_CY); ctx.scale(1/sq,sq); ctx.translate(-BG_CX,-BG_CY);
     sPatty(BG_CX,BG_CY,pressPct,false);
     ctx.restore();
+    sPressPlate(BG_CX,BG_CY-90,toolBob(ts));
     ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.45)';
     T('กด '+G.pattyTaps+' ครั้ง',VW/2,BG_CY+110,'center');
     if(G.pattyDone){
@@ -2240,6 +2402,7 @@ function createCookingGame(words, callbacks) {
     ctx.save(); ctx.translate(FR_CX,FR_CY); ctx.scale(1/sq,sq); ctx.translate(-FR_CX,-FR_CY);
     sPotato(FR_CX,FR_CY,peelPct);
     ctx.restore();
+    sPeeler(FR_CX+POTATO_RX+34,FR_CY-58,toolBob(ts));
     ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.45)';
     T('ปอก '+G.peelTaps+' ครั้ง',VW/2,FR_CY+POTATO_RY+42,'center');
     if(G.peelDone){
@@ -2685,6 +2848,7 @@ function createCookingGame(words, callbacks) {
     if(s===S.CAB){G.ing='cab';G.taps=0;G.choppedCount=0;G.chopRun=false;G.chopDone=false;G.chopStart=0;G.kAnim=0;G.chopPunch=0;G.starPunch=0;G.lastStarN=0;}
     if(s===S.SAU){G.kY=260;G.kDir=1;G.kSpd=2.8;G.cuts=0;G.cutSc=[];G.cutY=[];G.cutAt=[];G.scores.sau=0;}
     if(s===S.CMB){G.cList=['tom','cab','sau'];G.cIdx=0;G.sX=240;G.sDir=1;G.dropped=[];G.allDone=false;}
+    G.toolAnim=0; G.toolAt=0;
     if(s===SP.SAUCE){G.sauceCv=null;G.sauceMc=null;G.sauceLast=null;G.sauceCover=0;G.sauceRun=false;G.sauceStart=0;G.sauceDone=false;}
     if(s===SP.CHEESE){G.chAnim=0;G.chFlakes=[];}
     if(s===SP.CUT){G.pzCuts=[];G.pzCutSc=[];G.pzDrag=null;G.pzCutDone=false;}
@@ -2976,6 +3140,7 @@ function createCookingGame(words, callbacks) {
           G.eggTaps++;
           if(G.eggCracks<EGG_TAPS_NEEDED)G.eggCracks++;
           G.eggPunch=now;
+          G.toolAnim=1; G.toolAt=now;
           playChop();
           if(G.eggCracks>=EGG_TAPS_NEEDED&&!G.eggDone)finishEgg();
         }
@@ -3003,7 +3168,16 @@ function createCookingGame(words, callbacks) {
       if(G.st===SB.PLATE){
         if(G.plateIdx<PLATE_LIST.length){
           var pAcc=Math.max(0,1-Math.abs(G.plateX-VW/2)/(VW/2-45));
-          G.plateDropped.push({ing:PLATE_LIST[G.plateIdx],acc:pAcc});
+          // Keep it on the plate, but land it where the player let go.
+          var pX=G.plateX;
+          // Nudge clear of anything already plated: two items released at
+          // the same point would stack exactly, hiding the earlier one.
+          G.plateDropped.forEach(function(o){
+            if(Math.abs(pX-o.x)<46) pX=o.x+(pX>=o.x?46:-46);
+          });
+          pX=Math.max(VW/2-96,Math.min(VW/2+96,pX));
+          G.plateDropped.push({ing:PLATE_LIST[G.plateIdx],acc:pAcc,x:pX,
+                               dropStart:now,fromY:310,toY:446+G.plateIdx*8});
           G.plateIdx++;
           if(sc.sfxLand)sc.sfxLand.play();
         }
@@ -3025,6 +3199,7 @@ function createCookingGame(words, callbacks) {
           G.pattyTaps++;
           if(G.pattyCount<PATTY_TAPS_NEEDED)G.pattyCount++;
           G.pattyPunch=now;
+          G.toolAnim=1; G.toolAt=now;
           playChop();
           if(G.pattyCount>=PATTY_TAPS_NEEDED&&!G.pattyDone)finishPatty();
         }
@@ -3071,6 +3246,7 @@ function createCookingGame(words, callbacks) {
           G.peelTaps++;
           if(G.peelCount<PEEL_TAPS_NEEDED)G.peelCount++;
           G.peelPunch=now;
+          G.toolAnim=1; G.toolAt=now;
           playChop();
           if(G.peelCount>=PEEL_TAPS_NEEDED&&!G.peelDone)finishPeel();
         }
