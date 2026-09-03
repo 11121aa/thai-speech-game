@@ -240,7 +240,7 @@ function createCookingGame(words, callbacks) {
       cheeseTaps:0, cheeseCount:0, cheeseRun:false, cheeseDone:false, cheeseStart:0,
       cheesePunch:0, cheeseFinalPct:0,
       toppingIdx:0, toppingX:VW/2, toppingDir:1, toppingSpd:3.2, toppingDropped:[], toppingAllDone:false,
-      bakeRun:false, bakeStart:0, bakeDone:false, bakeVal:0, bakeTapVal:0,
+      bakeHeld:0, bakeHoldAt:0, bakeHolding:false, bakeDoneAt:0, bakeDone:false, bakeVal:0, bakeTapVal:0,
       // pzCuts: one {ang, sc, at} per completed slice; pzDrag holds the
       // in-progress stroke's start point while the finger is down.
       pzCuts:[], pzCutSc:[], pzDrag:null, pzCutDone:false,
@@ -248,19 +248,19 @@ function createCookingGame(words, callbacks) {
       // ── Breakfast ──
       eggTaps:0, eggCracks:0, eggRun:false, eggDone:false, eggStart:0, eggPunch:0,
       baconY:260, baconDir:1, baconSpd:2.6, baconCuts:0, baconSc:[], baconCutY:[], baconAt:[],
-      toastRun:false, toastStart:0, toastDone:false, toastVal:0, toastTapVal:0,
+      toastHeld:0, toastHoldAt:0, toastHolding:false, toastDoneAt:0, toastDone:false, toastVal:0, toastTapVal:0,
       plateIdx:0, plateX:VW/2, plateDir:1, plateSpd:3.2, plateDropped:[], plateAllDone:false,
 
       // ── Burger ──
       pattyTaps:0, pattyCount:0, pattyRun:false, pattyDone:false, pattyStart:0, pattyPunch:0, pattyFinalPct:0,
-      grillRun:false, grillStart:0, grillDone:false, grillVal:0, grillTapVal:0, grillFlip:0,
+      grillHeld:0, grillHoldAt:0, grillHolding:false, grillDoneAt:0, grillDone:false, grillVal:0, grillTapVal:0, grillFlip:0,
       bgVegIdx:0, bgVegX:VW/2, bgVegDir:1, bgVegSpd:3.2, bgVegDropped:[], bgVegAllDone:false,
       stackX:VW/2, stackDir:1, stackSpd:4.2, stackDone:false, stackDropAt:0,
 
       // ── Fries ──
       peelTaps:0, peelCount:0, peelRun:false, peelDone:false, peelStart:0, peelPunch:0, peelFinalPct:0,
       frSlices:[], frSliceSc:[], frDrag:null, frSliceDone:false,
-      fryRun:false, fryStart:0, fryDone:false, fryVal:0, fryTapVal:0,
+      fryHeld:0, fryHoldAt:0, fryHolding:false, fryDoneAt:0, fryDone:false, fryVal:0, fryTapVal:0,
       saltCount:0, saltRun:false, saltDone:false, saltStart:0, saltPunch:0, saltGrains:[],
     };
   }
@@ -392,6 +392,68 @@ function createCookingGame(words, callbacks) {
     if(pulsing) ctx.restore();
   }
   function hit(px,py,x,y,w,h){return px>=x&&px<=x+w&&py>=y&&py<=y+h;}
+
+  // ── Hold to cook, let go to take it out ──────────────────────────────
+  // Baking, toasting, grilling and frying are one mechanic wearing four
+  // costumes: press and HOLD the big button to cook, release to take the
+  // food out. The gauge only advances while a finger is actually down, so
+  // the child drives the timing instead of chasing a bar that runs on its
+  // own -- and letting go does exactly what tapping the button used to do.
+  var HOLD_W=300, HOLD_H=76, HOLD_PAD=36;
+  var BAKE_BTN_Y=600, TOAST_BTN_Y=506, GRILL_BTN_Y=582, FRY_BTN_Y=630;
+  // A release this early is a fumbled press, not a decision -- nobody means
+  // "take it out" a third of a second in, with the food still visibly raw.
+  // Under this the hold just pauses so they can press again.
+  var HOLD_MIN=0.06;
+  // Banks the time since the last tick -- but never more than a couple of
+  // frames' worth. When the render loop stalls (tab switched away, phone
+  // locked, a long GC pause) the next timestamp arrives seconds later, and
+  // without this clamp a pan someone is still holding would jump from raw
+  // to burnt across a gap they never experienced.
+  var HOLD_MAX_STEP=120;
+  function holdTick(p,ts){
+    if(G[p+'Holding']){
+      G[p+'Held']+=Math.min(ts-G[p+'HoldAt'],HOLD_MAX_STEP);
+      G[p+'HoldAt']=ts;
+    }
+    return G[p+'Held'];
+  }
+  function holdFrac(p,dur,ts){return Math.min(1,holdTick(p,ts)/dur);}
+  function holding(p){return !!G[p+'Holding'];}
+  function holdPress(p,ts){if(!G[p+'Holding']){G[p+'Holding']=true;G[p+'HoldAt']=ts;}}
+  // Banks the time held so far and returns the frac to score, or -1 when
+  // there was no hold to end.
+  function holdLift(p,dur,ts){
+    if(!G[p+'Holding'])return -1;
+    var held=holdTick(p,ts); G[p+'Holding']=false; G[p+'HoldAt']=0;
+    return Math.min(1,held/dur);
+  }
+  function holdReset(p){G[p+'Held']=0;G[p+'HoldAt']=0;G[p+'Holding']=false;G[p+'DoneAt']=0;G[p+'Done']=false;G[p+'Val']=0;}
+  // Deliberately oversized and low on the screen: a thumb rests here for
+  // seconds at a time, so it is a slab rather than a tap target. It sinks
+  // in and glows while held so it is obvious the food is cooking *now*.
+  function drawHoldBtn(y,txt,held,ts){
+    var x=VW/2-HOLD_W/2, dy=held?4:0;
+    var s=held?1:1+0.02*Math.sin(ts*0.005);
+    ctx.save();
+    ctx.translate(VW/2,y+HOLD_H/2); ctx.scale(s,s); ctx.translate(-VW/2,-(y+HOLD_H/2));
+    fillRR(x,y+8,HOLD_W,HOLD_H,20,'rgba(0,0,0,.4)');
+    if(held){ctx.shadowColor='rgba(255,190,60,.9)';ctx.shadowBlur=30;}
+    fillRR(x,y+dy,HOLD_W,HOLD_H,20,held?'#C9821F':C.gold);
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=3;
+    rr(x+5,y+dy+5,HOLD_W-10,HOLD_H-10,15); ctx.stroke();
+    ctx.textBaseline='middle';
+    ctx.font='bold 21px Prompt,sans-serif'; ctx.fillStyle=C.w;
+    T(txt,VW/2,y+dy+HOLD_H/2-10,'center');
+    ctx.font='bold 14px Prompt,sans-serif'; ctx.fillStyle='rgba(255,255,255,.92)';
+    T(held?'ปล่อยนิ้ว = หยิบออก':'แตะค้างไว้',VW/2,y+dy+HOLD_H/2+17,'center');
+    ctx.textBaseline='alphabetic';
+    ctx.restore();
+  }
+  function hitHoldBtn(px,py,y){
+    return hit(px,py,VW/2-HOLD_W/2-HOLD_PAD,y-HOLD_PAD,HOLD_W+HOLD_PAD*2,HOLD_H+HOLD_PAD*2);
+  }
 
   function drawBg(){
     if(bgImg){
@@ -1546,10 +1608,8 @@ function createCookingGame(words, callbacks) {
   function drawPizzaBake(ts){
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
-    T('กดหยิบออกตอนสุกกำลังดี!',VW/2,SH+28,'center');
-    if(!G.bakeRun){G.bakeRun=true;G.bakeStart=ts;}
-    var elapsed=ts-G.bakeStart;
-    var frac=G.bakeDone?G.bakeTapVal:Math.min(1,elapsed/BAKE_DUR);
+    T('แตะค้างเพื่ออบ แล้วปล่อยตอนสุกกำลังดี!',VW/2,SH+28,'center');
+    var frac=G.bakeDone?G.bakeTapVal:holdFrac('bake',BAKE_DUR,ts);
     G.bakeVal=frac;
     if(!G.bakeDone&&frac>=1) finishBake(1);
     var tintCol = frac<BAKE_GOOD[0] ? '#F3DCA6' : frac>BAKE_GOOD[1] ? '#7A4A1E' : '#E0A73D';
@@ -1578,7 +1638,7 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(goodX0,570,goodX1-goodX0,20);
     fillRR(40,570,(VW-80)*frac,20,10, frac<BAKE_GOOD[0]?C.acc: frac<=BAKE_GOOD[1]?C.gold:C.red);
     if(!G.bakeDone){
-      drawBtn(VW/2-100,606,200,50,'หยิบออกจากเตา! 🔥',C.gold,ts);
+      drawHoldBtn(BAKE_BTN_Y,'อบพิซซ่า 🔥',holding('bake'),ts);
     }else{
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
@@ -1692,10 +1752,8 @@ function createCookingGame(words, callbacks) {
   function drawBreakfastToast(ts){
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
-    T('กดป๊อปตอนสีเหลืองทองพอดี!',VW/2,SH+28,'center');
-    if(!G.toastRun){G.toastRun=true;G.toastStart=ts;}
-    var elapsed=ts-G.toastStart;
-    var frac=G.toastDone?G.toastTapVal:Math.min(1,elapsed/TOAST_DUR);
+    T('แตะค้างเพื่อปิ้ง แล้วปล่อยตอนเหลืองทอง!',VW/2,SH+28,'center');
+    var frac=G.toastDone?G.toastTapVal:holdFrac('toast',TOAST_DUR,ts);
     G.toastVal=frac;
     if(!G.toastDone&&frac>=1) finishToast(1);
     sToastSlice(VW/2,340,frac);
@@ -1704,7 +1762,7 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(goodX0,470,goodX1-goodX0,20);
     fillRR(40,470,(VW-80)*frac,20,10, frac<TOAST_GOOD[0]?C.acc: frac<=TOAST_GOOD[1]?C.gold:C.red);
     if(!G.toastDone){
-      drawBtn(VW/2-90,510,180,50,'ป๊อปขึ้นมา! 🍞',C.gold,ts);
+      drawHoldBtn(TOAST_BTN_Y,'ปิ้งขนมปัง 🍞',holding('toast'),ts);
     }else{
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
@@ -1881,10 +1939,8 @@ function createCookingGame(words, callbacks) {
   function drawBurgerGrill(ts){
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
-    T('กดยกออกตอนสุกกำลังดี!',VW/2,SH+28,'center');
-    if(!G.grillRun){G.grillRun=true;G.grillStart=ts;}
-    var elapsed=ts-G.grillStart;
-    var frac=G.grillDone?G.grillTapVal:Math.min(1,elapsed/GRILL_DUR);
+    T('แตะค้างเพื่อย่าง แล้วปล่อยตอนสุกกำลังดี!',VW/2,SH+28,'center');
+    var frac=G.grillDone?G.grillTapVal:holdFrac('grill',GRILL_DUR,ts);
     G.grillVal=frac;
     if(!G.grillDone&&frac>=1) finishGrill(1);
     sGrillGrate(BG_CX,BG_CY,300,190);
@@ -1910,7 +1966,7 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(gx0,548,gx1-gx0,20);
     fillRR(40,548,(VW-80)*frac,20,10, frac<GRILL_GOOD[0]?C.acc: frac<=GRILL_GOOD[1]?C.gold:C.red);
     if(!G.grillDone){
-      drawBtn(VW/2-100,586,200,50,'ยกออกจากเตา! 🔥',C.gold,ts);
+      drawHoldBtn(GRILL_BTN_Y,'ย่างเนื้อ 🔥',holding('grill'),ts);
     }else{
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
@@ -2093,10 +2149,8 @@ function createCookingGame(words, callbacks) {
   function drawFriesFry(ts){
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
-    T('ยกตะกร้าขึ้นตอนเหลืองกรอบพอดี!',VW/2,SH+28,'center');
-    if(!G.fryRun){G.fryRun=true;G.fryStart=ts;}
-    var elapsed=ts-G.fryStart;
-    var frac=G.fryDone?G.fryTapVal:Math.min(1,elapsed/FRY_DUR);
+    T('แตะค้างเพื่อทอด แล้วปล่อยตอนเหลืองกรอบ!',VW/2,SH+28,'center');
+    var frac=G.fryDone?G.fryTapVal:holdFrac('fry',FRY_DUR,ts);
     G.fryVal=frac;
     if(!G.fryDone&&frac>=1) finishFry(1);
     // Oil vat.
@@ -2118,7 +2172,8 @@ function createCookingGame(words, callbacks) {
     ctx.restore();
     var tint = frac<FRY_GOOD[0] ? '#F2E2B4' : frac>FRY_GOOD[1] ? '#8A5A22' : '#E8B54B';
     // Basket + fries lift out of the oil once done.
-    var lift=G.fryDone?Math.min(70,(ts-(G.fryStart+elapsed))*0.4+40):0;
+    if(G.fryDone&&!G.fryDoneAt)G.fryDoneAt=ts;
+    var lift=G.fryDone?Math.min(70,(ts-G.fryDoneAt)*0.12+18):0;
     ctx.save(); ctx.translate(0,-lift);
     for(var i=0;i<8;i++){
       var fx=FR_CX-95+i*27, fy=FR_CY+30+((i%3)-1)*16;
@@ -2136,7 +2191,7 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='rgba(240,165,0,.35)'; ctx.fillRect(fx0,600,fx1-fx0,20);
     fillRR(40,600,(VW-80)*frac,20,10, frac<FRY_GOOD[0]?C.acc: frac<=FRY_GOOD[1]?C.gold:C.red);
     if(!G.fryDone){
-      drawBtn(VW/2-100,636,200,50,'ยกตะกร้าขึ้น! 🍟',C.gold,ts);
+      drawHoldBtn(FRY_BTN_Y,'ทอดเฟรนช์ฟรายส์ 🍟',holding('fry'),ts);
     }else{
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
@@ -2470,12 +2525,14 @@ function createCookingGame(words, callbacks) {
     if(s===S.CMB){G.cList=['tom','cab','sau'];G.cIdx=0;G.sX=240;G.sDir=1;G.dropped=[];G.allDone=false;}
     if(s===SP.CUT){G.pzCuts=[];G.pzCutSc=[];G.pzDrag=null;G.pzCutDone=false;}
     if(s===SG.PATTY){G.pattyTaps=0;G.pattyCount=0;G.pattyRun=false;G.pattyDone=false;G.pattyStart=0;G.pattyPunch=0;}
-    if(s===SG.GRILL){G.grillRun=false;G.grillStart=0;G.grillDone=false;G.grillVal=0;}
+    if(s===SP.BAKE)holdReset('bake');
+    if(s===SB.TOAST)holdReset('toast');
+    if(s===SG.GRILL)holdReset('grill');
     if(s===SG.VEG){G.bgVegIdx=0;G.bgVegX=VW/2;G.bgVegDir=1;G.bgVegDropped=[];G.bgVegAllDone=false;}
     if(s===SG.STACK){G.stackX=VW/2-BG_SWEEP;G.stackDir=1;G.stackDone=false;}
     if(s===SF.PEEL){G.peelTaps=0;G.peelCount=0;G.peelRun=false;G.peelDone=false;G.peelStart=0;G.peelPunch=0;}
     if(s===SF.SLICE){G.frSlices=[];G.frSliceSc=[];G.frDrag=null;G.frSliceDone=false;}
-    if(s===SF.FRY){G.fryRun=false;G.fryStart=0;G.fryDone=false;G.fryVal=0;}
+    if(s===SF.FRY)holdReset('fry');
     if(s===SF.SALT){G.saltCount=0;G.saltDone=false;G.saltPunch=0;}
   }
   function getWord(fromSt){
@@ -2498,12 +2555,12 @@ function createCookingGame(words, callbacks) {
     preload:function(){
       this.load.audio('ck_chop', 'soundeffect/KifeChop.mp3');
       this.load.audio('ck_cut',  'soundeffect/TomatoCut.mp3');
-      this.load.audio('ck_bread','soundeffect/SlicingToast.mp3');
+      this.load.audio('ck_bread','soundeffect/SlicingToast.mp3?v=2');
       this.load.audio('ck_ok',       'soundeffect/CorrectSFX.mp3');
       this.load.audio('ck_click',    'soundeffect/Click.mp3');
       this.load.audio('ck_congrats', 'soundeffect/CongratSFX.mp3');
       this.load.audio('ck_land',     'soundeffect/FlipCard.mp3');
-      this.load.image('ck_bg', 'img/cooking/bg.jpg');
+      this.load.image('ck_bg', 'img/cooking/bg.jpg?v=2');
     },
 
     create:function(){
@@ -2529,7 +2586,8 @@ function createCookingGame(words, callbacks) {
         self.onDown(ptr.x,ptr.y,self.time.now);
       });
       this.input.on('pointermove', function(ptr){if(ptr.isDown)self.onMove(ptr.x,ptr.y);});
-      this.input.on('pointerup',   function(ptr){self.onUp(ptr.x,ptr.y);});
+      this.input.on('pointerup',        function(ptr){self.onUp(ptr.x,ptr.y,self.time.now);});
+      this.input.on('pointerupoutside', function(ptr){self.onUp(ptr.x,ptr.y,self.time.now);});
     },
 
     update:function(time){
@@ -2730,7 +2788,7 @@ function createCookingGame(words, callbacks) {
       if(G.st===SP.TOPPING_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SP.TOPPING_R,SP.BAKE);}return;}
       if(G.st===SP.BAKE){
         if(!G.bakeDone){
-          if(hit(x,y,VW/2-100,606,200,50)){pressFx(x,y);finishBake(G.bakeVal);}
+          if(hitHoldBtn(x,y,BAKE_BTN_Y)){pressFx(x,y);holdPress('bake',now);}
           return;
         }
         if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SP.BAKE_R);}
@@ -2776,7 +2834,7 @@ function createCookingGame(words, callbacks) {
       if(G.st===SB.BACON_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SB.BACON_R,SB.TOAST);}return;}
       if(G.st===SB.TOAST){
         if(!G.toastDone){
-          if(hit(x,y,VW/2-90,510,180,50)){pressFx(x,y);finishToast(G.toastVal);}
+          if(hitHoldBtn(x,y,TOAST_BTN_Y)){pressFx(x,y);holdPress('toast',now);}
           return;
         }
         if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SB.TOAST_R);}
@@ -2816,7 +2874,7 @@ function createCookingGame(words, callbacks) {
       if(G.st===SG.PATTY_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SG.PATTY_R,SG.GRILL);}return;}
       if(G.st===SG.GRILL){
         if(!G.grillDone){
-          if(hit(x,y,VW/2-100,586,200,50)){pressFx(x,y);finishGrill(G.grillVal);}
+          if(hitHoldBtn(x,y,GRILL_BTN_Y)){pressFx(x,y);holdPress('grill',now);}
           return;
         }
         if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SG.GRILL_R);}
@@ -2869,7 +2927,7 @@ function createCookingGame(words, callbacks) {
       if(G.st===SF.SLICE_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SF.SLICE_R,SF.FRY);}return;}
       if(G.st===SF.FRY){
         if(!G.fryDone){
-          if(hit(x,y,VW/2-100,636,200,50)){pressFx(x,y);finishFry(G.fryVal);}
+          if(hitHoldBtn(x,y,FRY_BTN_Y)){pressFx(x,y);holdPress('fry',now);}
           return;
         }
         if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SF.FRY_R);}
@@ -2909,7 +2967,26 @@ function createCookingGame(words, callbacks) {
       if(G.st===SF.SLICE&&G.frDrag){G.frDrag.cx=x;G.frDrag.cy=y;}
     },
 
-    onUp:function(x,y){
+    onUp:function(x,y,now){
+      // Letting go IS the action: it lifts the food out and locks in the
+      // score, exactly as tapping the button used to. Handled here rather
+      // than on the button's own rect so a thumb that drifts off the slab
+      // mid-cook still counts -- only lifting it ends the step.
+      if(now!==undefined){
+        var lifts=[['bake',SP.BAKE,BAKE_DUR,finishBake],
+                   ['toast',SB.TOAST,TOAST_DUR,finishToast],
+                   ['grill',SG.GRILL,GRILL_DUR,finishGrill],
+                   ['fry',SF.FRY,FRY_DUR,finishFry]];
+        for(var li=0;li<lifts.length;li++){
+          var L=lifts[li];
+          if(G.st!==L[1]||G[L[0]+'Done'])continue;
+          var f=holdLift(L[0],L[2],now);
+          if(f<0)break;                 // nothing was being held
+          G[L[0]+'Val']=f;
+          if(f>=HOLD_MIN)L[3](f);       // else: fumbled press, just pause
+          return;
+        }
+      }
       if(G.st===SP.CUT&&G.pzDrag){
         var d=G.pzDrag; G.pzDrag=null;
         if(this.sfxBread)this.sfxBread.stop();
