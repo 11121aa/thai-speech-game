@@ -24,6 +24,23 @@ html, body {
   font-size: 1.05rem;
   scroll-behavior: smooth;
 }
+/* Soft colour wash behind everything -- four wide, very light radial
+   blooms in the brand colours. Flat cream was what made the site read
+   as "bland"; this keeps text contrast untouched (nothing above 0.30
+   alpha) while giving the page some life. Fixed and non-scrolling so it
+   costs nothing to repaint. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(38rem 30rem at 8% 4%,   rgba(46,196,182,0.26), transparent 70%),
+    radial-gradient(34rem 28rem at 96% 12%, rgba(255,159,28,0.24), transparent 70%),
+    radial-gradient(32rem 26rem at 4% 92%,  rgba(138,92,246,0.22), transparent 70%),
+    radial-gradient(30rem 26rem at 92% 88%, rgba(255,107,157,0.20), transparent 70%);
+}
 
 h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
@@ -91,6 +108,11 @@ a {
   position: sticky;
   top: 0;
   z-index: 1030;
+  /* Rainbow hairline along the bottom -- a small, cheap signal that this
+     is a children's site, without touching nav legibility. */
+  border-bottom: 4px solid transparent;
+  border-image: linear-gradient(90deg,
+    #2ec4b6, #4caf50, #ff9f1c, #ff6b9d, #8a5cf6, #2980b9) 1;
 }
 
 .navbar-brand.app-brand {
@@ -654,31 +676,96 @@ a {
   margin: 2rem 0;
 }
 
+/* Every card used to be identical white, which made a screen of eleven
+   games read as one grey block. Each now carries its own colour (--c),
+   set per card below, driving a tinted body, a thick top band and the
+   hover glow -- so children navigate by colour and shape before they can
+   read the labels. */
 .game-mode-card {
+  --c: var(--color-primary);
+  position: relative;
+  overflow: hidden;
   width: 220px;
   min-height: 180px;
-  background: #fff;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--c) 14%, #fff) 0%, #fff 62%);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  border: 3px solid transparent;
+  box-shadow: 0 8px 0 color-mix(in srgb, var(--c) 22%, #fff), var(--shadow-soft);
+  border: 3px solid color-mix(in srgb, var(--c) 32%, #fff);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.8rem;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   padding: 1.6rem 1rem;
   text-align: center;
 }
-.game-mode-card:hover {
-  transform: translateY(-6px);
-  border-color: var(--color-primary);
-  box-shadow: 0 16px 40px rgba(43,36,56,0.15);
+/* Colour band across the top of each card. */
+.game-mode-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 7px;
+  background: var(--c);
 }
-.game-mode-card .mode-icon { font-size: 3.5rem; }
-.game-mode-card .mode-title { font-size: 1.25rem; font-weight: 700; color: var(--color-text); }
+.game-mode-card:hover,
+.game-mode-card:focus-visible {
+  transform: translateY(-6px) rotate(-0.6deg);
+  border-color: var(--c);
+  box-shadow: 0 14px 0 color-mix(in srgb, var(--c) 30%, #fff),
+              0 18px 40px color-mix(in srgb, var(--c) 28%, transparent);
+}
+.game-mode-card:active { transform: translateY(-2px) scale(0.985); }
+/* The icon sits on a soft disc of the card's own colour so it reads as
+   a badge rather than a bare emoji on white. */
+.game-mode-card .mode-icon {
+  font-size: 3.1rem;
+  line-height: 1;
+  width: 76px; height: 76px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c) 20%, #fff);
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--c) 30%, #fff);
+}
+/* 45%, not more: at 62% the two lightest cards (flashcard orange, tetris
+   teal) dropped to ~4.1:1 on white. Large bold text only needs 3:1, but
+   these are read by 4-7 year olds, so the tint is kept mild enough that
+   every title clears 4.5:1 while still reading as the card's colour. */
+.game-mode-card .mode-title {
+  font-size: 1.25rem; font-weight: 700;
+  color: color-mix(in srgb, var(--c) 45%, var(--color-text));
+}
 .game-mode-card .mode-desc { font-size: 0.85rem; color: var(--color-text-soft); }
+
+/* Per-game colours. Chosen to match each game's own art where it has a
+   dominant one (tetris teal, crossy road-orange, dress-up pink) so the
+   card and the game feel like the same thing. */
+#cardMatching     { --c: #8a5cf6; }
+#cardShooting     { --c: #e74c3c; }
+#cardAirplane     { --c: #2980b9; }
+#cardFlashcard    { --c: #ff9f1c; }
+#cardPlatformer   { --c: #4caf50; }
+#cardCrossy       { --c: #ff6b35; }
+#cardCooking      { --c: #d35400; }
+#cardDressup      { --c: #ff6b9d; }
+#cardTowerdefense { --c: #2e8b57; }
+#cardTetris       { --c: #2ec4b6; }
+#cardRpg          { --c: #6d28d9; }
+
+/* color-mix is well supported but not universal; without it every
+   mixed value is invalid and would fall back to unstyled. This block
+   restores a plain-but-correct look on browsers that lack it. */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .game-mode-card {
+    background: #fff;
+    border-color: var(--c);
+    box-shadow: var(--shadow-soft);
+  }
+  .game-mode-card .mode-icon { background: var(--color-bg-soft); box-shadow: none; }
+  .game-mode-card .mode-title { color: var(--color-text); }
+}
 
 /* ============ Pre-game setup overlay ============ */
 .setup-overlay {
@@ -1554,9 +1641,10 @@ body.in-game .game-hud-bar {
   91% { transform: translateY(-6px); }
 }
 
-/* Colorful accent stripe under navbar */
+/* Colorful accent stripe under navbar -- the rainbow border-image is set
+   on .site-header further up; this only keeps the shadow. It used to
+   re-declare a flat one-colour border here, which silently overrode it. */
 .site-header {
-  border-bottom: 4px solid var(--color-primary);
   box-shadow: 0 2px 20px rgba(43,36,56,0.07);
 }
 

@@ -373,7 +373,11 @@ function createShootingGame(words, callbacks) {
 
       this.sfxCannon.play();
       this.reloadUntil = this.time.now + RELOAD_MS;
-      this.trail = { angle: angle, life: 1.0 };
+      // Keep the arc the ball will actually fly, not just its launch
+      // angle: the fading trail used to be drawn as a straight 400px
+      // line, which contradicted the curved path the player had just
+      // aimed along with the dotted preview.
+      this.trail = { pts: this.previewArc(angle, speed), life: 1.0 };
 
       var m = this.muzzle(angle);
       this.projectiles.push({
@@ -454,13 +458,12 @@ function createShootingGame(words, callbacks) {
         this.trail.life -= dt * 3.5;
         if (this.trail.life <= 0) this.trail = null;
       }
-      if (this.trail) {
-        var tx2 = CANNON_X + Math.cos(this.trail.angle) * 400;
-        var ty2 = CANNON_Y + Math.sin(this.trail.angle) * 400;
-        g.lineStyle(5, 0xffd700, this.trail.life * 0.85);
-        g.lineBetween(CANNON_X, CANNON_Y, tx2, ty2);
-        g.fillStyle(0xffd700, this.trail.life);
-        g.fillCircle(tx2, ty2, 7);
+      if (this.trail && this.trail.pts && this.trail.pts.length) {
+        var tp = this.trail.pts;
+        g.fillStyle(0xffd700, this.trail.life * 0.8);
+        for (var ti = 0; ti < tp.length; ti++) {
+          g.fillCircle(tp[ti].x, tp[ti].y, 4.5 - (ti / tp.length) * 2);
+        }
       }
 
       // Move projectiles and check collisions
@@ -473,7 +476,14 @@ function createShootingGame(words, callbacks) {
 
         // Only cull downward past the ground -- a high lob legitimately
         // leaves the top of the screen and must be allowed to fall back in.
-        if (proj.x < -20 || proj.x > W + 20 || proj.y > H + 20) return false;
+        if (proj.x < -20 || proj.x > W + 20 || proj.y > H + 20) {
+          // A shot used to just silently vanish off-screen. Mark where it
+          // went so the child can see HOW they missed (short? wide?) and
+          // adjust, instead of only learning that nothing happened.
+          self.splash(Math.max(10, Math.min(W - 10, proj.x)), Math.min(GROUND_Y, proj.y));
+          self.showMiss();
+          return false;
+        }
 
         for (var i = 0; i < self.targets.length; i++) {
           var tgt = self.targets[i];
@@ -685,6 +695,31 @@ function createShootingGame(words, callbacks) {
     },
 
     // ── [POP] Floating score text ─────────────────────────────────
+    // Dust/water burst where a missed shot lands.
+    splash: function (x, y) {
+      for (var i = 0; i < 9; i++) {
+        var ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
+        this.particles.push({
+          x: x, y: y,
+          vx: Math.cos(ang) * (40 + Math.random() * 90),
+          vy: Math.sin(ang) * (60 + Math.random() * 110),
+          life: 0.7 + Math.random() * 0.3, r: 2 + Math.random() * 3,
+          color: 0xd8d8d8
+        });
+      }
+    },
+    // Throttled so a burst of misses doesn't stack pop-ups on each other.
+    showMiss: function () {
+      if (this.time.now < (this.nextMissMsgAt || 0)) return;
+      this.nextMissMsgAt = this.time.now + 900;
+      var t = this.add.text(W / 2, GROUND_Y - 30, 'พลาด! ลองเล็งใหม่', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '18px', fontStyle: 'bold',
+        color: '#e74c3c', stroke: '#ffffff', strokeThickness: 4
+      }).setOrigin(0.5).setDepth(10);
+      this.tweens.add({ targets: t, y: t.y - 34, alpha: 0, duration: 800,
+        onComplete: function () { t.destroy(); } });
+    },
+
     showPop: function (x, y, text) {
       var pop = this.add.text(x, y, text, {
         fontFamily: 'Prompt, sans-serif', fontSize: '22px', fontStyle: 'bold',
