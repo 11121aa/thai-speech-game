@@ -106,7 +106,7 @@ function createCookingGame(words, callbacks) {
      needing to re-derive safe layout bounds from a variable radius. ── */
   var PZ_CX=VW/2, PZ_CY=380, PZ_R_MIN=60, PZ_R_TARGET=150, PZ_R_MAX=185, PZ_R_TORN=210;
   var PZ_DISPLAY_R=130;
-  var CHEESE_TAPS_NEEDED=32, SAUCE_DUR=8000;
+  var CHEESE_TAPS_NEEDED=32, SAUCE_DUR=12000;
   var BAKE_DUR=6000, BAKE_GOOD=[0.55,0.78]; // fraction-of-duration "perfectly baked" window
   /* Slicing: drag across the baked pizza to cut it into 8 wedges. Each
      drag is matched to the nearest not-yet-used guide angle, and scored
@@ -838,7 +838,15 @@ function createCookingGame(words, callbacks) {
      softens the boundary for free. */
   var SAUCE_PX=140;          // mask resolution across the pizza's width
   var SAUCE_BRUSH=0.125;     // brush radius, as a fraction of that
-  var SAUCE_TARGET=0.84;     // a round brush can't reach the crust corners
+  // Measure exactly the disc the sauce is drawn into (sSauceLayer clips to
+  // r-8), so "covered everything I can see" and "100%" are the same thing
+  // -- measuring a wider disc than is ever painted would cap the score
+  // below 100 no matter how thoroughly the pizza was covered.
+  var SAUCE_VIS=(PZ_DISPLAY_R-8)/PZ_DISPLAY_R;
+  // Not a flat 1: the coverage is sampled on a lattice, so one stray
+  // unsampled speck should not stand between a fully sauced pizza and the
+  // end of the step. It still rounds to 100.
+  var SAUCE_DONE=0.995;
   function sauceCtx(){
     if(!G.sauceCv){
       var cv=document.createElement('canvas');
@@ -867,7 +875,7 @@ function createCookingGame(words, callbacks) {
   // thousand reads, cheap enough to run on each paint but not per frame.
   function sauceCoverage(){
     var mc=sauceCtx(), d=mc.getImageData(0,0,SAUCE_PX,SAUCE_PX).data;
-    var half=SAUCE_PX/2, lim=(half-3)*(half-3), inside=0, on=0;
+    var half=SAUCE_PX/2, rad=half*SAUCE_VIS, lim=rad*rad, inside=0, on=0;
     for(var y=0;y<SAUCE_PX;y+=2)for(var x=0;x<SAUCE_PX;x+=2){
       var dx=x-half, dy=y-half;
       if(dx*dx+dy*dy>lim)continue;
@@ -1734,7 +1742,7 @@ function createCookingGame(words, callbacks) {
     sauceStamp(mx,my);
     G.sauceLast={x:mx,y:my};
     G.sauceCover=sauceCoverage();
-    if(G.sauceCover>=SAUCE_TARGET) finishSauce();
+    if(G.sauceCover>=SAUCE_DONE) finishSauce();
   }
   function drawPizzaSauce(ts){
     drawBg(); drawStepBar(ts);
@@ -1747,7 +1755,7 @@ function createCookingGame(words, callbacks) {
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
     sDoughDisc(PZ_CX,PZ_CY,PZ_DISPLAY_R,false);
     sSauceLayer(PZ_CX,PZ_CY,PZ_DISPLAY_R);
-    var covPct=Math.round(Math.min(1,(G.sauceCover||0)/SAUCE_TARGET)*100);
+    var covPct=Math.round(Math.min(1,G.sauceCover||0)*100);
     ctx.font='bold 14px Prompt'; ctx.fillStyle=C.w;
     T('ป้ายแล้ว '+covPct+'%',VW/2,PZ_CY+PZ_DISPLAY_R+40,'center');
     if(G.sauceDone){
@@ -2682,7 +2690,7 @@ function createCookingGame(words, callbacks) {
     G.sauceDone=true;
     // Full marks for reaching the target coverage; below it, the score is
     // the share of the pizza that actually got sauced.
-    var score=Math.round(Math.min(1,(G.sauceCover||0)/SAUCE_TARGET)*100);
+    var score=Math.round(Math.min(1,G.sauceCover||0)*100);
     G.scores.sauce=score; G.total+=score; animateScore('sauce',score); gradeScore(score);
   }
   function finishCheese(){
