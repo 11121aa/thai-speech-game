@@ -206,7 +206,14 @@ const Recorder = (function () {
   // detection, so handing it out costs nothing -- the practice panel uses
   // it to make the record button swell with the child's voice, which is
   // the main "it's listening to ME" feedback they get.
-  function startHoldRecording(canvas, onStop, onError, silenceGapMs, onLevel) {
+  // onSegment (optional) fires the moment a repetition is confirmed --
+  // i.e. as soon as the silence gap after it closes the segment -- rather
+  // than making the caller wait for the whole hold to finish. When it is
+  // supplied, every segment is delivered through it, including the one
+  // still open when the hold ends. onStop still receives the full samples
+  // and the complete segment list either way, so callers that don't pass
+  // onSegment (the single-repetition flow) are unaffected.
+  function startHoldRecording(canvas, onStop, onError, silenceGapMs, onLevel, onSegment) {
     const rafHolder = { id: null };
     let audioCtx = null;
     let mediaStream = null;
@@ -297,6 +304,23 @@ const Recorder = (function () {
         processor.connect(muteGain);
         muteGain.connect(audioCtx.destination);
 
+        // Padding either side of a segment, matching the batch path's
+        // default so a card sounds the same however it was produced. The
+        // trailing pad is naturally shorter here -- only SILENCE_GAP_MS of
+        // audio exists past the boundary at the instant a segment closes --
+        // but that tail is silence by definition, so it isn't audible.
+        const SEGMENT_PAD_MS = 150;
+        function emitSegment(fromSample, toSample) {
+          if (!onSegment) return;
+          const rate = audioCtx.sampleRate;
+          const pad = Math.round(rate * SEGMENT_PAD_MS / 1000);
+          const slice = concatChunkRange(pcmChunks, fromSample - pad, toSample + pad);
+          // Same degenerate-segment rule as the batch path: skip it rather
+          // than surfacing a near-empty card the child would have to delete.
+          if (slice.length < Math.round(rate * MIN_SLICE_MS / 1000)) return;
+          onSegment(encodeWav(slice, rate));
+        }
+
         const recStartedAt = Date.now();
         const segments = [];         // completed [startSample, endSample] pairs
         let speechStartedAt = null;      // wall-clock ms -- only used to decide MIN_SPEECH_MS/SILENCE_GAP_MS timing
@@ -327,6 +351,7 @@ const Recorder = (function () {
           // near-zero-length segment.
           if (speechStartedAt && (Date.now() - speechStartedAt) >= MIN_SPEECH_MS) {
             segments.push([speechStartedSample, capturedSamples]);
+            emitSegment(speechStartedSample, capturedSamples);
           }
 
           let totalLen = 0;
@@ -388,6 +413,9 @@ const Recorder = (function () {
             const silenceLenMs = now - silenceStartedAt;
             if (hadSpeechMs >= MIN_SPEECH_MS && silenceLenMs >= SILENCE_GAP_MS) {
               segments.push([speechStartedSample, silenceStartedSample]);
+              // Hand it over now, while the hold is still running, so the
+              // repetition appears the instant it is recognised.
+              emitSegment(speechStartedSample, silenceStartedSample);
               speechStartedAt = null;
               silenceStartedAt = null;
               speechStartedSample = null;
@@ -434,6 +462,29 @@ const Recorder = (function () {
         }
       }
     };
+  }
+
+  // Copies one sample range out of a list of captured PCM chunks without
+  // first flattening the whole recording -- this runs mid-hold, once per
+  // repetition, while more audio is still arriving. The range is clamped
+  // to what has actually been captured, so asking for padding past either
+  // end simply yields a shorter slice.
+  function concatChunkRange(chunks, startSample, endSample) {
+    const start = Math.max(0, Math.floor(startSample));
+    const end = Math.max(start, Math.ceil(endSample));
+    const out = new Float32Array(end - start);
+    let pos = 0, written = 0;
+    for (let i = 0; i < chunks.length && pos < end; i++) {
+      const c = chunks[i], cEnd = pos + c.length;
+      if (cEnd > start) {
+        const from = Math.max(0, start - pos);
+        const to = Math.min(c.length, end - pos);
+        out.set(c.subarray(from, to), written);
+        written += to - from;
+      }
+      pos = cEnd;
+    }
+    return written === out.length ? out : out.subarray(0, written);
   }
 
   // Encodes mono Float32 PCM samples as a 16-bit WAV blob.
@@ -587,6 +638,7 @@ const Recorder = (function () {
     startRecording: startRecording,
     startHoldRecording: startHoldRecording,
     sliceSamplesToWavSegments: sliceSamplesToWavSegments,
+    concatChunkRange: concatChunkRange,
     uploadAndSavePractice: uploadAndSavePractice,
     drawPlayback: drawPlayback
   };
