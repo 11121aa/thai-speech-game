@@ -126,7 +126,7 @@ function createCookingGame(words, callbacks) {
   PIZZA_STEP_IDX[SP.BAKE_R]=3; PIZZA_STEP_IDX[SP.CUT_R]=4;
 
   /* ── Breakfast layout + steps ──────────────────────────────── */
-  var EGG_CX=VW/2, EGG_CY=380, EGG_R=100, EGG_TAPS_NEEDED=8, EGG_DUR=6000;
+  var EGG_CX=VW/2, EGG_CY=356, EGG_R=78, EGG_TAPS_NEEDED=8, EGG_DUR=6000;
   var BC_TOP=210, BC_BOT=560, BC_CUT_TY=[330,470], BC_KX=VW/2+120;
   var TOAST_DUR=5000, TOAST_GOOD=[0.5,0.75];
   var PLATE_LIST=['egg','bacon','toast'];
@@ -152,8 +152,6 @@ function createCookingGame(words, callbacks) {
   var BG_VEG_LIST=['lettuce','tomato','cheese'];
   var BG_VEG_LABELS={lettuce:'ผักกาด', tomato:'มะเขือเทศ', cheese:'ชีส'};
   var BG_STACK_BY=600;            // y of the bottom bun's top face in the stack screen
-  var BG_TARGET_W=150;            // width of the "line the top bun up here" target zone
-  var BG_SWEEP=112;               // how far either side of center the top bun travels
   var BURGER_STEPS=[
     {icon:'🥩',lbl:'1.ปั้น',   states:[SG.PATTY,SG.PATTY_R]},
     {icon:'🔥',lbl:'2.ย่าง',   states:[SG.GRILL,SG.GRILL_R]},
@@ -248,7 +246,7 @@ function createCookingGame(words, callbacks) {
       pattyTaps:0, pattyCount:0, pattyRun:false, pattyDone:false, pattyStart:0, pattyPunch:0, pattyFinalPct:0,
       grillHeld:0, grillHoldAt:0, grillHolding:false, grillDoneAt:0, grillDone:false, grillVal:0, grillTapVal:0, grillFlip:0,
       bgVegIdx:0, bgVegX:VW/2, bgVegDir:1, bgVegSpd:3.2, bgVegDropped:[], bgVegAllDone:false,
-      stackX:VW/2, stackDir:1, stackSpd:4.2, stackDone:false, stackDropAt:0,
+      stackX:VW/2, stackDir:1, stackSpd:3.2, stackDone:false, stackDropAt:0, stackDropX:VW/2,
 
       // ── Fries ──
       peelTaps:0, peelCount:0, peelRun:false, peelDone:false, peelStart:0, peelPunch:0, peelFinalPct:0,
@@ -336,6 +334,15 @@ function createCookingGame(words, callbacks) {
   // instead of re-deriving thresholds at each of the ~13 scoring call
   // sites (chop, cut, sauce, cheese, dough, bake, egg, toast, bun, plus
   // the three drag-and-drop averages).
+  /* The per-cut sibling of gradeScore: the same flash the bun cut gives,
+     fired for each individual slice as it lands. It deliberately leaves
+     the combo counter alone -- that belongs to the end-of-step grade, and
+     bumping it here would count one step twice. Only good cuts flash, so
+     it stays a reward rather than noise. */
+  function gradeHit(score){
+    if(score>=90){ triggerBigFx('PERFECT!','#FFD166'); triggerShake(5); if(sc.sfxOk)sc.sfxOk.play(); }
+    else if(score>=70){ triggerBigFx('เยี่ยม!','#2EC4B6'); if(sc.sfxOk)sc.sfxOk.play(); }
+  }
   function gradeScore(score){
     var grade = score>=90 ? {txt:'PERFECT!',col:'#FFD166',shake:5,ping:true}
       : score>=70 ? {txt:'เยี่ยม!',col:'#2EC4B6',shake:0,ping:true}
@@ -555,14 +562,37 @@ function createCookingGame(words, callbacks) {
   function dicedPieces(n,seed0,wLo,wHi,hLo,hHi){
     var out=[], seed=seed0;
     function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
-    for(var i=0;i<n;i++)
+    for(var i=0;i<n;i++){
+      // Per-vertex radius jitter, so no two pieces share a silhouette.
+      var k=6+Math.floor(rnd()*2), pts=[];
+      for(var j=0;j<k;j++) pts.push(0.74+rnd()*0.46);
       out.push({a:rnd()*Math.PI*2, rad:Math.sqrt(rnd())*0.9, rot:(rnd()-0.5)*Math.PI,
-                w:wLo+rnd()*(wHi-wLo), h:hLo+rnd()*(hHi-hLo), pale:rnd()<0.4});
+                w:wLo+rnd()*(wHi-wLo), h:hLo+rnd()*(hHi-hLo), pale:rnd()<0.4, pts:pts});
+    }
     return out;
   }
   var TOM_DICE=dicedPieces(96,20260905,0.17,0.28,0.14,0.22);
   var CAB_SHRED=dicedPieces(88,19981231,0.34,0.58,0.06,0.10);
-  function drawDiced(cx,cy,r,pct,pieces,squash,col,colPale,edge){
+  /* A closed curve through the jittered vertices, drawn as quadratics
+     between their midpoints so the outline is all bulges and never a
+     corner. The pieces used to be rounded rectangles with a stroke around
+     each one, which put straight edges and drawn borders back on food that
+     had just been chopped -- the grid look in miniature. */
+  function blobPath(w,h,pts){
+    var k=pts.length, P=[];
+    for(var i=0;i<k;i++){
+      var a=(i/k)*Math.PI*2;
+      P.push([Math.cos(a)*(w/2)*pts[i], Math.sin(a)*(h/2)*pts[i]]);
+    }
+    ctx.beginPath();
+    ctx.moveTo((P[0][0]+P[k-1][0])/2,(P[0][1]+P[k-1][1])/2);
+    for(var j=0;j<k;j++){
+      var cur=P[j], nxt=P[(j+1)%k];
+      ctx.quadraticCurveTo(cur[0],cur[1],(cur[0]+nxt[0])/2,(cur[1]+nxt[1])/2);
+    }
+    ctx.closePath();
+  }
+  function drawDiced(cx,cy,r,pct,pieces,squash,col,colPale){
     var n=Math.round(Math.max(0,Math.min(1,pct))*pieces.length);
     for(var i=0;i<n;i++){
       var d=pieces[i];
@@ -570,13 +600,18 @@ function createCookingGame(words, callbacks) {
       var w=d.w*r, h=d.h*r;
       ctx.save();
       ctx.translate(px,py); ctx.rotate(d.rot);
-      fillRR(-w/2,-h/2,w,h,Math.min(w,h)*0.35, d.pale?colPale:col);
-      if(edge){
-        ctx.strokeStyle=edge; ctx.lineWidth=1.5;
-        rr(-w/2,-h/2,w,h,Math.min(w,h)*0.35); ctx.stroke();
-      }
-      ctx.fillStyle='rgba(255,255,255,.22)';
-      fillRR(-w/2+w*0.12,-h/2+h*0.16,w*0.34,h*0.3,h*0.15,'rgba(255,255,255,.22)');
+      // Separated by a soft shadow rather than an outline: the pieces read
+      // as distinct without putting a drawn line back around each one.
+      ctx.shadowColor='rgba(48,20,10,.4)'; ctx.shadowBlur=4; ctx.shadowOffsetY=2;
+      ctx.fillStyle=d.pale?colPale:col;
+      blobPath(w,h,d.pts); ctx.fill();
+      ctx.shadowColor='transparent';
+      // A wet highlight instead of an outline -- it separates overlapping
+      // pieces by shading rather than by drawing a line around each.
+      ctx.globalAlpha=0.2; ctx.fillStyle='#FFFFFF';
+      ctx.beginPath();
+      ctx.ellipse(-w*0.13,-h*0.15,w*0.21,h*0.17,-0.4,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
       ctx.restore();
     }
   }
@@ -606,7 +641,7 @@ function createCookingGame(words, callbacks) {
     }
     if(pct>0){
       ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r-2,0,Math.PI*2); ctx.clip();
-      drawDiced(cx,cy,r,pct,TOM_DICE,1,C.tomD,C.tom,'rgba(120,26,18,.55)');
+      drawDiced(cx,cy,r,pct,TOM_DICE,1,C.tomD,C.tom);
       ctx.restore();
     }
     ctx.strokeStyle=C.outline; ctx.lineWidth=3;
@@ -627,7 +662,7 @@ function createCookingGame(words, callbacks) {
     if(pct>0){
       ctx.save(); ctx.beginPath(); ctx.ellipse(cx,cy,r-2,(r-2)*.85,0,0,Math.PI*2); ctx.clip();
       // Long thin strips rather than dice -- shredded cabbage, not cubed.
-      drawDiced(cx,cy,r,pct,CAB_SHRED,0.85,C.cab,C.cabHi,'rgba(70,110,52,.5)');
+      drawDiced(cx,cy,r,pct,CAB_SHRED,0.85,C.cab,C.cabHi);
       ctx.restore();
     }
     ctx.strokeStyle=C.outline; ctx.lineWidth=3;
@@ -1010,6 +1045,35 @@ function createCookingGame(words, callbacks) {
   }
 
   /* ── Breakfast: egg / bacon / toast / plate ──────────────────── */
+  /* Nobody cracks an egg with a knife. It is knocked against the rim of
+     the bowl it is going into, so the bowl has to exist for the motion to
+     make sense -- and once it does, the yolk has somewhere to land. */
+  var EBOWL={cx:VW/2, by:540, rx:130};
+  function sMixingBowl(){
+    var b=EBOWL, ry=b.rx*0.26;
+    ctx.save();
+    ctx.shadowColor=C.sh; ctx.shadowBlur=10; ctx.shadowOffsetY=6;
+    ctx.fillStyle='#E4E9EF';
+    ctx.beginPath(); ctx.ellipse(b.cx,b.by,b.rx,b.rx*0.62,0,0,Math.PI); ctx.closePath(); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.fillStyle='rgba(255,255,255,.55)';
+    ctx.beginPath(); ctx.ellipse(b.cx-b.rx*0.5,b.by+b.rx*0.2,b.rx*0.16,b.rx*0.2,-0.3,0,Math.PI*2); ctx.fill();
+    // Cavity, so the bowl reads as open rather than as a dome.
+    ctx.fillStyle='#B9C1CB';
+    ctx.beginPath(); ctx.ellipse(b.cx,b.by,b.rx,ry,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#9AA3AF';
+    ctx.beginPath(); ctx.ellipse(b.cx,b.by+4,b.rx-9,ry-4,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  // Drawn after whatever is in the bowl, so the contents sit inside it.
+  function sMixingBowlRim(){
+    var b=EBOWL, ry=b.rx*0.26;
+    ctx.save();
+    ctx.strokeStyle=C.outline; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(b.cx,b.by,b.rx,b.rx*0.62,0,0,Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(b.cx,b.by,b.rx,ry,0,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
   function sEggWhole(cx,cy,r){
     ctx.save();
     ctx.shadowColor=C.sh; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
@@ -1282,17 +1346,23 @@ function createCookingGame(words, callbacks) {
   }
   // Shared by the STACK screen and the finish screen so the burger the
   // player assembled is drawn identically in both places.
+  /* One stacking geometry, used by the veg screen, the top-bun screen and
+     the final plate, so a piece sits at the same height on all three. The
+     patty goes straight onto the bottom bun -- it is grilled before the
+     veg, yet it used to be drawn above them, appearing out of nowhere on
+     the assembly screen after you had already stacked on top of it. */
+  function bgPattyY(by){ return by-20; }
+  function bgLayerY(by,i){ return by-46-i*17; }
+  function bgTopBunY(by,n){ return bgLayerY(by,n)-20; }
   function sBurgerStack(cx,by,topBunDY){
     var w=180;
     sBunBot(cx,by,w,44);
-    var layerY=by-14;
-    G.bgVegDropped.forEach(function(d){
-      sBurgerVeg(d.ing,cx+(d.off||0),layerY,w-18);
-      layerY-=17;
+    sPatty(cx,bgPattyY(by),G.pattyFinalPct||1,true);
+    G.bgVegDropped.forEach(function(d,i){
+      sBurgerVeg(d.ing,cx+(d.off||0),bgLayerY(by,i),w-18);
     });
-    sPatty(cx,layerY-6,G.pattyFinalPct||1,true);
-    layerY-=34;
-    if(topBunDY!==null&&topBunDY!==undefined) sBunTop(cx,layerY-38+topBunDY,w,52);
+    if(topBunDY!==null&&topBunDY!==undefined)
+      sBunTop(cx,bgTopBunY(by,G.bgVegDropped.length)+topBunDY,w,52);
   }
 
   /* ── Fries: potato / slices / fryer / salt ─────────────────── */
@@ -1983,22 +2053,32 @@ function createCookingGame(words, callbacks) {
   function drawBreakfastEgg(ts){
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
-    T('แตะตอกไข่ให้แตก!',VW/2,SH+30,'center');
+    T('แตะเคาะไข่กับขอบชามให้แตก!',VW/2,SH+30,'center');
     var elapsed=G.eggRun?Math.min(EGG_DUR,ts-G.eggStart):0;
     var pct=Math.max(0,1-elapsed/EGG_DUR);
     if(G.eggRun&&!G.eggDone&&elapsed>=EGG_DUR) finishEgg();
     fillRR(40,SH+48,VW-80,18,9,'#2A1D14');
     fillRR(40,SH+48,(VW-80)*pct,18,9,pct>0.3?C.acc:C.red);
-    var punchT=G.eggPunch?(ts-G.eggPunch)/140:1, sq=1;
-    if(punchT<1){ var pe=1-Math.pow(1-punchT,2); sq=1-0.05*(1-pe); }
-    ctx.save(); ctx.translate(EGG_CX,EGG_CY); ctx.scale(1/sq,sq); ctx.translate(-EGG_CX,-EGG_CY);
-    if(G.eggCracks>=EGG_TAPS_NEEDED) sEggBroken(EGG_CX,EGG_CY,EGG_R);
-    else sEggCracked(EGG_CX,EGG_CY,EGG_R,G.eggCracks);
-    ctx.restore();
-    // The knife swings in on each tap, the same read as the chopping step.
-    sKnife(EGG_CX+EGG_R+48,EGG_CY-26,-toolBob(ts)*Math.PI/2);
+    sMixingBowl();
+    var cracked=G.eggCracks>=EGG_TAPS_NEEDED;
+    if(cracked){
+      // Contents have gone in; the shell is done with.
+      sEggBroken(EBOWL.cx,EBOWL.by-10,74);
+    }else{
+      // Each tap knocks the egg down onto the near rim and tips it.
+      var bob=toolBob(ts);
+      var punchT=G.eggPunch?(ts-G.eggPunch)/140:1, sq=1;
+      if(punchT<1){ var pe=1-Math.pow(1-punchT,2); sq=1-0.05*(1-pe); }
+      var ey=EGG_CY+bob*72;
+      ctx.save();
+      ctx.translate(EGG_CX,ey); ctx.rotate(-0.3-bob*0.16); ctx.translate(-EGG_CX,-ey);
+      ctx.translate(EGG_CX,ey); ctx.scale(1/sq,sq); ctx.translate(-EGG_CX,-ey);
+      sEggCracked(EGG_CX,ey,EGG_R,G.eggCracks);
+      ctx.restore();
+    }
+    sMixingBowlRim();
     ctx.font='12px Prompt'; ctx.fillStyle='rgba(255,255,255,.4)';
-    T('ตอก '+G.eggTaps+' ครั้ง',VW/2,EGG_CY+EGG_R+40,'center');
+    T('เคาะ '+G.eggTaps+' ครั้ง',VW/2,668,'center');
     if(G.eggDone){
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
@@ -2306,6 +2386,15 @@ function createCookingGame(words, callbacks) {
       drawBtn(VW/2-80,412,160,50,'ต่อไป →',C.acc,ts);
     }
   }
+  // The "line it up here" marker, shared so every piece of the burger --
+  // including the top bun -- is aimed the same way.
+  function drawDropTarget(cy,aimX){
+    ctx.strokeStyle='rgba(46,196,182,.38)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+    ctx.strokeRect(VW/2-CTW/2,cy-11,CTW,22); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(46,196,182,.06)'; ctx.fillRect(VW/2-CTW/2,cy-11,CTW,22);
+    ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1; ctx.setLineDash([3,6]);
+    ctx.beginPath(); ctx.moveTo(aimX,270); ctx.lineTo(aimX,cy-11); ctx.stroke(); ctx.setLineDash([]);
+  }
   function drawBurgerVeg(ts){
     drawBg(); drawStepBar(ts);
     var cur=BG_VEG_LIST[G.bgVegIdx];
@@ -2315,19 +2404,19 @@ function createCookingGame(words, callbacks) {
       G.bgVegX+=G.bgVegDir*G.bgVegSpd; if(G.bgVegX>VW-45)G.bgVegDir=-1; if(G.bgVegX<45)G.bgVegDir=1;
     }
     sBunBot(VW/2,BG_STACK_BY,180,44);
-    var ly=BG_STACK_BY-14;
-    G.bgVegDropped.forEach(function(d){
+    sPatty(VW/2,bgPattyY(BG_STACK_BY),G.pattyFinalPct||1,true);
+    G.bgVegDropped.forEach(function(d,i){
       var t=Math.min(1,(ts-d.dropStart)/DROP_DUR), ease=1-(1-t)*(1-t);
-      var yy=d.fromY+(ly-d.fromY)*ease;
+      var target=bgLayerY(BG_STACK_BY,i);
+      var yy=d.fromY+(target-d.fromY)*ease;
       sBurgerVeg(d.ing,VW/2+d.off*(1-ease),yy,162);
-      ly-=17;
     });
     if(G.bgVegIdx<BG_VEG_LIST.length){
-      ctx.strokeStyle='rgba(46,196,182,.38)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
-      ctx.strokeRect(VW/2-CTW/2,BG_STACK_BY-26,CTW,22); ctx.setLineDash([]);
-      ctx.fillStyle='rgba(46,196,182,.06)'; ctx.fillRect(VW/2-CTW/2,BG_STACK_BY-26,CTW,22);
-      ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1; ctx.setLineDash([3,6]);
-      ctx.beginPath(); ctx.moveTo(G.bgVegX,270); ctx.lineTo(G.bgVegX,BG_STACK_BY-26); ctx.stroke(); ctx.setLineDash([]);
+      // The target sits on top of the pile as it grows -- it used to stay
+      // pinned just above the bottom bun while the pieces landed higher
+      // and higher, so from the second piece on it marked the wrong place.
+      var nextY=bgLayerY(BG_STACK_BY,G.bgVegDropped.length);
+      drawDropTarget(nextY,G.bgVegX);
       sBurgerVeg(cur,G.bgVegX,250,150);
     }
     if(G.bgVegIdx>=BG_VEG_LIST.length&&!G.bgVegAllDone){
@@ -2340,27 +2429,24 @@ function createCookingGame(words, callbacks) {
   function drawBurgerStack(ts){
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
-    T('แตะตอนฝาบนตรงกลางพอดี!',VW/2,SH+28,'center');
-    // Sweep symmetrically around the target, otherwise the bun spends
-    // more time on one side of center and the "perfect" tap is easier
-    // from one direction than the other.
+    T('แตะเพื่อวางฝาบนให้ตรงกลาง!',VW/2,SH+26,'center');
+    // Sweeps the same span, at the same speed, from the same height as the
+    // lettuce and tomato before it. It used to travel a narrower arc at a
+    // different pace and drop from higher up, which made the last piece of
+    // the burger feel like a different game to the ones under it.
     if(!G.stackDone){
       G.stackX+=G.stackDir*G.stackSpd;
-      if(G.stackX>VW/2+BG_SWEEP)G.stackDir=-1;
-      if(G.stackX<VW/2-BG_SWEEP)G.stackDir=1;
+      if(G.stackX>VW-45)G.stackDir=-1;
+      if(G.stackX<45)G.stackDir=1;
     }
-    // Target zone marker on the stack itself.
-    ctx.strokeStyle='rgba(46,196,182,.4)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
-    ctx.strokeRect(VW/2-BG_TARGET_W/2,BG_STACK_BY-150,BG_TARGET_W,26); ctx.setLineDash([]);
+    sBurgerStack(VW/2,BG_STACK_BY,null);
+    var bunY=bgTopBunY(BG_STACK_BY,G.bgVegDropped.length);
     if(G.stackDone){
-      // Top bun drops into place with the same ease as the other drops.
       var dt=Math.min(1,(ts-G.stackDropAt)/DROP_DUR), de=1-(1-dt)*(1-dt);
-      sBurgerStack(VW/2,BG_STACK_BY,-90*(1-de));
+      sBunTop(VW/2+(G.stackDropX-VW/2)*(1-de), 250+(bunY-250)*de, 180,52);
     }else{
-      sBurgerStack(VW/2,BG_STACK_BY,null);
-      sBunTop(G.stackX,190,180,52);
-      ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1; ctx.setLineDash([3,6]);
-      ctx.beginPath(); ctx.moveTo(G.stackX,250); ctx.lineTo(G.stackX,BG_STACK_BY-150); ctx.stroke(); ctx.setLineDash([]);
+      drawDropTarget(bunY,G.stackX);
+      sBunTop(G.stackX,250,180,52);
     }
     if(G.stackDone){
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
@@ -2758,7 +2844,7 @@ function createCookingGame(words, callbacks) {
     var sc2=Math.round(Math.max(10,100-distC*0.85-angPenalty*1.6));
     G.pzCuts.push({guide:bestI,ang:PZ_CUT_ANGLES[bestI],sc:sc2,off:0,at:sc.time.now});
     G.pzCutSc.push(sc2);
-    playSlice();
+    playSlice(); gradeHit(sc2);
     if(G.pzCuts.length>=PZ_CUTS_NEEDED) finishPizzaCut();
   }
   function finishPizzaCut(){
@@ -2789,8 +2875,8 @@ function createCookingGame(words, callbacks) {
   }
   function finishStack(){
     if(G.stackDone)return;
-    G.stackDone=true; G.stackDropAt=sc.time.now;
-    var acc=Math.max(0,1-Math.abs(G.stackX-VW/2)/(BG_TARGET_W/2));
+    G.stackDone=true; G.stackDropAt=sc.time.now; G.stackDropX=G.stackX;
+    var acc=Math.max(0,1-Math.abs(G.stackX-VW/2)/(CTW/2));
     var score=Math.round(Math.max(10,acc*100));
     G.scores.stack=score; G.total+=score; animateScore('stack',score); gradeScore(score);
   }
@@ -2822,7 +2908,7 @@ function createCookingGame(words, callbacks) {
     var sc2=Math.round(Math.max(10,100-bestD*3.2-tilt*0.9));
     G.frSlices.push({guide:bestI,x:FR_SLICE_XS[bestI],sc:sc2});
     G.frSliceSc.push(sc2);
-    playSlice();
+    playSlice(); gradeHit(sc2);
     if(G.frSlices.length>=FR_SLICES_NEEDED) finishFrySlice();
   }
   function finishFrySlice(){
@@ -2865,7 +2951,7 @@ function createCookingGame(words, callbacks) {
     if(s===SB.TOAST)holdReset('toast');
     if(s===SG.GRILL)holdReset('grill');
     if(s===SG.VEG){G.bgVegIdx=0;G.bgVegX=VW/2;G.bgVegDir=1;G.bgVegDropped=[];G.bgVegAllDone=false;}
-    if(s===SG.STACK){G.stackX=VW/2-BG_SWEEP;G.stackDir=1;G.stackDone=false;}
+    if(s===SG.STACK){G.stackX=VW/2;G.stackDir=1;G.stackSpd=3.2;G.stackDone=false;G.stackDropX=VW/2;}
     if(s===SF.PEEL){G.peelTaps=0;G.peelCount=0;G.peelRun=false;G.peelDone=false;G.peelStart=0;G.peelPunch=0;}
     if(s===SF.SLICE){G.frSlices=[];G.frSliceSc=[];G.frDrag=null;G.frSliceDone=false;}
     if(s===SF.FRY)holdReset('fry');
@@ -3044,7 +3130,7 @@ function createCookingGame(words, callbacks) {
         if(G.cuts>=2){if(hit(x,y,VW/2-80,402,160,50)){pressFx(x,y);setState(S.SAU_R);}return;}
         var cs=Math.round(Math.max(10,100-Math.abs(G.kY-CUT_TY[G.cuts])*2));
         G.cutSc.push(cs);G.cutY.push(G.kY);G.cutAt.push(now);G.cuts++;
-        playSlice();
+        playSlice(); gradeHit(cs);
         if(G.cuts>=2){G.scores.sau=Math.round((G.cutSc[0]+G.cutSc[1])/2);G.total+=G.scores.sau;animateScore('sau',G.scores.sau);gradeScore(G.scores.sau);}
         return;
       }
@@ -3143,7 +3229,7 @@ function createCookingGame(words, callbacks) {
       if(G.st===SB.EGG){
         if(G.eggDone){if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SB.EGG_R);}return;}
         var edx=x-EGG_CX,edy=y-EGG_CY;
-        if(edx*edx+edy*edy<(EGG_R+22)*(EGG_R+22)){
+        if(edx*edx+edy*edy<(EGG_R+48)*(EGG_R+48)){
           if(!G.eggRun){G.eggRun=true;G.eggStart=now;}
           G.eggTaps++;
           if(G.eggCracks<EGG_TAPS_NEEDED)G.eggCracks++;
@@ -3159,7 +3245,7 @@ function createCookingGame(words, callbacks) {
         if(G.baconCuts>=2){if(hit(x,y,VW/2-80,402,160,50)){pressFx(x,y);setState(SB.BACON_R);}return;}
         var bcs=Math.round(Math.max(10,100-Math.abs(G.baconY-BC_CUT_TY[G.baconCuts])*2));
         G.baconSc.push(bcs);G.baconCutY.push(G.baconY);G.baconAt.push(now);G.baconCuts++;
-        playSlice();
+        playSlice(); gradeHit(bcs);
         if(G.baconCuts>=2){G.scores.bacon=Math.round((G.baconSc[0]+G.baconSc[1])/2);G.total+=G.scores.bacon;animateScore('bacon',G.scores.bacon);gradeScore(G.scores.bacon);}
         return;
       }
