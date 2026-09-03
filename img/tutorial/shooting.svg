@@ -1,0 +1,73 @@
+<svg viewBox="0 0 320 205" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="ลากถอยหลังแล้วปล่อยเพื่อยิง เล็งตามเส้นประ">
+  <!-- Shooting game tutorial. The control is a slingshot pull: drag AWAY
+       from the target and release. The dotted arc is the real preview the
+       game draws (previewArc in js/game-shooting.js), and the shot obeys
+       gravity — so the picture has to show a curve, not a straight line.
+       Colours: sky band #A8D4E6..#B2DAF5, grass #7CB342, bullseye rings
+       #e74c3c/#fff/#2980b9/#f1c40f, cannon #3e2723 barrel. -->
+  <defs>
+    <clipPath id="shScene"><rect x="12" y="14" width="296" height="106" rx="12"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="320" height="205" rx="18" fill="#EEF9F8"/>
+
+  <g clip-path="url(#shScene)">
+    <rect x="12" y="14" width="296" height="106" fill="#B2DAF5"/>
+    <rect x="12" y="90" width="296" height="30" fill="#7CB342"/>
+    <circle cx="288" cy="30" r="13" fill="#ffec6e"/>
+
+    <!-- bullseye target on a pole -->
+    <g>
+      <rect x="243" y="56" width="5" height="34" fill="#7d6b5a"/>
+      <circle cx="245.5" cy="50" r="20" fill="#e74c3c"/>
+      <circle cx="245.5" cy="50" r="15" fill="#ffffff"/>
+      <circle cx="245.5" cy="50" r="10.5" fill="#2980b9"/>
+      <circle cx="245.5" cy="50" r="6" fill="#ffffff"/>
+      <circle cx="245.5" cy="50" r="3" fill="#f1c40f"/>
+    </g>
+
+    <!-- gravity arc of dots, cannon -> target -->
+    <g fill="#ffffff">
+      <circle cx="112" cy="80" r="3.6"/><circle cx="132" cy="66" r="3.4"/>
+      <circle cx="152" cy="55" r="3.2"/><circle cx="172" cy="47" r="3"/>
+      <circle cx="192" cy="43" r="2.8"/><circle cx="212" cy="43" r="2.6"/>
+      <circle cx="230" cy="46" r="2.4"/>
+    </g>
+
+    <!-- cannon at bottom-left, barrel raised -->
+    <g>
+      <rect x="76" y="98" width="40" height="9" rx="3" fill="#795548"/>
+      <circle cx="96" cy="92" r="14" fill="#5d4037" stroke="#3e2723" stroke-width="2.5"/>
+      <rect x="90" y="60" width="12" height="34" rx="4" fill="#3e2723" transform="rotate(28 96 92)"/>
+      <circle cx="111" cy="66" r="6" fill="#212121"/>
+    </g>
+
+    <!-- the PULL: finger drags back and down, away from the target -->
+    <g>
+      <path d="M96 92 L58 116" stroke="#8d6e63" stroke-width="4.5" stroke-linecap="round"/>
+      <circle cx="58" cy="116" r="7.5" fill="#5d4037"/>
+      <path d="M84 84 L52 106" stroke="#E53935" stroke-width="3"
+            stroke-dasharray="6 4" stroke-linecap="round"/>
+      <path d="M58 100 L50 108 L60 112" fill="none" stroke="#E53935"
+            stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <rect x="12" y="14" width="296" height="106" rx="12" fill="none" stroke="#D8F0EE" stroke-width="2"/>
+
+  <!-- labels pinned to the scene -->
+  <text x="34" y="134" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11" font-weight="700" fill="#E53935">ลากถอย</text>
+  <text x="170" y="134" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11" font-weight="700" fill="#2980b9">เส้นประ = ทางลูกกระสุน</text>
+  <text x="283" y="134" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11" font-weight="700" fill="#c0392b">เป้า</text>
+
+  <rect x="14" y="142" width="292" height="34" rx="10" fill="#ffffff" stroke="#D8F0EE" stroke-width="2"/>
+  <text x="160" y="157" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11.5" fill="#5b5170">ลากนิ้ว "ถอยหลัง" ออกจากเป้า ยิ่งลากไกลยิ่งแรง</text>
+  <text x="160" y="171" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11.5" fill="#5b5170">ปล่อยนิ้วเมื่อเส้นประชี้ไปที่เป้า</text>
+
+  <text x="160" y="195" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="12" font-weight="700" fill="#13726a">🎯 ยิงโดนเป้า = ได้ฝึกออกเสียงคำ</text>
+</svg>

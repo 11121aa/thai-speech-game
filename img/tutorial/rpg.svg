@@ -1,0 +1,64 @@
+<svg viewBox="0 0 320 205" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="ลากนิ้วหรือใช้จอยสติ๊กเดิน สู้อัตโนมัติ แตะแท่นเรืองแสงเพื่อฝึกพูด แล้วปราบบอส">
+  <!-- RPG dungeon tutorial. NOTE: this game is currently archived (its
+       card is hidden on the mode-select screen, see #cardRpg in
+       game.html) — kept so un-archiving it doesn't leave the tutorial
+       back on the placeholder. Colours from js/game-rpg.js: floor
+       #CBD5E1 on #0f172a walls, HUD #1e2a40, shrine 🔯, joystick violet. -->
+  <defs>
+    <clipPath id="rpgMap"><rect x="12" y="14" width="182" height="112" rx="12"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="320" height="205" rx="18" fill="#EEF9F8"/>
+
+  <!-- dungeon map -->
+  <g clip-path="url(#rpgMap)">
+    <rect x="12" y="14" width="182" height="112" fill="#0f172a"/>
+    <!-- rooms + corridor -->
+    <rect x="24" y="26" width="56" height="40" fill="#CBD5E1"/>
+    <rect x="70" y="56" width="16" height="30" fill="#CBD5E1"/>
+    <rect x="56" y="78" width="62" height="36" fill="#CBD5E1"/>
+    <rect x="112" y="40" width="70" height="46" fill="#CBD5E1"/>
+    <rect x="104" y="58" width="16" height="14" fill="#CBD5E1"/>
+    <!-- hero -->
+    <circle cx="44" cy="46" r="8" fill="#2ec4b6" stroke="#0f766e" stroke-width="2"/>
+    <text x="44" y="50" text-anchor="middle" font-size="9">🧒</text>
+    <!-- enemy -->
+    <circle cx="86" cy="96" r="7" fill="#E53935"/>
+    <text x="86" y="100" text-anchor="middle" font-size="8">👾</text>
+    <!-- shrine -->
+    <circle cx="140" cy="62" r="12" fill="#F0A500" opacity="0.3"/>
+    <text x="140" y="67" text-anchor="middle" font-size="13">🔯</text>
+    <!-- boss -->
+    <text x="170" y="70" text-anchor="middle" font-size="15">👹</text>
+    <!-- path hint -->
+    <path d="M52 50 L74 70 L86 92" stroke="#2ec4b6" stroke-width="2"
+          stroke-dasharray="4 3" fill="none" stroke-linecap="round"/>
+  </g>
+  <rect x="12" y="14" width="182" height="112" rx="12" fill="none" stroke="#D8F0EE" stroke-width="2"/>
+
+  <!-- controls panel -->
+  <rect x="202" y="14" width="106" height="112" rx="12" fill="#ffffff" stroke="#D8F0EE" stroke-width="2"/>
+  <!-- joystick -->
+  <circle cx="230" cy="52" r="24" fill="#efeaf8" stroke="#c9bde8" stroke-width="2.5"/>
+  <circle cx="240" cy="46" r="12" fill="#9a86c9" stroke="#ffffff" stroke-width="2"/>
+  <text x="230" y="88" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="10" font-weight="700" fill="#6d28d9">จอยสติ๊ก</text>
+  <!-- skill button -->
+  <circle cx="284" cy="52" r="17" fill="#8A5CF6"/>
+  <text x="284" y="58" text-anchor="middle" font-size="14">🔮</text>
+  <text x="284" y="88" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="10" font-weight="700" fill="#6d28d9">สกิล</text>
+  <text x="255" y="108" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="10" fill="#8a8496">หรือลากนิ้วบนแผนที่</text>
+  <text x="255" y="120" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="10" fill="#8a8496">ตัวละครจะเดินไปหา</text>
+
+  <!-- rules -->
+  <rect x="14" y="134" width="292" height="46" rx="10" fill="#ffffff" stroke="#D8F0EE" stroke-width="2"/>
+  <text x="24" y="149" font-family="Prompt, sans-serif" font-size="11" fill="#5b5170">⚔️ เดินเข้าใกล้ศัตรู แล้วจะสู้กันเองอัตโนมัติ</text>
+  <text x="24" y="164" font-family="Prompt, sans-serif" font-size="11" fill="#5b5170">🔯 เดินชนแท่นเรืองแสง = ได้ฝึกพูด + ฟื้นพลังชีวิต</text>
+  <text x="24" y="176" font-family="Prompt, sans-serif" font-size="10" fill="#9a90a4">👹 บอสจะตื่นเมื่อแตะแท่นในห้องบอส</text>
+
+  <text x="160" y="196" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11.5" font-weight="700" fill="#13726a">ดันเจี้ยนสุ่มใหม่ทุกครั้งที่เล่น</text>
+</svg>
