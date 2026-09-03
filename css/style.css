@@ -19,7 +19,14 @@
 
 html, body {
   font-family: "Prompt", sans-serif;
-  background-color: var(--color-bg);
+  /* No background-color here on purpose. A background on the ROOT element
+     is painted as the page canvas, which sits over every negative
+     z-index layer -- it was hiding the hover backdrop completely (and
+     .kid-bg's floating decorations with it). The base cream now comes
+     from body::before below, which is itself a negative layer, so
+     everything in that stack renders in the order it declares. Leaving
+     it off body too: with html transparent, a body background would
+     propagate to the canvas and cause exactly the same problem. */
   color: var(--color-text);
   font-size: 1.05rem;
   scroll-behavior: smooth;
@@ -64,14 +71,18 @@ body::before {
   background-position: center;
   transition: opacity 0.35s ease;
 }
-#gameBackdrop.is-on { opacity: 0.4; }
+/* 0.4 behind a 0.45 scrim let only ~22% of the scene through, which read
+   as "nothing happened" on screen. 0.62 behind a lighter 0.3 scrim shows
+   roughly twice as much while still keeping page text well clear of AA
+   (measured against the darkest scene, tetris navy). */
+#gameBackdrop.is-on { opacity: 0.62; }
 /* A light scrim keeps card text readable over the darker scenes
    (tetris and rpg are near-navy). */
 #gameBackdrop::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(253, 246, 236, 0.45);
+  background: rgba(253, 246, 236, 0.3);
 }
 @media (hover: none) {
   #gameBackdrop { display: none; }
