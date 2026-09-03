@@ -321,8 +321,10 @@ function createPlatformerGame(words, callbacks, difficulty) {
         swipeFired = true;
         if (dy < 0) {
           self.doJump();
+          self.flashSwipe('up');
         } else {
           self.slideHeld = true;
+          self.flashSwipe('down');
           self.time.delayedCall(SWIPE_SLIDE_MS, function () { self.slideHeld = false; });
         }
       };
@@ -338,14 +340,57 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
       this.sfxSwoosh = this.sound.add('Swoosh',       { volume: 0.6 });
 
-      this.hint = this.add.text(W / 2, 26,
-        '🐒 กระโดด: ปัดขึ้น/↑/Space   สไลด์: ปัดลง/↓   ชนหนาม/ตกหลุม = จบเกม!', {
-          fontFamily: 'Prompt, sans-serif', fontSize: '13px', color: '#2b2438',
-          backgroundColor: '#ffffffaa', padding: { x: 8, y: 4 }
-        }).setOrigin(0.5).setDepth(10);
-      this.time.delayedCall(4000, function () {
-        self.tweens.add({ targets: self.hint, alpha: 0, duration: 600,
-          onComplete: function () { self.hint.destroy(); self.hint = null; }
+      // ── Swipe coach ────────────────────────────────────────────
+      // The controls used to be one 13px line of text that faded after
+      // 4s -- easy for a child to miss entirely, and it listed four
+      // input methods at once. This is two big picture badges instead:
+      // a green UP for jump and a blue DOWN for slide, held on screen
+      // long enough to actually read, with a matching arrow flashed on
+      // every real swipe (see flashSwipe) so the gesture keeps being
+      // taught while playing rather than only at the start.
+      this.coach = this.add.container(0, 0).setDepth(30);
+      var cg = this.add.graphics();
+      // panel
+      cg.fillStyle(0xffffff, 0.94);
+      cg.fillRoundedRect(W / 2 - 168, 34, 336, 104, 18);
+      cg.lineStyle(3, 0x2ec4b6, 0.9);
+      cg.strokeRoundedRect(W / 2 - 168, 34, 336, 104, 18);
+      // jump badge (green, arrow up)
+      cg.fillStyle(0x4caf50, 1);
+      cg.fillRoundedRect(W / 2 - 150, 52, 60, 68, 14);
+      cg.fillStyle(0xffffff, 1);
+      cg.fillTriangle(W / 2 - 120, 66, W / 2 - 137, 88, W / 2 - 103, 88);
+      cg.fillRect(W / 2 - 126, 88, 12, 18);
+      // slide badge (blue, arrow down)
+      cg.fillStyle(0x2980b9, 1);
+      cg.fillRoundedRect(W / 2 + 18, 52, 60, 68, 14);
+      cg.fillStyle(0xffffff, 1);
+      cg.fillTriangle(W / 2 + 48, 106, W / 2 + 31, 84, W / 2 + 65, 84);
+      cg.fillRect(W / 2 + 42, 66, 12, 18);
+      this.coach.add(cg);
+      this.coach.add(this.add.text(W / 2 - 78, 62, 'ปัดขึ้น\nกระโดด', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '17px', fontStyle: 'bold',
+        color: '#2e7d32', align: 'left', lineSpacing: 3
+      }));
+      this.coach.add(this.add.text(W / 2 + 90, 62, 'ปัดลง\nสไลด์ลอด', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '17px', fontStyle: 'bold',
+        color: '#1c5d8c', align: 'left', lineSpacing: 3
+      }));
+      this.coach.add(this.add.text(W / 2, 126, 'ปัดนิ้วบนหน้าจอตรงไหนก็ได้', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '12.5px', color: '#5b5468'
+      }).setOrigin(0.5, 0));
+      // A gentle pulse so the badges read as "do this", not decoration.
+      this.tweens.add({
+        targets: this.coach, scale: { from: 1, to: 1.03 },
+        duration: 620, yoyo: true, repeat: 5, ease: 'Sine.easeInOut'
+      });
+      this.coach.setPosition(0, 0);
+      // 6s, not 4 -- long enough for a child to look, try one swipe and
+      // still see the card confirming what happened.
+      this.time.delayedCall(6000, function () {
+        if (!self.coach) return;
+        self.tweens.add({ targets: self.coach, alpha: 0, y: -20, duration: 700,
+          onComplete: function () { if (self.coach) { self.coach.destroy(); self.coach = null; } }
         });
       });
 
@@ -354,6 +399,27 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.immortalTxt = this.add.text(10, 14, '🛡️ อมตะ', {
         fontFamily: 'Prompt, sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#2ec4b6'
       }).setDepth(10).setVisible(false);
+    },
+
+    // Big coloured arrow + word at the player, on every swipe. Keeps
+    // teaching the gesture during play (the coach card is only up for
+    // the first few seconds) and confirms the swipe registered at all,
+    // which matters when a swipe is rejected for being too short.
+    flashSwipe: function (dir) {
+      var up = dir === 'up';
+      var x = PLAYER_X + 58, y = up ? GROUND_Y - 118 : GROUND_Y - 44;
+      var g = this.add.graphics().setDepth(28);
+      g.fillStyle(up ? 0x4caf50 : 0x2980b9, 0.92);
+      if (up) { g.fillTriangle(x, y - 16, x - 15, y + 6, x + 15, y + 6); g.fillRect(x - 5, y + 6, 10, 16); }
+      else    { g.fillTriangle(x, y + 22, x - 15, y, x + 15, y);        g.fillRect(x - 5, y - 16, 10, 16); }
+      var t = this.add.text(x + 26, y - 4, up ? 'กระโดด!' : 'สไลด์!', {
+        fontFamily: 'Prompt, sans-serif', fontSize: '15px', fontStyle: 'bold',
+        color: up ? '#2e7d32' : '#1c5d8c'
+      }).setOrigin(0, 0.5).setDepth(28);
+      this.tweens.add({
+        targets: [g, t], alpha: 0, y: '-=18', duration: 520, ease: 'Quad.easeOut',
+        onComplete: function () { g.destroy(); t.destroy(); }
+      });
     },
 
     doJump: function () {
