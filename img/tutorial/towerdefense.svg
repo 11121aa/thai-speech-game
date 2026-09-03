@@ -1,0 +1,71 @@
+<svg viewBox="0 0 320 205" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="แตะการ์ดทหาร แตะช่องว่างเพื่อวาง อย่าให้ศัตรูเดินถึงฐาน">
+  <!-- Tower defense tutorial: pick a troop card, tap an empty grid cell
+       (not on the road), and stop enemies before they reach the base.
+       Colours from js/game-towerdefense.js: field #0f172a-ish dark, road
+       tan, archer #2EC4B6, sword #E53935, barrack #6D4C41, gold #F0A500,
+       base #27AE60. Placement is grid-based and blocked near the road. -->
+  <defs>
+    <clipPath id="tdField"><rect x="12" y="14" width="296" height="96" rx="12"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="320" height="205" rx="18" fill="#EEF9F8"/>
+
+  <g clip-path="url(#tdField)">
+    <rect x="12" y="14" width="296" height="96" fill="#DDEBC8"/>
+    <!-- winding road, portal (left) to base (right) -->
+    <path d="M12 34 H86 V78 H190 V40 H262 V88 H308"
+          fill="none" stroke="#C9A227" stroke-width="17" stroke-linejoin="round"/>
+    <path d="M12 34 H86 V78 H190 V40 H262 V88 H308"
+          fill="none" stroke="#E3C463" stroke-width="11" stroke-linejoin="round"/>
+    <!-- portal + enemies walking -->
+    <circle cx="22" cy="34" r="10" fill="#8E44AD"/>
+    <circle cx="52" cy="34" r="8" fill="#27AE60" stroke="#1b6b3a" stroke-width="1.5"/>
+    <circle cx="86" cy="62" r="8" fill="#7F8C8D" stroke="#4d5657" stroke-width="1.5"/>
+    <path d="M64 34 h12" stroke="#E53935" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M73 30 l5 4 l-5 4" fill="none" stroke="#E53935" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- base -->
+    <rect x="290" y="76" width="20" height="24" rx="4" fill="#27AE60" stroke="#14663a" stroke-width="2"/>
+    <text x="300" y="93" text-anchor="middle" font-size="11">🏠</text>
+    <!-- placed archer off-road, with range ring -->
+    <circle cx="128" cy="40" r="22" fill="#2EC4B6" opacity="0.16"/>
+    <circle cx="128" cy="40" r="13" fill="#2EC4B6" stroke="#12867c" stroke-width="2"/>
+    <text x="128" y="45" text-anchor="middle" font-size="12">🏹</text>
+    <!-- an empty grid cell being tapped -->
+    <rect x="212" y="60" width="24" height="24" rx="5" fill="#ffffff" opacity="0.5"
+          stroke="#2EC4B6" stroke-width="2.5" stroke-dasharray="4 3"/>
+    <text x="230" y="90" font-size="15">☝️</text>
+  </g>
+  <rect x="12" y="14" width="296" height="96" rx="12" fill="none" stroke="#D8F0EE" stroke-width="2"/>
+
+  <!-- labels on the field -->
+  <text x="26" y="124" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="9.5" font-weight="700" fill="#8E44AD">ศัตรูออกมา</text>
+  <text x="299" y="124" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="9.5" font-weight="700" fill="#27AE60">ฐานเรา</text>
+
+  <!-- troop palette + steps -->
+  <g>
+    <rect x="14" y="132" width="46" height="34" rx="8" fill="#ffffff" stroke="#2EC4B6" stroke-width="2.5"/>
+    <text x="37" y="150" text-anchor="middle" font-size="14">🏹</text>
+    <text x="37" y="162" text-anchor="middle" font-family="Prompt, sans-serif"
+          font-size="8.5" font-weight="700" fill="#8a6300">🪙40</text>
+    <rect x="64" y="132" width="46" height="34" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
+    <text x="87" y="150" text-anchor="middle" font-size="14">⚔️</text>
+    <text x="87" y="162" text-anchor="middle" font-family="Prompt, sans-serif"
+          font-size="8.5" font-weight="700" fill="#8a6300">🪙35</text>
+    <rect x="114" y="132" width="46" height="34" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
+    <text x="137" y="150" text-anchor="middle" font-size="14">🏰</text>
+    <text x="137" y="162" text-anchor="middle" font-family="Prompt, sans-serif"
+          font-size="8.5" font-weight="700" fill="#8a6300">🪙90</text>
+  </g>
+  <circle cx="18" cy="130" r="8.5" fill="#F0A500"/>
+  <text x="18" y="134" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="10" font-weight="700" fill="#3D2010">1</text>
+
+  <text x="176" y="144" font-family="Prompt, sans-serif" font-size="11" fill="#5b5170">2. แตะช่องว่างข้างถนนเพื่อวาง</text>
+  <text x="176" y="160" font-family="Prompt, sans-serif" font-size="11" fill="#5b5170">3. แตะทหารเพื่ออัพเกรด</text>
+
+  <rect x="14" y="172" width="292" height="24" rx="9" fill="#ffffff" stroke="#D8F0EE" stroke-width="2"/>
+  <text x="160" y="188" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11" font-weight="700" fill="#E53935">อย่าให้ศัตรูเดินถึงฐาน! · ก่อนเริ่มแต่ละด่านจะได้ฝึกพูด</text>
+</svg>

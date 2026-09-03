@@ -1,0 +1,87 @@
+<svg viewBox="0 0 320 205" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="หลบรถ เดินให้ถึงแถบสีฟ้าเพื่อฝึกพูด ลากนิ้วค้างไว้เพื่อเดิน">
+  <!-- Crossy tutorial, red/green split. Colours from js/game-crossy.js:
+       road #616161, grass #4caf50, goal row #00bcd4, cars #ff5252 /
+       #ffb300 / #fff176. Control is press-and-DRAG (one hop per 30px of
+       travel, finger stays down) — the caption says so, since that
+       replaced the old button pad. -->
+  <defs>
+    <clipPath id="crL"><rect x="12" y="14" width="140" height="98" rx="12"/></clipPath>
+    <clipPath id="crR"><rect x="168" y="14" width="140" height="98" rx="12"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="320" height="205" rx="18" fill="#EEF9F8"/>
+
+  <!-- ── AVOID: cars on the road ── -->
+  <g clip-path="url(#crL)">
+    <rect x="12" y="14" width="140" height="98" fill="#4caf50"/>
+    <rect x="12" y="34" width="140" height="26" fill="#616161"/>
+    <rect x="12" y="66" width="140" height="26" fill="#616161"/>
+    <path d="M18 47 h12 M42 47 h12 M66 47 h12 M90 47 h12 M114 47 h12 M138 47 h12"
+          stroke="#e0e0e0" stroke-width="2" stroke-dasharray="8 8"/>
+    <path d="M18 79 h12 M42 79 h12 M66 79 h12 M90 79 h12 M114 79 h12 M138 79 h12"
+          stroke="#e0e0e0" stroke-width="2" stroke-dasharray="8 8"/>
+    <!-- cars -->
+    <g>
+      <rect x="26" y="38" width="40" height="17" rx="5" fill="#ff5252"/>
+      <rect x="36" y="41" width="10" height="8" rx="2" fill="#ffe0e0"/>
+      <circle cx="34" cy="56" r="3.5" fill="#2b2438"/><circle cx="58" cy="56" r="3.5" fill="#2b2438"/>
+      <rect x="88" y="70" width="40" height="17" rx="5" fill="#ffb300"/>
+      <rect x="98" y="73" width="10" height="8" rx="2" fill="#fff4d6"/>
+      <circle cx="96" cy="88" r="3.5" fill="#2b2438"/><circle cx="120" cy="88" r="3.5" fill="#2b2438"/>
+    </g>
+    <!-- frog about to get hit -->
+    <g transform="translate(78,26)">
+      <ellipse cx="0" cy="0" rx="9" ry="7" fill="#2E9E5B"/>
+      <circle cx="-3.5" cy="-4" r="2.6" fill="#fff"/><circle cx="3.5" cy="-4" r="2.6" fill="#fff"/>
+      <circle cx="-3.5" cy="-4" r="1.2" fill="#12341f"/><circle cx="3.5" cy="-4" r="1.2" fill="#12341f"/>
+    </g>
+  </g>
+  <rect x="12" y="14" width="140" height="98" rx="12" fill="none" stroke="#E53935" stroke-width="3"/>
+  <circle cx="145" cy="21" r="13" fill="#E53935"/>
+  <path d="M139 15 L151 27 M151 15 L139 27" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+
+  <!-- ── GOAL: the blue checkpoint row ── -->
+  <g clip-path="url(#crR)">
+    <rect x="168" y="14" width="140" height="98" fill="#4caf50"/>
+    <rect x="168" y="60" width="140" height="26" fill="#616161"/>
+    <path d="M174 73 h12 M198 73 h12 M222 73 h12 M246 73 h12 M270 73 h12 M294 73 h12"
+          stroke="#e0e0e0" stroke-width="2" stroke-dasharray="8 8"/>
+    <!-- goal row -->
+    <rect x="168" y="22" width="140" height="26" fill="#00bcd4"/>
+    <text x="238" y="39" text-anchor="middle" font-family="Prompt, sans-serif"
+          font-size="12" font-weight="700" fill="#ffffff">คำ 🎤</text>
+    <!-- frog stepping onto it -->
+    <g transform="translate(238,58)">
+      <ellipse cx="0" cy="0" rx="9" ry="7" fill="#2E9E5B"/>
+      <circle cx="-3.5" cy="-4" r="2.6" fill="#fff"/><circle cx="3.5" cy="-4" r="2.6" fill="#fff"/>
+      <circle cx="-3.5" cy="-4" r="1.2" fill="#12341f"/><circle cx="3.5" cy="-4" r="1.2" fill="#12341f"/>
+    </g>
+    <path d="M238 76 L238 62" stroke="#ffffff" stroke-width="2.5"
+          stroke-dasharray="4 3" stroke-linecap="round"/>
+  </g>
+  <rect x="168" y="14" width="140" height="98" rx="12" fill="none" stroke="#27AE60" stroke-width="3"/>
+  <circle cx="301" cy="21" r="13" fill="#27AE60"/>
+  <path d="M295 21 L299.5 26 L308 16" stroke="#fff" stroke-width="3.2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- ── captions ── -->
+  <text x="82" y="130" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="14" font-weight="700" fill="#E53935">หลบรถให้ดี!</text>
+  <text x="82" y="147" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11" fill="#7a6f80">รถวิ่งสวนกันสองทาง</text>
+  <text x="82" y="162" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="10.5" fill="#9a90a4">ชนรถ = เสียเวลา แล้วถอยหลัง</text>
+
+  <text x="238" y="130" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="14" font-weight="700" fill="#27AE60">เดินให้ถึงแถบฟ้า</text>
+  <text x="238" y="147" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11" fill="#7a6f80">ถึงแล้วได้ฝึกพูด</text>
+  <text x="238" y="162" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="10.5" fill="#9a90a4">เดินหน้าไปเรื่อยๆ ไม่มีจุดจบ</text>
+
+  <line x1="160" y1="24" x2="160" y2="168" stroke="#D8F0EE" stroke-width="2" stroke-dasharray="5 5"/>
+
+  <rect x="14" y="174" width="292" height="24" rx="9" fill="#ffffff" stroke="#D8F0EE" stroke-width="2"/>
+  <text x="160" y="190" text-anchor="middle" font-family="Prompt, sans-serif"
+        font-size="11.5" font-weight="700" fill="#5b5170">👆 ลากนิ้วค้างไว้เพื่อเดินต่อเนื่อง · แตะ = ไปข้างหน้า</text>
+</svg>
