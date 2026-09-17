@@ -8,143 +8,124 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Mali:wght@500;600&family=Noto+Sans+Thai+Looped:wght@500;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="css/style.css?v=23" rel="stylesheet">
+<link href="css/kid-b.css?v=1" rel="stylesheet">
 </head>
-<body class="kid-page">
+<body class="kid-page ui-b">
 
 <!-- Purely decorative floating background (clouds/stars/balloons) — aria-hidden
      and pointer-events:none so it never interferes with reading or touch input. -->
 <!-- Fades in a scene from whichever game is being hovered (see
      wireBackdropHover below and #gameBackdrop in css/style.css). -->
 <div id="gameBackdrop" aria-hidden="true"></div>
-<div class="kid-bg" aria-hidden="true">
-  <span class="kid-deco kid-cloud"   style="top:6%;  left:6%;">☁️</span>
-  <span class="kid-deco kid-cloud"   style="top:16%; left:74%;">☁️</span>
-  <span class="kid-deco kid-cloud"   style="top:46%; left:88%;">☁️</span>
-  <span class="kid-deco kid-cloud"   style="top:70%; left:2%;">☁️</span>
-  <span class="kid-deco kid-star"    style="top:10%; left:42%;">⭐</span>
-  <span class="kid-deco kid-star"    style="top:62%; left:14%;">✨</span>
-  <span class="kid-deco kid-star"    style="top:80%; left:78%;">⭐</span>
-  <span class="kid-deco kid-balloon" style="top:24%; left:18%;">🎈</span>
-  <span class="kid-deco kid-balloon" style="top:58%; left:93%;">🎈</span>
-  <span class="kid-deco kid-balloon" style="top:85%; left:45%;">🎈</span>
-  <span class="kid-deco kid-rainbow" style="top:3%;  left:58%;">🌈</span>
+<div class="kb-scenery" aria-hidden="true">
+  <div class="kb-sun"></div>
+  <div class="kb-cloud" style="--w:96px;left:6%;top:120px"></div>
+  <div class="kb-cloud" style="--w:70px;left:62%;top:190px;opacity:.75"></div>
+  <div class="kb-cloud" style="--w:84px;left:84%;top:70px;opacity:.85"></div>
+  <div class="kb-hill kb-hill-1"></div>
+  <div class="kb-hill kb-hill-2"></div>
 </div>
 
-<header class="site-header">
-  <nav class="navbar navbar-expand-lg app-nav">
-    <div class="container">
-      <a class="navbar-brand app-brand" href="index.html">
-        <span class="brand-emoji">🗣️</span>
-        <span>แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</span>
-      </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navMain">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
-          <li class="nav-item"><a class="nav-link active" data-page="game.html" href="game.html">เกม</a></li>
-          <li class="nav-item"><a class="nav-link" data-page="contact.html" href="contact.html">ติดต่อเรา</a></li>
-          <li class="nav-item" id="navShop" style="display:none;"><a class="nav-link" data-page="shop.html" href="shop.html">🪙 ร้านค้า</a></li>
-          <li class="nav-item" id="navGuest"><a class="nav-link nav-cta" data-page="login.html" href="login.html">เข้าสู่ระบบ</a></li>
-          <li class="nav-item" id="navSelf" style="display:none;"><a class="nav-link" data-page="management.html" href="management.html">ของฉัน</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
+<header class="kb-hud" id="kbHud">
+  <div class="kb-me"><span class="kb-me-av" id="kbAvatar"><span data-ic="user"></span></span><b id="kbName">สวัสดี!</b></div>
+  <span class="kb-pill kb-streak" id="kbStreakPill" hidden><span data-ic="fire"></span><b id="kbStreak">0</b></span>
+  <span class="kb-pill kb-coin" id="kbCoinPill" hidden><span data-ic="star"></span><b id="kbTotal">0</b></span>
 </header>
 
-<main class="py-4">
-  <div class="container">
+<nav class="kb-dock" aria-label="เมนู">
+  <ul>
+    <li id="navGuest"><a href="login.html"><span data-ic="key"></span>เข้าสู่ระบบ</a></li>
+    <li id="navSelf" style="display:none;"><a href="management.html"><span data-ic="lock"></span>ผู้ปกครอง</a></li>
+    <li id="navShop" style="display:none;"><a href="shop.html">ร้านค้า</a></li>
+  </ul>
+</nav>
 
-    <!-- Mode Selection -->
-    <div id="screenMode">
-      <div class="text-center mb-4">
-        <h1 class="hero-title" style="font-size:2.4rem;">🎮 เลือกเกม</h1>
-        <p class="hero-lead">เลือกประเภทเกมที่ชอบแล้วเริ่มฝึกออกเสียงได้เลย!</p>
-      </div>
+<main class="kb-main" id="top">
+  <div class="kb-wrap">
 
-      <!-- Practice leaderboard -->
-      <div class="soft-card mb-4" id="practiceLeaderCard">
-        <h6 class="fw-bold mb-3"><i class="bi bi-mic-fill me-1" style="color:var(--color-accent-purple);"></i>ผู้ฝึกยอดเยี่ยม <span class="text-secondary fw-normal small">(จำนวนคำที่ฝึกทั้งหมด)</span></h6>
-        <div id="practiceLeaderRows"><div class="text-secondary text-center small py-2">กำลังโหลด...</div></div>
-      </div>
+    <div id="screenMode" class="kb-home">
+      <section class="kb-guide" aria-live="polite">
+        <span class="kb-owl" aria-hidden="true"></span>
+        <div class="kb-bubble" id="kbBubble">
+          <p class="kb-hand">สวัสดีจ้า! รอสักครู่นะ</p>
+        </div>
+      </section>
 
-      <div class="game-mode-hub">
-        <div class="game-mode-card" id="cardMatching">
-          <span class="mode-icon">🃏</span>
-          <span class="mode-title">จับคู่ภาพ</span>
-          <span class="mode-desc">จับคู่คำกับภาพที่ตรงกัน</span>
-        </div>
-        <div class="game-mode-card" id="cardShooting">
-          <span class="mode-icon">🎯</span>
-          <span class="mode-title">ยิงเป้า</span>
-          <span class="mode-desc">คลิกเป้าแล้วฝึกออกเสียงคำ</span>
-        </div>
-        <div class="game-mode-card" id="cardAirplane">
-          <span class="mode-icon">✈️</span>
-          <span class="mode-title">ขับเครื่องบิน</span>
-          <span class="mode-desc">เก็บลูกโป่งคำศัพท์บนท้องฟ้า</span>
-        </div>
-        <div class="game-mode-card" id="cardFlashcard">
-          <span class="mode-icon">🎴</span>
-          <span class="mode-title">ไพ่คำศัพท์</span>
-          <span class="mode-desc">ดูภาพแล้วพูดคำที่เห็น ทีละใบ</span>
-        </div>
-        <div class="game-mode-card" id="cardPlatformer">
-          <span class="mode-icon">🏃</span>
-          <span class="mode-title">วิ่งเก็บเหรียญ</span>
-          <span class="mode-desc">กระโดด สไลด์ หลีกหิน ชนแล้วจบเกม!</span>
-        </div>
-        <div class="game-mode-card" id="cardCrossy">
-          <span class="mode-icon">🚗</span>
-          <span class="mode-title">ข้ามถนน</span>
-          <span class="mode-desc">โดดข้ามรถ ฝึกพูดคำทุกครั้งที่ข้ามได้</span>
-        </div>
-        <div class="game-mode-card" id="cardCooking">
-          <span class="mode-icon">🍳</span>
-          <span class="mode-title">ทำอาหาร</span>
-          <span class="mode-desc">หั่น สับ ประกอบ Hot Dog ฝึกคำศัพท์อาหาร</span>
-        </div>
-        <div class="game-mode-card" id="cardDressup">
-          <span class="mode-icon">👗</span>
-          <span class="mode-title">แต่งตัวตุ๊กตา</span>
-          <span class="mode-desc">แต่งตัวตุ๊กตาด้วยของที่ซื้อจากร้านค้า</span>
-        </div>
-        <div class="game-mode-card" id="cardTowerdefense">
-          <span class="mode-icon">🏹</span>
-          <span class="mode-title">ป้องกันฐาน</span>
-          <span class="mode-desc">วางทหารป้องกันเส้นทาง ฝึกพูดคำก่อนแต่ละด่าน</span>
-        </div>
-        <div class="game-mode-card" id="cardTetris">
-          <span class="mode-icon">🧩</span>
-          <span class="mode-title">เตตริส</span>
-          <span class="mode-desc">ต่อบล็อกให้เต็มแถว ฝึกพูดคำทุก 1,000 คะแนน</span>
-        </div>
-        <!-- ARCHIVED: the dungeon crawler is hidden from the game list --
-             it played too hard for the children this app is for. Hidden
-             rather than deleted: js/game-rpg.js, its shop items and its
-             leaderboard history are all still here, so bringing it back
-             is just removing this style="display:none" (and the matching
-             guard on its click handler below). -->
-        <div class="game-mode-card" id="cardRpg" style="display:none;">
-          <span class="mode-icon">⚔️</span>
+      <section class="kb-balloons" id="kbBalloonsSec" hidden>
+        <h3 class="kb-hand">ลูกโป่งเสียง <small>แตะเพื่อฝึกเสียงนั้น</small></h3>
+        <div class="kb-balloon-row" id="kbBalloons"></div>
+      </section>
+
+      <section class="kb-world" aria-label="เลือกเกม">
+        <div class="game-mode-hub kb-islands">
+        <button type="button" class="game-mode-card kb-island" id="cardShooting" style="--ga:#FFE4DC;--gb:#E0461F">
+          <span class="mode-icon" data-ic="target"></span>
+          <span class="mode-text"><span class="mode-title">ยิงเป้า</span><span class="mode-desc">เล็งแล้วยิงให้โดนเป้า</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardCooking" style="--ga:#FFF1D6;--gb:#C77F06">
+          <span class="mode-icon" data-ic="pan"></span>
+          <span class="mode-text"><span class="mode-title">ทำอาหาร</span><span class="mode-desc">หั่น ทอด อบ ทีละขั้น</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardAirplane" style="--ga:#DDEFFF;--gb:#2B82D9">
+          <span class="mode-icon" data-ic="plane"></span>
+          <span class="mode-text"><span class="mode-title">ขับเครื่องบิน</span><span class="mode-desc">เก็บลูกโป่งคำศัพท์</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardMatching" style="--ga:#EEE6FF;--gb:#7A55E0">
+          <span class="mode-icon" data-ic="cards"></span>
+          <span class="mode-text"><span class="mode-title">จับคู่ภาพ</span><span class="mode-desc">พลิกหาภาพที่เหมือนกัน</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardPlatformer" style="--ga:#DFF6E6;--gb:#239B56">
+          <span class="mode-icon" data-ic="runner"></span>
+          <span class="mode-text"><span class="mode-title">วิ่งเก็บเหรียญ</span><span class="mode-desc">ปัดขึ้นกระโดด ปัดลงสไลด์</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardCrossy" style="--ga:#FFE3EC;--gb:#D6336C">
+          <span class="mode-icon" data-ic="car"></span>
+          <span class="mode-text"><span class="mode-title">ข้ามถนน</span><span class="mode-desc">ลากนิ้วพาข้ามถนน</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardFlashcard" style="--ga:#E2F4F4;--gb:#15878A">
+          <span class="mode-icon" data-ic="flashcard"></span>
+          <span class="mode-text"><span class="mode-title">ไพ่คำศัพท์</span><span class="mode-desc">ดูภาพแล้วพูดคำ</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardDressup" style="--ga:#FCE7F6;--gb:#B83CA0">
+          <span class="mode-icon" data-ic="dress"></span>
+          <span class="mode-text"><span class="mode-title">แต่งตัวตุ๊กตา</span><span class="mode-desc">พูดถูกได้ชุดใหม่</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardTowerdefense" style="--ga:#ECEBDF;--gb:#6F6A2E">
+          <span class="mode-icon" data-ic="bow"></span>
+          <span class="mode-text"><span class="mode-title">ป้องกันฐาน</span><span class="mode-desc">วางทหารกันเส้นทาง</span></span>
+        </button>
+        <button type="button" class="game-mode-card kb-island" id="cardTetris" style="--ga:#E4E8FF;--gb:#4257D6">
+          <span class="mode-icon" data-ic="blocks"></span>
+          <span class="mode-text"><span class="mode-title">เตตริส</span><span class="mode-desc">ต่อบล็อกให้เต็มแถว</span></span>
+        </button>
+        <!-- ARCHIVED: dungeon crawler hidden (too hard for these children); js/game-rpg.js kept. -->
+        <button type="button" class="game-mode-card" id="cardRpg" style="display:none;">
+          <span class="mode-icon" data-ic="star"></span>
           <span class="mode-title">ผจญภัยดันเจี้ยน</span>
-          <span class="mode-desc">สำรวจดันเจี้ยนสุ่มใหม่ทุกครั้ง ปราบบอส ฝึกพูดที่แท่นเรืองแสง</span>
+        </button>
         </div>
-      </div>
+      </section>
+
+      <section class="kb-board" id="practiceLeaderCard">
+        <div class="kb-board-in">
+          <h3 class="kb-hand"><span data-ic="trophy"></span>ป้ายคนเก่ง</h3>
+          <div id="practiceLeaderRows"><div class="muted-note">กำลังโหลด...</div></div>
+        </div>
+      </section>
     </div>
 
     <!-- Active Game Screen -->
     <div id="screenGame" style="display:none;">
       <div class="game-hud-bar">
-        <button class="btn-quit" id="btnQuitGame">← ออก</button>
-        <strong id="hudModeName" style="color:var(--color-primary-dark);font-size:1rem;"></strong>
+        <button class="btn-quit" id="btnQuitGame"><span data-ic="back"></span>บ้าน</button>
+        <strong id="hudModeName"></strong>
         <div class="game-hud-pills">
-          <span class="hud-pill">⭐ <span id="hudPoints">0</span></span>
-          <span class="hud-pill">⏱ <span id="hudTimer">60</span>s</span>
+          <span class="hud-pill"><span data-ic="star"></span><span id="hudPoints">0</span></span>
+          <span class="hud-pill"><span id="hudTimer">60</span>s</span>
         </div>
       </div>
       <div id="matchingGame" style="display:none;"></div>
@@ -219,27 +200,30 @@
 
     <!-- Finish Screen -->
     <div id="screenFinish" style="display:none;">
-      <div class="finish-screen">
+      <div class="finish-screen kb-win">
+        <div class="kb-rays" aria-hidden="true"></div>
         <div class="finish-card">
-          <div class="finish-emoji">🎉</div>
-          <h2 class="mt-2 mb-1">จบแล้ว!</h2>
-          <div class="finish-score" id="finishScoreLine">⭐ <span id="finalPoints">0</span> แต้ม</div>
-          <p class="finish-high text-secondary"><span id="finishHighLabel">สูงสุด</span>: <strong id="highScore">0</strong></p>
-          <div class="finish-stars" id="finishStars" aria-label="ดาวที่ได้"></div>
-          <div class="finish-progress" id="finishProgress" hidden></div>
-          <div class="finish-words" id="finishWords" hidden></div>
-          <div class="finish-btns">
-            <button class="btn btn-outline-primary btn-bouncy" id="btnReturnMode">กลับเมนูเกม</button>
-            <button class="btn btn-warning btn-bouncy" id="btnPlayAgain">เล่นอีกครั้ง</button>
-          </div>
-          <!-- Per-game leaderboard -->
-          <div id="finishLeaderboard" style="margin-top:1.2rem;width:100%;text-align:left;">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:0.5rem;">
-              <i class="bi bi-trophy-fill" style="color:var(--color-secondary-dark);"></i>
-              <span class="fw-bold" style="font-size:0.95rem;">Top 5 — <span id="finishLeaderGame"></span></span>
+          <div class="kb-win-hero">
+            <span class="kb-trophy" aria-hidden="true"></span>
+            <h2 id="kbWinTitle">เก่งมาก!</h2>
+            <div class="finish-stars" id="finishStars" aria-label="ดาวที่ได้"></div>
+            <div class="kb-plus-row">
+              <span class="kb-pill kb-plus finish-score" id="finishScoreLine"><span data-ic="star"></span> <span id="finalPoints">0</span></span>
+              <span class="kb-pill kb-best"><span id="finishHighLabel">สูงสุด</span> <b id="highScore">0</b></span>
             </div>
-            <div id="finishLeaderRows"><div class="text-secondary text-center small py-1">กำลังโหลด...</div></div>
           </div>
+          <div class="kb-win-body">
+            <div class="finish-progress" id="finishProgress" hidden></div>
+            <div class="finish-words kb-stickers" id="finishWords" hidden></div>
+          </div>
+          <div class="finish-btns kb-pair">
+            <button class="kb-candy yellow" id="btnReturnMode"><span data-ic="home"></span>กลับบ้าน</button>
+            <button class="kb-candy green" id="btnPlayAgain"><span data-ic="retry"></span>เล่นอีก</button>
+          </div>
+          <details class="kb-board kb-res-board" id="finishLeaderboard">
+            <summary class="kb-hand"><span data-ic="trophy"></span>ป้ายคนเก่ง <span id="finishLeaderGame"></span></summary>
+            <div id="finishLeaderRows"><div class="muted-note">กำลังโหลด...</div></div>
+          </details>
         </div>
       </div>
     </div>
@@ -248,182 +232,164 @@
 </main>
 
 <!-- Pre-game Setup Overlay -->
-<div id="screenSetup" class="setup-overlay" style="display:none;">
-  <div class="setup-panel">
-    <!-- Title + Start/Cancel are ONE sticky block (was at the bottom,
-         requiring a scroll through every option first). They must stick
-         together: as separate sticky elements the buttons pinned over
-         the heading and covered it. See css/style.css .setup-head. -->
-    <div class="setup-head">
-      <h4>⚙️ ตั้งค่าเกม — <span id="setupModeName"></span></h4>
-      <div class="setup-footer setup-footer-top">
-        <button class="btn btn-outline-secondary btn-bouncy" id="btnSetupCancel">ยกเลิก</button>
-        <button class="btn btn-warning btn-bouncy" id="btnSetupStart">เริ่มเกม! 🚀</button>
-      </div>
-    </div>
-
-    <div class="setup-error" id="setupError" role="alert" hidden></div>
-
-    <div class="setup-tutorial" id="setupTutorial">
+<div id="screenSetup" class="setup-overlay kb-dim" style="display:none;">
+  <div class="kb-ready">
+    <span class="kb-owl" aria-hidden="true"></span>
+    <div class="setup-panel kb-card" role="dialog" aria-modal="true" aria-labelledby="setupModeName">
+      <button type="button" class="kb-lock" id="kbLock" aria-label="ตั้งค่าสำหรับผู้ใหญ่ กดค้างไว้" aria-expanded="false" aria-controls="kbAdult">
+        <span class="kb-lock-ring" aria-hidden="true"></span><span data-ic="lock"></span>
+      </button>
+      <div class="kb-card-scroll">
+        <div class="kb-ready-top">
+          <span class="kb-island-art" id="kbSetupArt"></span>
+          <div><small class="kb-hand">พร้อมเล่นไหม?</small><h2 id="setupModeName"></h2></div>
+        </div>
+        <div class="setup-tutorial" id="setupTutorial">
       <img id="tutorialImg" class="setup-tutorial-img" src="" alt="ตัวอย่างวิธีเล่น">
       <p class="setup-tutorial-desc" id="tutorialDesc"></p>
     </div>
-
-    <div class="setup-row">
+        <div class="kb-set" id="kbSet">
+          <span data-ic="book"></span>
+          <span class="kb-set-text"><b id="kbSetName">กำลังเตรียมคำ...</b><small id="kbSetMeta"></small></span>
+        </div>
+        <div id="pfDiffRow" class="setup-row" style="display:none;">
+      <label>ความเร็ว</label>
+      <div class="diff-btns">
+        <button class="pf-diff-btn diff-btn" data-pfdiff="ง่าย">ช้า</button>
+        <button class="pf-diff-btn diff-btn active" data-pfdiff="ธรรมดา">ปกติ</button>
+        <button class="pf-diff-btn diff-btn" data-pfdiff="ยาก">เร็ว</button>
+      </div>
+    </div>
+        <div id="tdMapRow" class="setup-row" style="display:none;">
+      <label>แผนที่</label>
+      <div class="diff-btns">
+        <button class="td-map-btn diff-btn active" data-tdmap="0">ทุ่งหญ้า</button>
+        <button class="td-map-btn diff-btn" data-tdmap="1">ทะเลทราย</button>
+        <button class="td-map-btn diff-btn" data-tdmap="2">ภูเขาไฟ</button>
+      </div>
+    </div>
+        <div class="kb-adult" id="kbAdult" hidden>
+          <div class="kb-adult-head"><span data-ic="lock"></span>สำหรับผู้ใหญ่</div>
+          <div class="setup-row">
       <label>ชุดคำที่จะฝึก</label>
       <div class="diff-btns" id="hwDiffBtns">
         <button class="diff-btn active" data-diff="hw">การบ้าน</button>
         <button class="diff-btn" data-diff="worksheet">แบบฝึกหัด</button>
-        <button class="diff-btn" data-diff="custom">กำหนดเอง <small class="text-secondary">เลือกหมวดเสียงเอง</small></button>
+        <button class="diff-btn" data-diff="custom">เลือกเอง</button>
       </div>
     </div>
-
-    <div class="setup-row">
-      <label>ระดับความยาก</label>
-      <div class="diff-btns" id="hardModeBtns">
-        <button class="diff-btn active" data-hardmode="easy">พูดตาม <small class="text-secondary">มีตัวอย่างเสียง</small></button>
-        <button class="diff-btn" data-hardmode="hard">ไม่พูดตาม <small class="text-secondary">ไม่มีตัวอย่าง</small></button>
-      </div>
-    </div>
-
     <div id="hwSelectorRow" class="setup-row" style="display:none;">
       <label>เลือกการบ้าน</label>
-      <div id="hwSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;overscroll-behavior:contain;"></div>
+      <div id="hwSelectorList" class="pick-list"></div>
     </div>
-
     <div id="worksheetSelectorRow" class="setup-row" style="display:none;">
       <label>เลือกแบบฝึกหัด</label>
-      <div id="worksheetSelectorList" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;overscroll-behavior:contain;"></div>
+      <div id="worksheetSelectorList" class="pick-list"></div>
     </div>
-
-    <div id="pfDiffRow" class="setup-row" style="display:none;">
-      <label>ความเร็วเกม</label>
-      <div class="diff-btns">
-        <button class="pf-diff-btn diff-btn" data-pfdiff="ง่าย">ง่าย</button>
-        <button class="pf-diff-btn diff-btn active" data-pfdiff="ธรรมดา">ธรรมดา</button>
-        <button class="pf-diff-btn diff-btn" data-pfdiff="ยาก">ยาก</button>
-      </div>
-    </div>
-
-    <div id="tdMapRow" class="setup-row" style="display:none;">
-      <label>แผนที่</label>
-      <div class="diff-btns">
-        <button class="td-map-btn diff-btn active" data-tdmap="0">ทุ่งหญ้า <small class="text-secondary">ง่าย</small></button>
-        <button class="td-map-btn diff-btn" data-tdmap="1">ทะเลทราย <small class="text-secondary">ปานกลาง</small></button>
-        <button class="td-map-btn diff-btn" data-tdmap="2">ภูเขาไฟ <small class="text-secondary">ยาก</small></button>
-      </div>
-    </div>
-
     <div id="soundLevelRows">
       <div class="setup-row">
-        <label>1 · เลือกหมวดเสียง</label>
-        <div class="word-set-list" id="setupSoundList"></div>
+        <label>หมวดเสียง</label>
+        <div class="word-set-list sound-list" id="setupSoundList"></div>
       </div>
-
       <div class="setup-row">
-        <label>2 · เลือกระดับที่ต้องการฝึก</label>
-        <div class="word-set-list" id="setupLevelList"></div>
+        <label>ระดับ</label>
+        <div class="word-set-list level-list" id="setupLevelList"></div>
       </div>
     </div>
-
-    <div class="setup-row" style="align-items:center;">
-      <label>จำนวนคำที่จะใช้</label>
-      <span id="setupWordCount" class="badge bg-warning text-dark" style="font-size:1rem;padding:5px 12px;">0</span>
+          <div class="setup-row setup-row-inline">
+      <label>จำนวนคำ</label>
+      <span id="setupWordCount" class="count-badge">0</span>
     </div>
-
-    <div class="setup-row" style="align-items:center;">
-      <label>ออกเสียงคำละกี่ครั้ง</label>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPronounceMinus" style="width:34px;">−</button>
-        <span id="setupPronounceCount" style="font-size:1.1rem;font-weight:700;min-width:20px;text-align:center;">1</span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPronouncePlus" style="width:34px;">+</button>
+          <div class="setup-row">
+      <label>ตัวอย่างเสียง</label>
+      <div class="diff-btns" id="hardModeBtns">
+        <button class="diff-btn active" data-hardmode="easy">มีเสียงให้ฟัง</button>
+        <button class="diff-btn" data-hardmode="hard">ไม่มีเสียงให้ฟัง</button>
       </div>
     </div>
-
-    <div class="setup-row">
-      <label>ดูตัวเองก่อนเริ่ม</label>
-      <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSetupCam">เปิดกล้อง</button>
+          <div class="setup-row setup-row-inline">
+      <label>พูดคำละกี่ครั้ง</label>
+      <div class="stepper">
+        <button type="button" id="btnPronounceMinus" aria-label="ลด">−</button>
+        <span id="setupPronounceCount">1</span>
+        <button type="button" id="btnPronouncePlus" aria-label="เพิ่ม">+</button>
+      </div>
+    </div>
+          <div class="setup-row">
+      <label>ดูตัวเองในกล้องก่อนเริ่ม</label>
+      <button type="button" class="soft-btn" id="btnSetupCam"><span data-ic="user"></span>เปิดกล้อง</button>
       <div class="camera-preview-setup" id="setupCameraWrap" style="display:none;">
         <video id="setupCameraVideo" autoplay muted playsinline></video>
+      </div>
+    </div>
+        </div>
+      </div>
+      <div class="kb-card-foot">
+        <div class="setup-error" id="setupError" role="alert" hidden></div>
+        <div class="kb-pair">
+          <button type="button" class="kb-candy white" id="btnSetupCancel"><span data-ic="back"></span>กลับ</button>
+          <button type="button" class="kb-candy green" id="btnSetupStart">ไปเลย!<span data-ic="arrow"></span></button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Shared Practice Modal — static backdrop prevents accidental close on mobile -->
-<div class="modal fade" id="practiceModal" tabindex="-1"
-     data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-    <div class="modal-content" style="border-radius:24px;">
-      <div class="modal-body text-center p-4" style="position:relative;">
-        <button id="ppBtnSkip" title="ข้าม"
-          style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:1.4rem;color:#bbb;cursor:pointer;line-height:1;"
-          aria-label="ข้าม">✕</button>
-        <p class="text-secondary mb-1">ลองออกเสียงคำนี้ดูสิ</p>
-        <div style="font-size:2.4rem;" id="ppEmoji">🔸</div>
-        <div class="challenge-word" id="ppWord">บ้าน</div>
-        <p class="text-secondary" id="ppReading"></p>
-        <p class="small fw-bold" id="ppRepCounter" style="display:none;color:#8a5cf6;"></p>
-        <div class="practice-stage" id="ppPracticeStage">
-          <div class="mouth-animation-box" id="ppMouthAnimation" style="display:none;"></div>
-          <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
-          <div class="camera-mirror" id="ppCameraWrap">
-            <video id="ppCameraVideo" autoplay muted playsinline></video>
-          </div>
+<div class="modal fade" id="practiceModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-label="ฝึกพูด">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-md-down modal-dialog-scrollable pp-dialog">
+    <div class="modal-content pp-content">
+      <div class="modal-body pp-body">
+        <div class="pp-top">
+          <button type="button" id="ppBtnSkip" class="pp-close" aria-label="ข้ามคำนี้"><span data-ic="close"></span></button>
+          <span class="kb-rep-stars" aria-hidden="true"></span>
+          <span class="pp-rep" id="ppRepCounter" style="display:none;"></span>
         </div>
-        <button class="btn btn-outline-primary btn-sm" id="ppBtnListen"><i class="bi bi-volume-up-fill me-1"></i>ฟังตัวอย่าง</button>
-        <canvas id="ppWaveCanvas" width="400" height="70" style="width:100%; background:var(--color-bg-soft); border-radius:14px; margin-top:0.75rem;"></canvas>
-        <button class="mic-btn mt-3" id="ppBtnMic"><i class="bi bi-mic-fill"></i></button>
-        <p class="small text-secondary" id="ppRecordHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด</p>
-        <div id="ppMultiCapture" style="display:none;">
-          <div id="ppMultiCards" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:0.5rem 0;"></div>
-          <p class="small fw-bold" id="ppMultiProgress" style="color:#8a5cf6;"></p>
-          <button class="mic-btn mt-2" id="ppBtnMicHold"><i class="bi bi-mic-fill"></i></button>
-          <p class="small text-secondary" id="ppMultiHint">กดปุ่มไมค์เพื่อเริ่มอัดเสียง แล้วกดอีกครั้งเพื่อหยุด</p>
-          <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-success flex-fill" id="ppBtnMultiDone" disabled>เสร็จแล้ว</button>
-            <button class="btn btn-outline-secondary flex-fill" id="ppBtnMultiRedo">อัดใหม่</button>
-          </div>
+        <div class="pp-card">
+          <div class="pp-pic" id="ppEmoji"></div>
+          <div class="challenge-word" id="ppWord"></div>
+          <p class="pp-reading" id="ppReading"></p>
+          <button type="button" class="pp-listen" id="ppBtnListen"><span data-ic="speaker"></span>ฟัง</button>
         </div>
-        <div class="alert alert-danger" id="ppErrorMsg" style="display:none;"></div>
-        <div id="ppPlaybackArea" style="display:none;">
-          <audio id="ppPlaybackAudio" controls style="width:100%;"></audio>
-          <p class="playback-label">ฟังเสียงตัวเองแล้วให้ผู้ปกครองช่วยตัดสิน</p>
-          <div class="alert alert-success" id="ppCorrectMsg" style="display:none;">เยี่ยมมาก! ได้แต้มเพิ่มแล้ว 🎉</div>
-          <div class="judge-buttons">
-            <button class="btn judge-btn-correct" id="ppBtnCorrect" disabled><i class="bi bi-check-circle-fill me-1"></i>บันทึก</button>
-            <button class="btn judge-btn-retry" id="ppBtnRetry"><i class="bi bi-arrow-counterclockwise me-1"></i>ลองอีกครั้ง</button>
+        <div class="pp-side">
+          <div class="practice-stage" id="ppPracticeStage">
+            <div class="mouth-animation-box" id="ppMouthAnimation" style="display:none;"></div>
+            <div class="mouth-diagram-box" id="ppMouthDiagram"></div>
+            <div class="camera-mirror" id="ppCameraWrap">
+              <video id="ppCameraVideo" autoplay muted playsinline></video>
+            </div>
+          </div>
+          <canvas id="ppWaveCanvas" class="pp-wave" width="400" height="70"></canvas>
+          <button type="button" class="mic-btn" id="ppBtnMic" aria-label="อัดเสียง"><i class="bi bi-mic-fill"></i></button>
+          <div class="kb-owl-row"><span class="kb-owl" aria-hidden="true"></span><p class="pp-hint kb-say" id="ppRecordHint">แตะไมค์แล้วพูดเลย!</p></div>
+          <div id="ppMultiCapture" class="pp-multi" style="display:none;">
+            <div id="ppMultiCards" class="pp-multi-cards"></div>
+            <p class="pp-multi-progress" id="ppMultiProgress"></p>
+            <button type="button" class="mic-btn" id="ppBtnMicHold" aria-label="อัดเสียง"><i class="bi bi-mic-fill"></i></button>
+            <div class="kb-owl-row"><span class="kb-owl" aria-hidden="true"></span><p class="pp-hint kb-say" id="ppMultiHint">แตะไมค์แล้วพูดเลย!</p></div>
+            <div class="pp-actions">
+              <button type="button" class="pp-btn pp-btn-2" id="ppBtnMultiRedo"><span data-ic="retry"></span>อัดใหม่</button>
+              <button type="button" class="pp-btn pp-btn-ok" id="ppBtnMultiDone" disabled><span data-ic="check"></span>ครบแล้ว!</button>
+            </div>
+          </div>
+          <div class="pp-error" id="ppErrorMsg" style="display:none;"></div>
+          <div id="ppPlaybackArea" class="pp-playback" style="display:none;">
+            <div class="pp-mine">
+              <button type="button" class="pp-mine-play" data-mine-play aria-label="ฟังเสียงตัวเอง"><span data-ic="play"></span></button>
+              <div class="pp-mine-text"><strong>ฟังเสียงตัวเอง</strong><small class="playback-label">ให้ผู้ใหญ่ช่วยฟังนะ</small></div>
+            </div>
+            <audio id="ppPlaybackAudio" controls></audio>
+            <div class="pp-correct" id="ppCorrectMsg" style="display:none;">เยี่ยมมาก! ได้แต้มเพิ่มแล้ว</div>
+            <div class="pp-actions judge-buttons">
+              <button type="button" class="pp-btn pp-btn-2 judge-btn-retry" id="ppBtnRetry"><span data-ic="retry"></span>ลองใหม่</button>
+              <button type="button" class="pp-btn pp-btn-ok judge-btn-correct" id="ppBtnCorrect" disabled><span data-ic="check"></span>ถูกแล้ว!</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
 </div>
-
-<footer class="site-footer">
-  <div class="container">
-    <div class="row gy-4">
-      <div class="col-lg-4">
-        <h5>🗣️ แบบฝึกหัดฝึกพูดสำหรับเด็กพูดไม่ชัด</h5>
-        <p>เกมฝึกออกเสียงภาษาไทยสำหรับเด็ก ช่วยให้เด็กกล้าพูด ออกเสียงชัด มั่นใจมากขึ้นทุกวัน</p>
-      </div>
-      <div class="col-lg-4">
-        <h5>เมนู</h5>
-        <ul class="list-unstyled">
-          <li><a href="game.html">เกม</a></li>
-          <li><a href="contact.html">ติดต่อเรา</a></li>
-        </ul>
-      </div>
-      <div class="col-lg-4">
-        <h5>ติดต่อเรา</h5>
-        <p>มีคำแนะนำหรือข้อเสนอแนะ ติดต่อได้ที่หน้า "ติดต่อเรา"</p>
-      </div>
-    </div>
-    <div class="footer-disclaimer text-center">
-      เว็บไซต์นี้จัดทำขึ้นเพื่อการศึกษาและฝึกฝนเบื้องต้นเท่านั้น ไม่ใช่เครื่องมือวินิจฉัยหรือทดแทนการรักษาทางการแพทย์
-    </div>
-  </div>
-</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -833,7 +799,7 @@ function finishGame(matchElapsedMs) {
       G.highScores.matching_time = matchElapsedMs;
       localStorage.setItem('ghsv2', JSON.stringify(G.highScores));
     }
-    document.getElementById('finishScoreLine').innerHTML = '⏱ ' + formatMatchTime(matchElapsedMs);
+    document.getElementById('finishScoreLine').innerHTML = '<span data-ic="retry"></span> ' + formatMatchTime(matchElapsedMs);
     document.getElementById('finishHighLabel').textContent = 'เร็วที่สุด';
     document.getElementById('highScore').textContent = formatMatchTime(G.highScores.matching_time);
     // Stored negated so the shared leaderboard's "higher/DESC = better"
@@ -845,7 +811,7 @@ function finishGame(matchElapsedMs) {
       G.highScores[G.mode] = G.pts;
       localStorage.setItem('ghsv2', JSON.stringify(G.highScores));
     }
-    document.getElementById('finishScoreLine').innerHTML = '⭐ <span id="finalPoints">' + G.pts + '</span> แต้ม';
+    document.getElementById('finishScoreLine').innerHTML = '<span data-ic="star"></span> <span id="finalPoints">' + G.pts + '</span>';
     document.getElementById('finishHighLabel').textContent = 'สูงสุด';
     document.getElementById('highScore').textContent = G.highScores[G.mode] || 0;
     scoreToSave = G.pts;
@@ -853,7 +819,7 @@ function finishGame(matchElapsedMs) {
 
   var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', cooking:'ทำอาหาร 🌭', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹', tetris:'เตตริส 🧩', rpg:'ผจญภัยดันเจี้ยน ⚔️' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
-  document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
+  document.getElementById('finishLeaderRows').innerHTML = '<div class="muted-note">กำลังโหลด...</div>';
 
   renderRoundSummary();
   showScreen('screenFinish');
@@ -1074,21 +1040,17 @@ async function loadGameLeaderboard(gameKey, containerId) {
   if (!container) return;
   try {
     var { data } = await sb.from('game_scores').select('display_name, best_score').eq('game_key', gameKey).order('best_score', { ascending: false }).limit(5);
-    if (!data || !data.length) { container.innerHTML = '<div class="text-secondary text-center small py-1">ยังไม่มีข้อมูล</div>'; return; }
+    if (!data || !data.length) { container.innerHTML = '<div class="muted-note">ยังไม่มีข้อมูล</div>'; return; }
     var medals = ['🥇','🥈','🥉'];
     // Matching stores a negated elapsed-ms as its "score" (see finishGame)
     // so the shared higher-is-better sort/comparison works unchanged for
     // this lower-is-better metric — flip it back to a time here for display.
     var isMatch = gameKey === 'matching';
     container.innerHTML = data.map(function(r, i) {
-      var scoreLabel = isMatch ? ('⏱ ' + formatMatchTime(-r.best_score)) : ('⭐ ' + r.best_score);
-      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid #f0ebfc;">' +
-        '<span style="font-size:1.1rem;width:26px;text-align:center;">' + (medals[i] || '<span style="color:#9b93b0;font-weight:700;font-size:0.8rem;">' + (i+1) + '</span>') + '</span>' +
-        '<span style="flex:1;font-size:0.88rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.display_name || '—') + '</span>' +
-        '<span style="font-weight:700;color:var(--color-primary-dark);white-space:nowrap;">' + scoreLabel + '</span>' +
-        '</div>';
+      var scoreLabel = isMatch ? formatMatchTime(-r.best_score) : r.best_score;
+      return '<div class="lb-row' + (i < 3 ? ' top' + (i + 1) : '') + '"><span class="lb-rank">' + (i + 1) + '</span><span class="lb-name">' + (r.display_name || '—') + '</span><span class="lb-score">' + scoreLabel + '</span></div>';
     }).join('');
-  } catch(e) { container.innerHTML = '<div class="text-secondary text-center small py-1">ไม่สามารถโหลดได้</div>'; }
+  } catch(e) { container.innerHTML = '<div class="muted-note">ไม่สามารถโหลดได้</div>'; }
 }
 
 async function loadPracticeLeaderboard() {
@@ -1098,14 +1060,10 @@ async function loadPracticeLeaderboard() {
   try {
     var { data, error } = await sb.rpc('get_practice_leaderboard', { lim: 5 });
     if (error) throw error;
-    if (!data || !data.length) { container.innerHTML = '<div class="text-secondary text-center small py-1">ยังไม่มีข้อมูล</div>'; return; }
+    if (!data || !data.length) { container.innerHTML = '<div class="muted-note">ยังไม่มีข้อมูล</div>'; return; }
     var medals = ['🥇','🥈','🥉'];
     container.innerHTML = data.map(function(r, i) {
-      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid #f0ebfc;">' +
-        '<span style="font-size:1.1rem;width:26px;text-align:center;">' + (medals[i] || '<span style="color:#9b93b0;font-weight:700;font-size:0.8rem;">' + (i+1) + '</span>') + '</span>' +
-        '<span style="flex:1;font-size:0.88rem;font-weight:500;">' + (r.display_name || '—') + '</span>' +
-        '<span style="font-weight:700;color:var(--color-accent-purple);white-space:nowrap;">🎤 ' + r.total_count + '</span>' +
-        '</div>';
+      return '<div class="lb-row' + (i < 3 ? ' top' + (i + 1) : '') + '"><span class="lb-rank">' + (i + 1) + '</span><span class="lb-name">' + (r.display_name || '—') + '</span><span class="lb-score"><span data-ic="mic"></span>' + r.total_count + '</span></div>';
     }).join('');
   } catch(e) {
     if (card) card.style.display = 'none'; // hide if function not set up yet
@@ -1157,7 +1115,7 @@ var TUTORIAL_INFO = {
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { matching: 'จับคู่ภาพ 🃏', shooting: 'ยิงเป้า 🎯', airplane: 'ขับเครื่องบิน ✈️', flashcard: 'ไพ่คำศัพท์ 🎴', platformer: 'วิ่งเก็บเหรียญ 🍄', crossy: 'ข้ามถนน 🚗', cooking: 'ทำอาหาร 🌭', dressup: 'แต่งตัวตุ๊กตา 👗', towerdefense: 'ป้องกันฐาน 🏹', tetris: 'เตตริส 🧩', rpg: 'ผจญภัยดันเจี้ยน ⚔️' };
+  var names = { shooting: 'ยิงเป้า', cooking: 'ทำอาหาร', airplane: 'ขับเครื่องบิน', matching: 'จับคู่ภาพ', platformer: 'วิ่งเก็บเหรียญ', crossy: 'ข้ามถนน', flashcard: 'ไพ่คำศัพท์', dressup: 'แต่งตัวตุ๊กตา', towerdefense: 'ป้องกันฐาน', tetris: 'เตตริส', rpg: 'ผจญภัยดันเจี้ยน' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
   var tut = TUTORIAL_INFO[mode];
   document.getElementById('tutorialImg').src = tut ? tut.img : '';
@@ -1524,7 +1482,7 @@ async function launchGame(reuse) {
     tetris:     'เตตริส 🧩',
     rpg:        'ผจญภัยดันเจี้ยน ⚔️'
   };
-  document.getElementById('hudModeName').textContent = names[G.mode] || G.mode;
+  document.getElementById('hudModeName').textContent = window.KidUI && KidUI.GAMES[G.mode] ? KidUI.GAMES[G.mode].name : (names[G.mode] || G.mode);
 
   ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame','towerdefenseGame','tetrisGame','rpgGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
@@ -1724,5 +1682,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 });
 </script>
+<script src="js/kid-ui-common.js?v=1"></script>
+<script src="js/kid-art-b.js?v=1"></script>
+<script src="js/kid-ui-b.js?v=1"></script>
 </body>
 </html>
