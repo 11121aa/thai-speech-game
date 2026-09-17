@@ -225,6 +225,9 @@
           <h2 class="mt-2 mb-1">จบแล้ว!</h2>
           <div class="finish-score" id="finishScoreLine">⭐ <span id="finalPoints">0</span> แต้ม</div>
           <p class="finish-high text-secondary"><span id="finishHighLabel">สูงสุด</span>: <strong id="highScore">0</strong></p>
+          <div class="finish-stars" id="finishStars" aria-label="ดาวที่ได้"></div>
+          <div class="finish-progress" id="finishProgress" hidden></div>
+          <div class="finish-words" id="finishWords" hidden></div>
           <div class="finish-btns">
             <button class="btn btn-outline-primary btn-bouncy" id="btnReturnMode">กลับเมนูเกม</button>
             <button class="btn btn-warning btn-bouncy" id="btnPlayAgain">เล่นอีกครั้ง</button>
@@ -258,6 +261,8 @@
         <button class="btn btn-warning btn-bouncy" id="btnSetupStart">เริ่มเกม! 🚀</button>
       </div>
     </div>
+
+    <div class="setup-error" id="setupError" role="alert" hidden></div>
 
     <div class="setup-tutorial" id="setupTutorial">
       <img id="tutorialImg" class="setup-tutorial-img" src="" alt="ตัวอย่างวิธีเล่น">
@@ -337,6 +342,7 @@
 
     <div class="setup-row">
       <label>ดูตัวเองก่อนเริ่ม</label>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSetupCam">เปิดกล้อง</button>
       <div class="camera-preview-setup" id="setupCameraWrap" style="display:none;">
         <video id="setupCameraVideo" autoplay muted playsinline></video>
       </div>
@@ -443,10 +449,11 @@
 <script src="js/config.js?v=2-free"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js?v=2"></script>
+<script src="js/kid-icons.js?v=1"></script>
 <script src="js/words-api.js?v=2"></script>
 <script src="js/speech.js"></script>
 <script src="js/recorder.js?v=9"></script>
-<script src="js/practice-panel.js?v=13"></script>
+<script src="js/practice-panel.js?v=14"></script>
 <script src="js/main.js"></script>
 <script>
 /* ===== Global game-session state ===== */
@@ -454,6 +461,7 @@ var G = {
   mode: null, words: [], pts: 0, timeLeft: 60,
   paused: false, timerHandle: null, hardMode: false,
   hwMode: false, hwAssignmentId: null, worksheetMode: false, worksheetProgressId: null, pronounceCount: 1, recordRepsTogether: true,
+  practiced: [],
   highScores: JSON.parse(localStorage.getItem('ghsv2') || '{}')
 };
 
@@ -715,6 +723,13 @@ function addPts(n) {
   document.getElementById('hudPoints').textContent = G.pts;
 }
 
+// Words the child recorded and saved this round, for the results screen.
+function notePracticed(word) {
+  if (!word) return;
+  var key = word.id != null ? word.id : word.word;
+  if (!G.practiced.some(function (w) { return (w.id != null ? w.id : w.word) === key; })) G.practiced.push(word);
+}
+
 function openPractice(word, onCorrect, onClosed) {
   G.paused = true;
   var total = G.pronounceCount || 1;
@@ -730,7 +745,7 @@ function openPractice(word, onCorrect, onClosed) {
       hwAssignmentId: G.hwAssignmentId,
       worksheetProgressId: G.worksheetProgressId,
       total: total,
-      onCorrect: function () { addPts(20 * total); if (onCorrect) onCorrect(); },
+      onCorrect: function () { addPts(20 * total); notePracticed(word); if (onCorrect) onCorrect(); },
       onClosed: function () { G.paused = false; if (onClosed) onClosed(); }
     });
     return;
@@ -744,7 +759,7 @@ function openPractice(word, onCorrect, onClosed) {
       worksheetProgressId: G.worksheetProgressId,
       repIndex: repIndex,
       repTotal: total,
-      onCorrect: function () { addPts(20); if (onCorrect) onCorrect(); },
+      onCorrect: function () { addPts(20); notePracticed(word); if (onCorrect) onCorrect(); },
       // Fires once this rep's pop-up closes (correct or skipped) — once all
       // reps for this word are done, hand off to the game's own success callback.
       onClosed: function () {
@@ -840,6 +855,7 @@ function finishGame(matchElapsedMs) {
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
   document.getElementById('finishLeaderRows').innerHTML = '<div class="text-secondary text-center small py-1">กำลังโหลด...</div>';
 
+  renderRoundSummary();
   showScreen('screenFinish');
 
   // Save score then refresh leaderboard
@@ -847,6 +863,194 @@ function finishGame(matchElapsedMs) {
     loadGameLeaderboard(G.mode, 'finishLeaderRows');
   });
 }
+
+/* ── Round summary on the results screen ──
+   Stars reflect speaking practice, not the game score: the point of every
+   game is the words, so a round where the child recorded six words earns
+   three stars whatever the game's own points were. */
+function starsForRound(n) { return n >= 6 ? 3 : n >= 3 ? 2 : n >= 1 ? 1 : 0; }
+
+function wordPictureHtml(w) {
+  var url = w.image_url || (window.Illustrations && Illustrations.get(w.word));
+  if (url) return '<img src="' + url + '" alt="">';
+  return (w.emoji && w.emoji !== w.word) ? '<span class="fw-emoji">' + w.emoji + '</span>' : '';
+}
+
+function renderRoundSummary() {
+  var n = G.practiced.length;
+  var stars = document.getElementById('finishStars');
+  if (stars) {
+    var s = starsForRound(n), html = '';
+    for (var i = 0; i < 3; i++) html += '<span class="fstar' + (i < s ? ' on' : '') + '" data-ic="star"></span>';
+    stars.innerHTML = html;
+    stars.setAttribute('aria-label', 'ได้ ' + s + ' ดาว');
+  }
+  var words = document.getElementById('finishWords');
+  if (words) {
+    words.hidden = !n;
+    words.innerHTML = n ? '<div class="fw-title">คำที่ฝึกรอบนี้ ' + n + ' คำ</div><div class="fw-list">' +
+      G.practiced.map(function (w) {
+        return '<span class="fw-chip">' + wordPictureHtml(w) + '<span class="fw-text">' + w.word + '</span><span class="fw-ok" data-ic="check"></span></span>';
+      }).join('') + '</div>' : '';
+  }
+  var prog = document.getElementById('finishProgress');
+  if (prog) { prog.hidden = true; prog.innerHTML = ''; }
+  if (G.hwMode || G.worksheetMode) loadRoundProgress();
+  if (window.KidIcons) KidIcons.paint(document.getElementById('screenFinish'));
+}
+
+// How far the homework/worksheet got, counted the same way the dashboard
+// counts it: a word is done once practised repeat_count times.
+async function loadRoundProgress() {
+  var prog = document.getElementById('finishProgress');
+  if (!prog) return;
+  try {
+    var words = [], repeat = G.pronounceCount || 5, name = '', filter = null;
+    if (G.hwMode) {
+      var a = (_hwAssignments || []).filter(function (x) { return x.id === G.hwAssignmentId; })[0];
+      if (!a || !a.homework) return;
+      words = (a.homework.homework_words || []).map(function (w) { return w.word_id; });
+      repeat = a.homework.repeat_count || 5; name = a.homework.name || 'การบ้าน';
+      filter = ['homework_assignment_id', G.hwAssignmentId];
+    } else {
+      var ws = (_worksheets || []).filter(function (x) { return x.id === _selectedWorksheetId; })[0];
+      if (!ws || !G.worksheetProgressId) return;
+      words = (ws.worksheet_words || []).map(function (w) { return w.word_id; });
+      repeat = ws.repeat_count || 5; name = ws.name || 'แบบฝึกหัด';
+      filter = ['worksheet_progress_id', G.worksheetProgressId];
+    }
+    if (!words.length) return;
+    var { data } = await sb.from('practice').select('word_id').eq(filter[0], filter[1]);
+    var counts = {};
+    (data || []).forEach(function (p) { counts[p.word_id] = (counts[p.word_id] || 0) + 1; });
+    var done = words.filter(function (id) { return (counts[id] || 0) >= repeat; }).length;
+    prog.innerHTML = '<div class="fp-row"><span class="fp-name"><span data-ic="book"></span>' + name + '</span><span class="fp-count">' + done + '/' + words.length + '</span></div>' +
+      '<div class="fp-bar"><span style="width:' + Math.round(done / words.length * 100) + '%"></span></div>' +
+      '<div class="fp-note">' + (done >= words.length ? 'เสร็จครบทุกคำแล้ว!' : 'อีก ' + (words.length - done) + ' คำก็เสร็จ') + '</div>';
+    prog.hidden = false;
+    if (window.KidIcons) KidIcons.paint(prog);
+  } catch (e) { /* summary is a nice-to-have; never block the results screen */ }
+}
+
+/* ── Kid profile summary for the home screen ──
+   Name, total words practised, practice streak, the first unfinished
+   homework, and per-sound/per-level word counts. Fetched once; each UI
+   experiment renders it its own way from window.KID ('kidstats' event). */
+window.KID = null;
+async function loadKidStats() {
+  var kid = { name: '', total: 0, streak: 0, homework: null, levels: {} };
+  try {
+    var session = await Auth.getSession();
+    if (!session) { window.KID = kid; document.dispatchEvent(new CustomEvent('kidstats')); return; }
+    var uid = session.user.id;
+    var prof = await sb.from('profiles').select('username').eq('user_id', uid).maybeSingle();
+    kid.name = (prof.data && prof.data.username) || '';
+
+    var since = new Date(Date.now() - 400 * 864e5).toISOString();
+    var { data: rows } = await sb.from('practice').select('practiced_at, word_id, words(level, letter_category)')
+      .eq('user_id', uid).gte('practiced_at', since).order('practiced_at', { ascending: false }).limit(5000);
+    rows = rows || [];
+    var { count } = await sb.from('practice').select('id', { count: 'exact', head: true }).eq('user_id', uid);
+    kid.total = count || rows.length;
+
+    // Consecutive days with practice, ending today or yesterday.
+    var days = {};
+    rows.forEach(function (r) { days[new Date(r.practiced_at).toDateString()] = true; });
+    var d = new Date(); if (!days[d.toDateString()]) d = new Date(Date.now() - 864e5);
+    while (days[d.toDateString()]) { kid.streak++; d = new Date(d.getTime() - 864e5); }
+
+    var seen = {};
+    rows.forEach(function (r) {
+      if (!r.words) return;
+      var k = r.words.letter_category + '|' + r.words.level + '|' + r.word_id;
+      if (seen[k]) return; seen[k] = true;
+      var s = kid.levels[r.words.letter_category] = kid.levels[r.words.letter_category] || {};
+      s[r.words.level] = (s[r.words.level] || 0) + 1;
+    });
+
+    var { data: asg } = await sb.from('homework_assignments')
+      .select('id, homework(id, name, repeat_count, homework_words(word_id))')
+      .eq('patient_user_id', uid).order('assigned_at', { ascending: false });
+    asg = asg || [];
+    if (asg.length) {
+      var { data: hp } = await sb.from('practice').select('word_id, homework_assignment_id').in('homework_assignment_id', asg.map(function (a) { return a.id; }));
+      hp = hp || [];
+      for (var i = 0; i < asg.length; i++) {
+        var hw = asg[i].homework; if (!hw) continue;
+        var ids = (hw.homework_words || []).map(function (w) { return w.word_id; });
+        var rep = hw.repeat_count || 5;
+        var done = ids.filter(function (id) {
+          return hp.filter(function (p) { return p.homework_assignment_id === asg[i].id && p.word_id === id; }).length >= rep;
+        }).length;
+        if (ids.length && done < ids.length) {
+          kid.homework = { id: asg[i].id, name: hw.name || 'การบ้าน', words: ids.length, done: done, repeat: rep };
+          break;
+        }
+      }
+    }
+  } catch (e) { console.error('[kid] stats failed:', e); }
+  window.KID = kid;
+  document.dispatchEvent(new CustomEvent('kidstats'));
+}
+
+/* ── Remembered setup choices ──
+   The setup screen used to reset to its defaults every time it opened.
+   These are remembered per device instead; homework still takes priority
+   whenever there is unfinished homework. */
+var SETUP_PREFS_KEY = 'kidSetupV1';
+function loadSetupPrefs() {
+  try { return JSON.parse(localStorage.getItem(SETUP_PREFS_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function saveSetupPrefs() {
+  var prefs = loadSetupPrefs();
+  var diffBtn = document.querySelector('#hwDiffBtns .diff-btn.active');
+  var soundEl = document.querySelector('#setupSoundList input[name="setupSound"]:checked');
+  prefs.diff = diffBtn ? diffBtn.getAttribute('data-diff') : prefs.diff;
+  prefs.hard = isHardMode();
+  prefs.pronounce = _pronounceCount;
+  if (soundEl) prefs.sound = soundEl.value;
+  prefs.levels = Array.prototype.map.call(document.querySelectorAll('#setupLevelList input:checked'), function (cb) { return cb.value; });
+  prefs.pf = getPfDifficulty();
+  prefs.td = getTdMapIdx();
+  prefs.lastGame = _setupMode;
+  try { localStorage.setItem(SETUP_PREFS_KEY, JSON.stringify(prefs)); } catch (e) {}
+}
+function lastPlayedGame() { return loadSetupPrefs().lastGame || 'flashcard'; }
+
+// Shows a problem inside the setup panel instead of a browser alert.
+function setupError(msg) {
+  var el = document.getElementById('setupError');
+  if (!el) { alert(msg); return; }
+  el.textContent = msg || '';
+  el.hidden = !msg;
+}
+
+// Word-set switching, shared by the buttons and by the automatic default.
+function setWordSet(diffVal) {
+  document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-diff') === diffVal);
+  });
+  var hw = diffVal === 'hw', worksheet = diffVal === 'worksheet';
+  document.getElementById('hwSelectorRow').style.display = hw ? 'block' : 'none';
+  document.getElementById('worksheetSelectorRow').style.display = worksheet ? 'block' : 'none';
+  document.getElementById('soundLevelRows').style.display = (hw || worksheet) ? 'none' : 'block';
+  if (hw) { _selectedHwAssignmentId = null; _hwPool = []; return loadHwSelectorList().then(updateWordCount); }
+  if (worksheet) { _selectedWorksheetId = null; _worksheetPool = []; return loadWorksheetSelectorList().then(updateWordCount); }
+  updateWordCount();
+  return Promise.resolve();
+}
+
+// Opens a game's setup with a sound (and optionally one level) chosen,
+// e.g. from a level node on the home screen.
+function openSetupWith(mode, sound, level) {
+  var prefs = loadSetupPrefs();
+  prefs.forceCustom = true;
+  if (sound) prefs.sound = sound;
+  if (level) prefs.levels = [level];
+  try { localStorage.setItem(SETUP_PREFS_KEY, JSON.stringify(prefs)); } catch (e) {}
+  openSetup(mode);
+}
+function startHomework() { openSetup(lastPlayedGame()); }
 
 /* ── Leaderboard helpers ── */
 var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', cooking:'ทำอาหาร', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน', tetris:'เตตริส', rpg:'ผจญภัยดันเจี้ยน' };
@@ -958,32 +1162,44 @@ function openSetup(mode) {
   var tut = TUTORIAL_INFO[mode];
   document.getElementById('tutorialImg').src = tut ? tut.img : '';
   document.getElementById('tutorialDesc').textContent = tut ? tut.desc : '';
-  // Reset to homework word-set / easy difficulty
-  document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
-  document.querySelector('#hwDiffBtns .diff-btn[data-diff="hw"]').classList.add('active');
-  document.querySelectorAll('#hardModeBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
-  document.querySelector('#hardModeBtns .diff-btn[data-hardmode="easy"]').classList.add('active');
-  document.getElementById('hwSelectorRow').style.display = 'block';
-  document.getElementById('worksheetSelectorRow').style.display = 'none';
-  document.getElementById('soundLevelRows').style.display = 'none';
+  var prefs = loadSetupPrefs();
+  var forceCustom = !!prefs.forceCustom;
+  if (forceCustom) { delete prefs.forceCustom; try { localStorage.setItem(SETUP_PREFS_KEY, JSON.stringify(prefs)); } catch (e) {} }
+  setupError('');
+  document.querySelectorAll('#hardModeBtns .diff-btn').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-hardmode') === (prefs.hard ? 'hard' : 'easy'));
+  });
   _selectedHwAssignmentId = null; _hwPool = [];
   _selectedWorksheetId = null; _worksheetPool = [];
-  loadHwSelectorList();
+  // Word set: unfinished homework comes first and is picked automatically.
+  // With none, fall back to the child's last choice -- never leave the
+  // homework list showing "none assigned" in front of a Start button.
+  if (forceCustom) {
+    setWordSet('custom');
+  } else {
+    setWordSet('hw').then(function () {
+      if (_setupMode !== mode) return;
+      var first = document.querySelector('.hw-selector-btn');
+      if (first) { selectHwButton(first); return; }
+      setWordSet(prefs.diff === 'worksheet' ? 'worksheet' : 'custom');
+    });
+  }
   // Platformer speed selector — only shown for the platformer mode, reset to ธรรมดา (normal)
   document.getElementById('pfDiffRow').style.display = (mode === 'platformer') ? 'block' : 'none';
-  document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.remove('active'); });
-  document.querySelector('.pf-diff-btn[data-pfdiff="ธรรมดา"]').classList.add('active');
+  document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-pfdiff') === (prefs.pf || 'ธรรมดา')); });
   // Tower defense map selector — only shown for that mode, reset to map 0 (easiest)
   document.getElementById('tdMapRow').style.display = (mode === 'towerdefense') ? 'block' : 'none';
-  document.querySelectorAll('.td-map-btn').forEach(function (b) { b.classList.remove('active'); });
-  document.querySelector('.td-map-btn[data-tdmap="0"]').classList.add('active');
+  document.querySelectorAll('.td-map-btn').forEach(function (b) { b.classList.toggle('active', String(b.getAttribute('data-tdmap')) === String(prefs.td || 0)); });
   // How many times a word must be pronounced per practice pop-up — reset to default (1)
-  _pronounceCount = 1;
+  _pronounceCount = Math.min(PRONOUNCE_COUNT_MAX, Math.max(PRONOUNCE_COUNT_MIN, prefs.pronounce || 1));
   document.getElementById('setupPronounceCount').textContent = _pronounceCount;
-  populateSounds();
-  populateLevels();
+  populateSounds(prefs.sound);
+  populateLevels(prefs.levels);
   updateWordCount();
-  startSetupCam();
+  // Camera stays off until someone asks for it (btnSetupCam).
+  var camBtn = document.getElementById('btnSetupCam');
+  if (camBtn) camBtn.hidden = false;
+  if (window.KidIcons) KidIcons.paint(document.getElementById('screenSetup'));
   document.getElementById('screenSetup').style.display = 'flex';
   // Locks the page behind the overlay from scrolling -- on iPad, without
   // this, dragging inside the (already scrollable) setup panel could
@@ -994,7 +1210,7 @@ function openSetup(mode) {
   document.body.style.overflow = 'hidden';
 }
 
-function populateSounds() {
+function populateSounds(preferred) {
   var sounds = [];
   _allWords.forEach(function (w) { if (w.letter_category && !sounds.includes(w.letter_category)) sounds.push(w.letter_category); });
   sounds.sort(function (a, b) { return a.localeCompare(b, 'th'); });
@@ -1004,20 +1220,22 @@ function populateSounds() {
     var id = 'sound_' + i;
     var item = document.createElement('div');
     item.className = 'word-set-item';
-    item.innerHTML = '<input type="radio" name="setupSound" id="' + id + '" value="' + s + '"' + (i === 0 ? ' checked' : '') + '><label for="' + id + '" style="font-size:1.2rem;font-weight:700;">' + s + '</label>';
+    var checked = preferred && sounds.indexOf(preferred) !== -1 ? s === preferred : i === 0;
+    item.innerHTML = '<input type="radio" name="setupSound" id="' + id + '" value="' + s + '"' + (checked ? ' checked' : '') + '><label for="' + id + '" style="font-size:1.2rem;font-weight:700;">' + s + '</label>';
     item.querySelector('input').addEventListener('change', updateWordCount);
     list.appendChild(item);
   });
 }
 
-function populateLevels() {
+function populateLevels(preferred) {
   var list = document.getElementById('setupLevelList');
   list.innerHTML = '';
   LEVELS_ALL.forEach(function (lv) {
     var id = 'lvl_' + lv.replace(/\s/g, '_');
     var item = document.createElement('div');
     item.className = 'word-set-item';
-    item.innerHTML = '<input type="checkbox" id="' + id + '" value="' + lv + '" checked><label for="' + id + '">' + lv + '</label>';
+    var on = !(preferred && preferred.length) || preferred.indexOf(lv) !== -1;
+    item.innerHTML = '<input type="checkbox" id="' + id + '" value="' + lv + '"' + (on ? ' checked' : '') + '><label for="' + id + '">' + lv + '</label>';
     item.querySelector('input').addEventListener('change', updateWordCount);
     list.appendChild(item);
   });
@@ -1079,6 +1297,8 @@ function updateWordCount() {
   document.getElementById('setupWordCount').textContent = count + ' คำ';
 }
 
+function selectHwButton(btn) { if (btn && btn._select) btn._select(); }
+
 async function loadHwSelectorList() {
   var list = document.getElementById('hwSelectorList');
   list.innerHTML = '<div class="text-secondary small text-center py-2">กำลังโหลด...</div>';
@@ -1130,13 +1350,15 @@ async function loadHwSelectorList() {
     btn.className = 'btn btn-outline-secondary text-start w-100 py-2 hw-selector-btn';
     btn.style.cssText = 'border-radius:10px;font-size:0.9rem;';
     btn.innerHTML = '<strong>' + (hw.name || 'การบ้าน #' + hw.id) + '</strong><span class="text-secondary small ms-2">' + wordObjs.length + ' คำ</span>';
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.hw-selector-btn').forEach(function (b) { b.classList.remove('btn-warning'); b.classList.add('btn-outline-secondary'); });
-      btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-warning');
+    btn._select = function () {
+      document.querySelectorAll('.hw-selector-btn').forEach(function (b) { b.classList.remove('btn-warning', 'is-selected'); b.classList.add('btn-outline-secondary'); });
+      btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-warning', 'is-selected');
       _selectedHwAssignmentId = a.id;
       _hwPool = wordObjs;
+      setupError('');
       updateWordCount();
-    });
+    };
+    btn.addEventListener('click', btn._select);
     list.appendChild(btn);
   });
 }
@@ -1174,6 +1396,7 @@ async function loadWorksheetSelectorList() {
       btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-warning');
       _selectedWorksheetId = ws.id;
       _worksheetPool = wordObjs;
+      setupError('');
       updateWordCount();
     });
     list.appendChild(btn);
@@ -1237,8 +1460,8 @@ async function launchGame(reuse) {
   } else {
     G.recordRepsTogether = true;
   }
-  if (G.hwMode && !_selectedHwAssignmentId) { alert('กรุณาเลือกการบ้านก่อน'); return; }
-  if (G.worksheetMode && !_selectedWorksheetId) { alert('กรุณาเลือกแบบฝึกหัดก่อน'); return; }
+  if (G.hwMode && !_selectedHwAssignmentId) { setupError('แตะเลือกการบ้านด้านล่างก่อนเริ่มเกม'); return; }
+  if (G.worksheetMode && !_selectedWorksheetId) { setupError('แตะเลือกแบบฝึกหัดด้านล่างก่อนเริ่มเกม'); return; }
   // On replay, reuse the exact word set from the round that just finished
   // instead of re-shuffling -- getSetupPool() picks randomly each call, so
   // calling it again wouldn't reproduce the same words even with identical
@@ -1266,7 +1489,7 @@ async function launchGame(reuse) {
       // the worksheet, regardless of which game mode is being played.
       G.worksheetProgressId = await getOrStartWorksheetRound(_selectedWorksheetId, _worksheetPool, effectivePronounceCount, session.user.id);
     } catch (err) {
-      alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+      setupError('เริ่มแบบฝึกหัดไม่ได้: ' + (err.message || err) + ' ลองกดเริ่มอีกครั้ง');
       startBtn.disabled = false; startBtn.innerHTML = startBtnOrigText;
       return;
     }
@@ -1278,7 +1501,9 @@ async function launchGame(reuse) {
     var hwAssignment = _hwAssignments.find(function (a) { return a.id === _selectedHwAssignmentId; });
     effectivePronounceCount = (hwAssignment && hwAssignment.homework && hwAssignment.homework.repeat_count) || 5;
   }
-  if (!pool.length) { alert('กรุณาเลือกหมวดเสียงและระดับที่มีคำอย่างน้อย 1 คำ'); return; }
+  if (!pool.length) { setupError('ชุดคำนี้ยังไม่มีคำ ลองเลือกหมวดเสียงหรือระดับอื่น'); return; }
+  if (!reuse) saveSetupPrefs();
+  G.practiced = [];
   if (_ownedUpgradesPromise) await _ownedUpgradesPromise;
   stopSetupCam();
   document.getElementById('screenSetup').style.display = 'none';
@@ -1406,6 +1631,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   _allWords = await WordsApi.fetchAllWords();
   await Illustrations.load();
   loadPracticeLeaderboard();
+  loadKidStats();
   // Not awaited here -- the setup screen (word selection etc.) takes the
   // player a few seconds regardless, and launchGame() awaits this exact
   // same in-flight promise before actually starting a game, so no
@@ -1430,17 +1656,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      document.querySelectorAll('#hwDiffBtns .diff-btn').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      var diffVal = btn.getAttribute('data-diff');
-      var hw = diffVal === 'hw';
-      var worksheet = diffVal === 'worksheet';
-      document.getElementById('hwSelectorRow').style.display = hw ? 'block' : 'none';
-      document.getElementById('worksheetSelectorRow').style.display = worksheet ? 'block' : 'none';
-      document.getElementById('soundLevelRows').style.display = (hw || worksheet) ? 'none' : 'block';
-      if (hw) { _selectedHwAssignmentId = null; _hwPool = []; loadHwSelectorList(); }
-      if (worksheet) { _selectedWorksheetId = null; _worksheetPool = []; loadWorksheetSelectorList(); }
-      updateWordCount();
+      setupError('');
+      setWordSet(btn.getAttribute('data-diff')).then(function () {
+        // Picking homework with exactly one assignment needs no second tap.
+        var list = document.querySelectorAll('.hw-selector-btn');
+        if (btn.getAttribute('data-diff') === 'hw' && list.length === 1) selectHwButton(list[0]);
+      });
     });
   });
 
@@ -1473,6 +1694,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     _pronounceCount = Math.min(PRONOUNCE_COUNT_MAX, _pronounceCount + 1);
     document.getElementById('setupPronounceCount').textContent = _pronounceCount;
   });
+
+  var camBtn = document.getElementById('btnSetupCam');
+  if (camBtn) camBtn.addEventListener('click', function () { camBtn.hidden = true; startSetupCam(); });
 
   document.getElementById('btnSetupCancel').addEventListener('click', function () {
     stopSetupCam();

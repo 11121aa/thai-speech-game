@@ -143,14 +143,18 @@ const PracticePanel = (function () {
     // predate the upload feature) > the emoji fallback.
     const pictureUrl = word.image_url || (window.Illustrations && Illustrations.get(word.word));
     if (pictureUrl) {
-      el("ppEmoji").innerHTML = '<img src="' + pictureUrl + '" alt="' + word.word + '" style="height:64px;max-width:100%;object-fit:contain;">';
+      el("ppEmoji").innerHTML = '<img class="pp-picture" src="' + pictureUrl + '" alt="' + word.word + '">';
     } else {
       // No picture and no custom emoji — show the word itself rather
       // than a meaningless generic icon.
-      el("ppEmoji").textContent = (word.emoji && word.emoji !== word.word) ? word.emoji : word.word;
+      // Without a picture, leave the slot empty rather than printing the
+      // word a second time directly above itself.
+      el("ppEmoji").textContent = (word.emoji && word.emoji !== word.word) ? word.emoji : "";
     }
     el("ppWord").textContent = word.word;
-    el("ppReading").textContent = word.level || "";
+    // The level name ("คำ 2 พยางค์ไม่มีความหมาย") is therapist vocabulary,
+    // not something a child needs to read under the word.
+    el("ppReading").textContent = "";
 
     // Animation box: animation > picture > hidden. The mouth-animation
     // clip is uploaded per sound (see management.html's Sounds tab) and
