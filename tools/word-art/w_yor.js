@@ -42,28 +42,29 @@ const soundWaves = (x, y, s) => g(line('M0 -40 Q30 0 0 40 M40 -80 Q90 0 40 80 M8
 
 W['หยุด'] = (i) => backdrop(i) + shadow(400, 690, 90) + stopSign(400, 360, 1.3) + g(hand([true, true, true, true, true]), at(620, 640, 0.5));
 W['ยาย'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.4, grandma({ arms: { l: [-90, -110], r: [90, -110] } })) + heart(610, 270, 0.9, C.pink);
-W['ใหญ่'] = (i) => backdrop(i) + shadow(360, 700, 250) + g(
-  // body + legs first
+W['ใหญ่'] = (i) => backdrop(i) + shadow(380, 706, 240) + g(
   L.silhouette((fill, w) => {
-    const st = w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round"` : '';
-    return `<ellipse cx="110" cy="-30" rx="170" ry="132" fill="${fill}"${st}/>` +
-      `<rect x="0" y="66" width="78" height="152" rx="36" fill="${fill}"${st}/>` +
-      `<rect x="96" y="72" width="78" height="146" rx="36" fill="${fill}"${st}/>` +
-      `<rect x="186" y="66" width="78" height="152" rx="36" fill="${fill}"${st}/>` +
-      `<rect x="258" y="72" width="74" height="144" rx="34" fill="${fill}"${st}/>` +
-      `<circle cx="-92" cy="-52" r="150" fill="${fill}"${st}/>`;
+    const st = w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"` : '';
+    return `<ellipse cx="150" cy="-40" rx="150" ry="120" fill="${fill}"${st}/>` +      // body
+      `<rect x="50" y="46" width="76" height="160" rx="36" fill="${fill}"${st}/>` +      // legs
+      `<rect x="140" y="52" width="76" height="154" rx="36" fill="${fill}"${st}/>` +
+      `<rect x="222" y="46" width="76" height="160" rx="36" fill="${fill}"${st}/>` +
+      `<rect x="286" y="52" width="72" height="152" rx="34" fill="${fill}"${st}/>` +
+      `<path d="M-30 -160 Q76 -172 84 -60 L84 40 Q80 96 6 96 Q-70 96 -84 20 L-96 -54 Q-100 -150 -30 -160Z" fill="${fill}"${st}/>` +  // head
+      `<path d="M-72 40 Q-96 140 -60 196 Q-24 244 22 212 Q60 186 28 150" fill="none"` +
+      (w ? ` stroke="${INK}" stroke-width="${w + 52}" stroke-linejoin="round" stroke-linecap="round"/>`
+         : ` stroke="${fill}" stroke-width="52" stroke-linejoin="round" stroke-linecap="round"/>`);   // trunk
   }, '#9AA8C9') +
-  line('M20 206 L58 206 M116 206 L154 206 M206 206 L244 206 M276 206 L312 206', 7, '#7F8CAC') +
-  // ear on the head, then the trunk in front of everything
-  path('M-86 -164 Q-236 -186 -252 -52 Q-264 62 -150 74 Q-104 34 -108 -62Z', '#8394B8') +
-  path('M-114 -132 Q-212 -142 -222 -46 Q-228 30 -148 44', 'none', 5) +
-  tube('M-170 20 Q-214 110 -180 176 Q-150 232 -96 208 Q-56 190 -80 154', '#9AA8C9', 58) +
-  path('M-96 44 L-40 104 L-124 106Z', '#F6F2E6', 6) +
-  `<ellipse cx="-80" cy="-84" rx="15" ry="18" fill="${INK}"/><circle cx="-75" cy="-90" r="6" fill="#fff"/>` +
-  ellipse(-128, -16, 26, 15, C.blush, 0) +
-  line('M-190 70 Q-208 120 -188 160 M-158 96 Q-172 136 -156 168', 5, '#7F8CAC') +
-  tube('M276 -74 Q328 -44 312 12', '#9AA8C9', 12), at(390, 466, 0.88)) +
-  draw(650, 700, 0.4, mouse(0, 0, 1)) + sparkle(200, 250, 0.7);
+  // ear behind the eye, tusks either side of the trunk
+  path('M64 -132 Q186 -150 196 -40 Q204 54 104 62 Q72 22 68 -50Z', '#8394B8') +
+  path('M84 -104 Q166 -116 176 -40 Q182 26 108 36', 'none', 5) +
+  path('M-66 16 L-16 74 L-98 76Z', '#F6F2E6', 6) +
+  `<ellipse cx="4" cy="-84" rx="16" ry="19" fill="${INK}"/><circle cx="10" cy="-91" r="6" fill="#fff"/>` +
+  line('M-24 -126 Q4 -138 30 -124', 5, '#7F8CAC') + ellipse(-54, -24, 24, 14, C.blush, 0) +
+  line('M-88 82 Q-104 130 -84 166 M-58 106 Q-72 142 -56 176', 5, '#7F8CAC') +
+  line('M68 192 L108 192 M160 192 L200 192 M240 192 L280 192 M306 192 L342 192', 7, '#7F8CAC') +
+  tube('M298 -84 Q352 -54 336 4', '#9AA8C9', 12), at(360, 480, 0.84)) +
+  draw(668, 706, 0.34, mouse(0, 0, 1)) + sparkle(210, 250, 0.7);
 W['ยาม'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.35, man({ shirt: '#3C5AA6', pants: '#26335E', arms: { l: [-80, -100], r: [110, -170] }, face: { mouth: 'smile' },
   hat: (hy) => g(path('M-90 0 Q-80 -80 0 -84 Q80 -80 90 0Z', '#26335E') + path('M-96 0 L100 0 L130 24 L-96 20Z', C.black) + circle(0, -40, 18, C.yellow, 6), at(0, hy - 40)),
   torsoExtra: rect(20, -170, 26, 30, 6, C.yellow, 5) })) + g(rect(-20, -60, 40, 90, 16, C.black) + circle(0, -70, 20, C.yellow), at(560, 450)) + star(200, 260, 26);
@@ -85,8 +86,7 @@ W['ยุง'] = (i) => backdrop(i) + g(
   path('M-40 -22 Q40 -100 150 -50 Q60 -28 -20 -6Z', '#DDF3FF', 7) +
   ellipse(60, 30, 130, 46, '#5C6080', 9, 12) + line('M10 16 L2 56 M60 24 L54 66 M110 34 L106 72', 6, '#43466088') +
   ellipse(-56, -6, 54, 44, '#6B6E8A') +
-  line('M-30 34 L-70 150 M30 40 L20 156 M96 52 L150 150', 9) +
-  line('M-54 100 L-120 120 M22 108 L-32 140 M120 104 L176 122', 7) +
+  line('M-30 34 L-74 152 M30 40 L18 158 M96 52 L156 150', 9) +
   circle(-118, -30, 40, '#5C6080') + circle(-132, -44, 13, '#fff', 0) + circle(-128, -40, 6, INK, 0) +
   line('M-152 -6 L-250 60', 9) + line('M-136 -70 L-166 -126 M-108 -72 L-96 -134', 6), at(430, 400, 1.05)) +
   g(line('M0 0 q22 -22 44 0 q22 22 44 0', 6, C.grayD), at(150, 650)) + sparkle(640, 620, 0.6);

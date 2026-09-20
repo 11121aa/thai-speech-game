@@ -47,22 +47,27 @@ const arrowUp = (x, y, s, color = C.green) => g(path('M0 -120 L90 -10 L36 -10 L3
 W['ไข่'] = (i) => backdrop(i) + shadow(400, 690, 150) + egg(400, 470, 1.6) + g(face(90, { eyes: 'happy' }), at(400, 520)) + sparkle(610, 260, 0.8) + egg(620, 630, 0.4, '#F3D9B1', 20);
 W['ขาว'] = (i) => backdrop(i, { dots: false }) + `<circle cx="400" cy="410" r="330" fill="#DCE6F5"/>` + paint(400, 440, 1.3, '#fff') + g(face(80, { eyes: 'happy' }), at(400, 440)) + sparkle(620, 250, 0.8, '#fff');
 W['ขี่'] = (i) => {
-  const wheel = (x, y) => circle(x, y, 84, 'none', 16) + circle(x, y, 84, 'none', 7).replace(`stroke="${INK}"`, `stroke="${C.grayD}"`);
-  // frame: rear hub (-160,90) crank (20,90) seat (-20,-40) bar (110,-40) grip (206,-128)
-  const bike = g(wheel(-160, 90) + wheel(190, 90) +
-    line('M-160 90 L-20 -40 L110 -40 L190 90 M-20 -40 L20 90 L110 -40 M20 90 L-160 90', 14, C.red) +
-    line('M110 -40 L140 -120 L206 -128', 14, C.grayD) + rect(-74, -66, 96, 22, 11, C.black) +
-    circle(20, 90, 20, C.grayD) + line('M20 90 L70 116 M20 90 L-30 64', 11, C.grayD) +
-    rect(48, 106, 46, 16, 6, C.black) + rect(-54, 54, 46, 16, 6, C.black), at(400, 560));
-  // rider, leaning forward: seat (380,520) grip (606,432) pedals (471,674) (369,622)
-  const rider = g(
-    tube('M0 0 L46 84 L71 154', C.blue, 32) + tube('M0 0 L-24 78 L-31 102', C.blueD, 32) +   // legs to both pedals
-    ellipse(71, 162, 27, 15, C.black, 6) + ellipse(-31, 110, 27, 15, C.black, 6) +
-    path('M-34 -14 Q-52 -110 24 -122 L52 -118 Q86 -112 80 -74 L60 -6 Q20 16 -34 -14Z', C.yellow) +   // torso leaning
-    tube('M56 -104 L146 -74 L206 -88', C.skin, 22) + circle(214, -90, 19, C.skin, 7) +               // arm to the grip
-    g(circle(0, 0, 62, C.skin) + path('M-62 -6 Q-66 -76 0 -72 Q66 -76 62 -6 Q44 -38 12 -34 Q-12 -50 -30 -32 Q-48 -30 -62 -6Z', C.hair) +
-      g(face(60, { eyes: 'happy', mouth: 'big', look: 1 }), at(0, 8)), at(34, -176)), at(380, 520));
-  return backdrop(i) + shadow(400, 700, 240) + bike + rider + motion(120, 450, 0.9, 180);
+  // One local frame for bike + rider (group placed at 400,540).
+  // Contact points: GRIP (196,-150)  PEDAL_F (52,96)  PEDAL_B (-16,150)  SEAT (-40,-70)
+  const GRIP = [196, -150], PF = [52, 96], PB = [-16, 150], SEAT = [-40, -70];
+  const wheel = (x, y) => circle(x, y, 92, 'none', 17) + circle(x, y, 92, 'none', 7).replace(`stroke="${INK}"`, `stroke="${C.grayD}"`);
+  const bike =
+    wheel(-170, 124) + wheel(180, 124) +
+    line('M-170 124 L-40 -50 L96 -50 L180 124 M-40 -50 L18 124 L96 -50 M18 124 L-170 124', 14, C.red) +
+    line('M96 -50 L150 -150 L196 -150', 14, C.grayD) +           // handlebar ends exactly at GRIP
+    rect(-78, -76, 96, 22, 11, C.black) +                        // saddle under SEAT
+    circle(18, 124, 20, C.grayD) + line('M18 124 L52 96 M18 124 L-16 150', 12, C.grayD) +
+    rect(PF[0] - 24, PF[1] - 8, 48, 16, 6, C.black) + rect(PB[0] - 24, PB[1] - 8, 48, 16, 6, C.black);
+  const rider =
+    tube(`M-24 -104 L36 -40 L${PF[0]} ${PF[1] - 14}`, C.blue, 32) +
+    tube(`M-30 -104 L-58 -30 L${PB[0]} ${PB[1] - 14}`, C.blueD, 32) +
+    g(ellipse(0, 0, 27, 15, C.black, 6), at(PF[0], PF[1] - 6)) + g(ellipse(0, 0, 27, 15, C.black, 6), at(PB[0], PB[1] - 6)) +
+    path('M-76 -96 Q-104 -200 -12 -216 L26 -212 Q66 -204 56 -160 L28 -84 Q-24 -60 -76 -96Z', C.yellow) +
+    tube(`M34 -196 L120 -178 L${GRIP[0] - 18} ${GRIP[1] - 10}`, C.skin, 22) +
+    circle(GRIP[0] - 4, GRIP[1] - 6, 20, C.skin, 7) +
+    g(circle(0, 0, 64, C.skin) + path('M-64 -6 Q-68 -78 0 -74 Q68 -78 64 -6 Q46 -40 12 -36 Q-12 -52 -32 -34 Q-50 -32 -64 -6Z', C.hair) +
+      g(face(62, { eyes: 'happy', mouth: 'big', look: 1 }), at(0, 8)), at(0, -274));
+  return backdrop(i) + shadow(400, 690, 250) + g(bike + rider, at(400, 540, 0.92)) + motion(120, 440, 0.9, 180);
 };
 W['แขน'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.35, kid({ shirt: C.red, sleeve: C.skin, arms: { l: [-150, -290], r: [150, -290] }, face: { eyes: 'happy', mouth: 'big' } })) + sparkle(170, 250, 0.8) + sparkle(630, 250, 0.8) + motion(660, 420, 0.7) + motion(140, 420, 0.7, 180);
 W['ข้าว'] = (i) => backdrop(i) + shadow(400, 690, 190) + riceBowl(400, 540, 1.35, C.blue) + tube('M520 330 L450 470', '#D9A066', 10) + tube('M550 340 L470 474', '#D9A066', 10) +
@@ -74,16 +79,19 @@ W['เข็ม'] = (i) => backdrop(i) + g(path('M-14 -260 Q0 -290 14 -260 L10 2
   line('M468 250 Q640 200 620 360 Q600 480 480 470 Q340 460 360 580 Q380 660 520 650', 10, C.red) + g(circle(0, 0, 60, C.pink) + line('M-50 -30 L50 30 M-56 0 L56 0 M-50 30 L50 -30', 5, '#E0559A'), at(560, 650));
 W['เข่า'] = (i) => backdrop(i) + g(L.silhouette((fill, w) => {
     const st = w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"` : '';
-    return `<path d="M-96 -300 L96 -300 L104 -150 Q108 -96 78 -60 L70 -40 Q118 10 110 90 L96 170
-                     Q92 200 62 200 L18 200 Q-12 200 -10 170 L-4 92 Q0 40 -36 6 L-62 -20
-                     Q-104 -60 -102 -150Z" fill="${fill}"${st}/>` +
-      `<path d="M-14 176 Q-18 214 6 226 L128 226 Q158 226 156 206 Q154 186 120 180 L74 168Z" fill="${fill}"${st}/>`;
+    return `<path d="M-84 -300 L92 -300 L104 -170 Q112 -120 86 -92
+                     Q140 -54 138 30 Q136 104 104 150 L98 168
+                     Q94 186 64 186 L34 186 Q10 186 12 166 L20 130
+                     Q42 84 40 34 Q38 -12 -4 -34 Q-70 -68 -76 -160Z" fill="${fill}"${st}/>`;
   }, C.skin) +
-  // knee bump + ankle crease
-  line('M-52 -34 Q4 -66 62 -34', 6, '#E3A377') + line('M-4 150 Q40 162 84 150', 6, '#E3A377') +
-  rect(-110, -340, 220, 90, 26, C.blue), at(400, 400, 0.92)) +
-  g(circle(0, 0, 86, 'none', 11).replace(`stroke="${INK}"`, `stroke="${C.red}"`), at(404, 372)) +
-  g(line('M0 0 L-76 -34', 9, C.red) + path('M-76 -34 L-40 -36 L-52 -10Z', C.red, 0), at(610, 300)) + sparkle(200, 300, 0.7);
+  line('M-24 -104 Q44 -140 96 -104', 6, '#E3A377') +
+  // ankle notch + shoe with the toes pointing right
+  line('M16 140 Q56 150 96 140', 6, '#E3A377') + circle(22, 142, 9, '#E3A377', 0) +
+  path('M6 168 Q-6 206 22 216 L150 216 Q186 216 184 194 Q182 172 140 166 L96 158 L92 168Z', C.black) +
+  line('M30 190 L150 196', 5, '#55506E') +
+  rect(-100, -340, 210, 80, 26, C.blue), at(380, 400, 0.92)) +
+  g(circle(0, 0, 80, 'none', 11).replace(`stroke="${INK}"`, `stroke="${C.red}"`), at(404, 300)) +
+  g(line('M0 0 L-86 -20', 9, C.red) + path('M-86 -20 L-52 -30 L-56 -2Z', C.red, 0), at(620, 300)) + sparkle(200, 620, 0.7);
 W['ค้อน'] = (i) => backdrop(i) + g(rect(-24, -60, 48, 380, 20, C.brownL) + line('M0 -20 L0 300', 5, C.brown) +
   path('M-150 -170 L110 -170 Q160 -170 160 -120 L160 -70 Q160 -20 110 -20 L-150 -20 L-190 -60 L-190 -130Z', C.grayD) + shine(-90, -130, 60, 12, 0, 0.35), at(420, 400, 1, 30)) + star(200, 300, 30) + motion(220, 420, 0.8, 160);
 W['คัน'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.35, kid({ arms: { l: [-40, -150], r: [60, -300] }, face: { mouth: 'wavy', eyes: 'x' }, shirt: C.green,
@@ -127,8 +135,12 @@ W['หญ้าสีเขียว'] = (i) => backdrop(i, { dots: false }) + i
 W['ขายไข่ไก่'] = (i) => backdrop(i) + shadow(400, 700, 240) + table(400, 560, 480) + basketEggs(400, 500, 1.1) +
   g(rect(-90, -60, 180, 90, 12, '#fff') + text(0, 6, 1, '฿5', C.red, 0, 52), at(400, 250)) + line('M400 310 L400 380', 7) + egg(620, 360, 0.35);
 W['ไขกุญแจ'] = (i) => backdrop(i) + shadow(380, 690, 150) + padlock(380, 500, 1.15) +
-  // keyhole is at padlock local (0,20) -> (380,523); the key's bit sits in it
-  g(key(0, 0, 0.9, 0), at(374, 523)) + motion(200, 380, 0.7, 200) + sparkle(620, 300, 0.7);
+  // key comes in at an angle, its bit ending on the keyhole (380,523)
+  g(key(0, 0, 0.78, -18), at(392, 528)) +
+  // the hole drawn again over the tip: the key reads as going into it
+  g(circle(0, 0, 25, INK, 0) + rect(-9, 0, 18, 64, 6, INK, 0), at(380, 520)) +
+  g(path('M-22 -6 A24 24 0 0 1 22 -6 L14 14 L-14 14Z', '#C99A00', 0), at(380, 512)) +
+  motion(210, 380, 0.7, 200) + sparkle(630, 300, 0.7);
 W['ขึ้นข้างบน'] = (i) => backdrop(i, { dots: false }) + inCircle(stairs(400, 560, 1.1)) + draw(312, 560, 0.7, kid({ arms: { l: [-80, -110], r: [120, -230] }, face: { eyes: 'happy', mouth: 'big' } })) + arrowUp(620, 250, 0.7);
 W['กินคุกกี้'] = (i) => backdrop(i) + shadow(400, 712, 150) +
   draw(400, 712, 1.3, girl({ arms: { l: [-110, -130], r: [46, -216] }, face: { eyes: 'happy', mouth: 'chew' } })) +

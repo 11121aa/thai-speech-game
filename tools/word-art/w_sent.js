@@ -122,23 +122,22 @@ W['เด็กเล่นหุ่นยนต์ตอนเย็น'] = (i)
   draw(260, 712, 1.1, kid({ arms: { l: [-90, -120], r: [120, -190] }, face: { eyes: 'happy', mouth: 'big' } })) + robot(540, 560, 0.72, { wave: true });
 W['คุณย่ากินลำไยยามเย็น'] = (i) => backdrop(i, { dots: false }) + `<circle cx="400" cy="410" r="330" fill="#FFD7B5"/>` + circle(630, 260, 60, C.orange) + shadow(400, 712, 160) +
   draw(360, 712, 1.3, grandma({ hair: 'grayShort', shirt: C.teal, arms: { l: [-80, -110], r: [40, -205] }, face: { eyes: 'happy', mouth: 'chew' } })) + Y.longan(580, 600, 0.45);
-W['ยักษ์ใหญ่ไล่เหยียบยักษ์เล็ก'] = (i) => backdrop(i) + shadow(300, 700, 200) + shadow(600, 706, 80) +
-  // standing leg down, the other lifted high and about to stomp
+W['ยักษ์ใหญ่ไล่เหยียบยักษ์เล็ก'] = (i) => backdrop(i) + shadow(280, 700, 190) + shadow(590, 712, 70) +
   g(L.g(
-    tube('M-50 60 L-70 220', '#3DBE6E', 50) + ellipse(-84, 232, 52, 24, C.brownD) +
-    tube('M60 60 L150 100 L196 40', '#3DBE6E', 50) + g(ellipse(0, 0, 56, 26, C.brownD), at(206, 34, 1, -25)) +
-    tube('M-100 -100 Q-190 -40 -186 40', '#3DBE6E', 40) + tube('M100 -100 Q200 -140 230 -80', '#3DBE6E', 40) +
+    tube('M-54 60 L-72 220', '#3DBE6E', 50) + ellipse(-86, 232, 52, 24, C.brownD) +
+    tube('M56 60 L170 30 L184 122', '#3DBE6E', 50) +
+    g(path('M-78 -22 L78 -22 Q104 -22 104 4 Q104 30 78 30 L-78 30 Q-104 30 -104 4 Q-104 -22 -78 -22Z', C.brownD), at(184, 140)) +
+    tube('M-100 -100 Q-190 -40 -186 40', '#3DBE6E', 40) + tube('M100 -100 Q200 -140 240 -60', '#3DBE6E', 40) +
     L.rect(-120, -140, 240, 220, 60, C.red) + L.rect(-120, 0, 240, 36, 0, C.yellow, 6) +
     path('M-100 -140 Q-110 -300 0 -310 Q110 -300 100 -140Z', '#3DBE6E') +
     path('M-90 -290 L-70 -390 L-40 -310 L0 -420 L40 -310 L70 -390 L90 -290Z', C.yellow) +
     circle(-40, -230, 22, '#fff') + circle(40, -230, 22, '#fff') + circle(-38, -228, 10, INK, 0) + circle(42, -228, 10, INK, 0) +
     line('M-76 -272 L-18 -252 M76 -272 L18 -252', 9) +
     path('M-50 -180 Q0 -140 50 -180 Q30 -146 0 -146 Q-30 -146 -50 -180Z', '#8E2F3C', 6) +
-    path('M-40 -178 L-32 -150 L-22 -172Z M40 -178 L32 -150 L22 -172Z', '#fff', 4), at(0, 0)), at(300, 470, 0.8)) +
-  // little giant scrambling away under the raised foot
-  g(giant(0, 0, 0.3, '#5AA9FF', { armL: '-190 -150', armR: '190 -150' }), at(612, 700)) +
-  motion(700, 560, 0.6) + motion(470, 250, 0.6, 30) +
-  g(line('M0 0 L40 -30 M20 6 L66 -10 M6 -22 L36 -56', 7, C.grayD), at(520, 560));
+    path('M-40 -178 L-32 -150 L-22 -172Z M40 -178 L32 -150 L22 -172Z', '#fff', 4), at(0, 0)), at(280, 470, 0.8)) +
+  g(giant(0, 0, 0.26, '#5AA9FF', { armL: '-190 -150', armR: '190 -150' }), at(600, 712)) +
+  g(line('M0 0 L-16 46 M40 -4 L44 48 M-40 -6 L-70 36', 9, C.grayD), at(430, 620)) +
+  motion(690, 600, 0.55) + motion(230, 300, 0.6, 200);
 W['เขาเคยขายไข่ข้าว'] = (i) => backdrop(i) + shadow(400, 700, 250) + draw(400, 560, 0.95, man({ arms: { l: [-110, -150], r: [110, -150] }, face: { eyes: 'happy', mouth: 'big' }, shirt: C.orange })) +
   K.stall(400, 620, 0.9, K.egg(-120, -80, 0.35) + K.egg(-80, -90, 0.35, '#F3D9B1') + K.riceBowl(100, -80, 0.35, C.blue), false);
 W['พวกเขาซื้อขนมเค้กทุกคน'] = (i) => backdrop(i) + shadow(400, 712, 260) +
