@@ -62,7 +62,6 @@
     setText($('kbSetMeta'), ws.meta);
     var warn = !ws.ok || !ws.count, set = $('kbSet');
     if (set.classList.contains('warn') !== warn) set.classList.toggle('warn', warn);
-    if (warn && ws.kind === 'custom' && ws.count === 0 && $('kbAdult').hidden && document.querySelector('#setupSoundList input')) setAdult(true);
   }
 
   function setAdult(open) {
@@ -73,22 +72,11 @@
     if (open) setTimeout(function () { panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
   }
 
-  // Grown-up settings open after holding the lock for a moment, so a
-  // child tapping around the card doesn't land in them by accident.
+  // Grown-up settings (sound examples, repeats, camera) open on a tap.
+  // The word set itself stays on the card -- adults need it every time.
   (function wireLock() {
     var lock = $('kbLock'); if (!lock) return;
-    var t0 = 0, raf = 0, HOLD = 700;
-    function tick() {
-      var p = Math.min(1, (performance.now() - t0) / HOLD);
-      lock.style.setProperty('--p', p.toFixed(3));
-      if (p >= 1) { stop(); setAdult($('kbAdult').hidden); return; }
-      raf = requestAnimationFrame(tick);
-    }
-    function stop() { cancelAnimationFrame(raf); raf = 0; t0 = 0; lock.style.setProperty('--p', '0'); }
-    lock.addEventListener('pointerdown', function (e) { e.preventDefault(); t0 = performance.now(); raf = requestAnimationFrame(tick); });
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { lock.addEventListener(ev, function () { if (t0) stop(); }); });
-    lock.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    lock.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAdult($('kbAdult').hidden); } });
+    lock.addEventListener('click', function () { setAdult($('kbAdult').hidden); });
   })();
 
   function renderResults() {

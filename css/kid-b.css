@@ -470,3 +470,10 @@ body.ui-b .pp-body > .pp-side { margin-bottom: auto; }
 @media (min-width: 768px) {
   body.ui-b .pp-body > .pp-card, body.ui-b .pp-body > .pp-side { margin: 0; }
 }
+
+/* Word set stays on the ready card; only the extra dials hide behind the lock. */
+.kb-wordset { display: flex; flex-direction: column; gap: 14px; }
+.ui-b .kb-lock { width: auto; min-width: 50px; height: 50px; padding: 0 14px; gap: 6px; grid-auto-flow: column; font-size: 15px; font-weight: 500; color: var(--purple-d); }
+.ui-b .kb-lock > [data-ic] { grid-area: auto; }
+.ui-b .kb-lock-ring { display: none; }
+.ui-b .kb-lock[aria-expanded="true"] { background: var(--purple); color: #fff; }

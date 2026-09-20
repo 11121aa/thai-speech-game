@@ -12,7 +12,7 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="css/style.css?v=23" rel="stylesheet">
-<link href="css/kid-b.css?v=2" rel="stylesheet">
+<link href="css/kid-b.css?v=3" rel="stylesheet">
 </head>
 <body class="kid-page ui-b">
 
@@ -236,8 +236,8 @@
   <div class="kb-ready">
     <span class="kb-owl" aria-hidden="true"></span>
     <div class="setup-panel kb-card" role="dialog" aria-modal="true" aria-labelledby="setupModeName">
-      <button type="button" class="kb-lock" id="kbLock" aria-label="ตั้งค่าสำหรับผู้ใหญ่ กดค้างไว้" aria-expanded="false" aria-controls="kbAdult">
-        <span class="kb-lock-ring" aria-hidden="true"></span><span data-ic="lock"></span>
+      <button type="button" class="kb-lock" id="kbLock" aria-expanded="false" aria-controls="kbAdult">
+        <span data-ic="lock"></span>ผู้ใหญ่
       </button>
       <div class="kb-card-scroll">
         <div class="kb-ready-top">
@@ -252,24 +252,7 @@
           <span data-ic="book"></span>
           <span class="kb-set-text"><b id="kbSetName">กำลังเตรียมคำ...</b><small id="kbSetMeta"></small></span>
         </div>
-        <div id="pfDiffRow" class="setup-row" style="display:none;">
-      <label>ความเร็ว</label>
-      <div class="diff-btns">
-        <button class="pf-diff-btn diff-btn" data-pfdiff="ง่าย">ช้า</button>
-        <button class="pf-diff-btn diff-btn active" data-pfdiff="ธรรมดา">ปกติ</button>
-        <button class="pf-diff-btn diff-btn" data-pfdiff="ยาก">เร็ว</button>
-      </div>
-    </div>
-        <div id="tdMapRow" class="setup-row" style="display:none;">
-      <label>แผนที่</label>
-      <div class="diff-btns">
-        <button class="td-map-btn diff-btn active" data-tdmap="0">ทุ่งหญ้า</button>
-        <button class="td-map-btn diff-btn" data-tdmap="1">ทะเลทราย</button>
-        <button class="td-map-btn diff-btn" data-tdmap="2">ภูเขาไฟ</button>
-      </div>
-    </div>
-        <div class="kb-adult" id="kbAdult" hidden>
-          <div class="kb-adult-head"><span data-ic="lock"></span>สำหรับผู้ใหญ่</div>
+        <div class="kb-wordset">
           <div class="setup-row">
       <label>ชุดคำที่จะฝึก</label>
       <div class="diff-btns" id="hwDiffBtns">
@@ -300,6 +283,26 @@
       <label>จำนวนคำ</label>
       <span id="setupWordCount" class="count-badge">0</span>
     </div>
+        </div>
+        <div id="pfDiffRow" class="setup-row" style="display:none;">
+      <label>ความเร็ว</label>
+      <div class="diff-btns">
+        <button class="pf-diff-btn diff-btn" data-pfdiff="ง่าย">ช้า</button>
+        <button class="pf-diff-btn diff-btn active" data-pfdiff="ธรรมดา">ปกติ</button>
+        <button class="pf-diff-btn diff-btn" data-pfdiff="ยาก">เร็ว</button>
+      </div>
+    </div>
+        <div id="tdMapRow" class="setup-row" style="display:none;">
+      <label>แผนที่</label>
+      <div class="diff-btns">
+        <button class="td-map-btn diff-btn active" data-tdmap="0">ทุ่งหญ้า</button>
+        <button class="td-map-btn diff-btn" data-tdmap="1">ทะเลทราย</button>
+        <button class="td-map-btn diff-btn" data-tdmap="2">ภูเขาไฟ</button>
+      </div>
+    </div>
+        <div class="kb-adult" id="kbAdult" hidden>
+          <div class="kb-adult-head"><span data-ic="lock"></span>สำหรับผู้ใหญ่</div>
+          
           <div class="setup-row">
       <label>ตัวอย่างเสียง</label>
       <div class="diff-btns" id="hardModeBtns">
@@ -1684,6 +1687,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 </script>
 <script src="js/kid-ui-common.js?v=1"></script>
 <script src="js/kid-art-b.js?v=1"></script>
-<script src="js/kid-ui-b.js?v=2"></script>
+<script src="js/kid-ui-b.js?v=3"></script>
 </body>
 </html>
