@@ -114,7 +114,19 @@
     if (id === 'screenFinish') renderResults();
     if (id === 'screenMode') { renderHome(); window.scrollTo(0, 0); }
   });
-  if (window.Auth && Auth.getSession) Auth.getSession().then(function (s) { window._kidSession = !!s; if (!s || window.KID) renderHome(); }).catch(function () {});
+  if (window.Auth && Auth.getSession) Auth.getSession().then(function (s) {
+    window._kidSession = !!s;
+    if (!s || window.KID) renderHome();
+    // A therapist reaching the kid screens came from their own workspace,
+    // so the dock link back to it says "return", not "parents".
+    if (s && Auth.getRole) Auth.getRole(s.user.id).then(function (role) {
+      if (role !== 'specialist') return;
+      var a = document.querySelector('#navSelf a');
+      if (!a) return;
+      a.innerHTML = '<span data-ic="back"></span>กลับ';
+      U.paint(a);
+    }).catch(function () {});
+  }).catch(function () {});
 
   drawArt(document);
   U.wire();
