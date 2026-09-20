@@ -97,6 +97,16 @@ function person(o = {}) {
   const armsDefault = { l: [-80, -100], r: [80, -100] };
   const arms = Object.assign({}, armsDefault, o.arms || {});
   let out = o.extraBack || '';
+  // Long hair belongs behind the body, so draw it before the torso.
+  const hy0 = -250;
+  let hairBack = '';
+  switch (o.hair || 'short') {
+    case 'bob': hairBack = path(`M-96 ${hy0 + 96} Q-112 ${hy0 - 70} 0 ${hy0 - 92} Q112 ${hy0 - 70} 96 ${hy0 + 96} Q60 ${hy0 + 110} 40 ${hy0 + 80} L-40 ${hy0 + 80} Q-60 ${hy0 + 110} -96 ${hy0 + 96}Z`, hc); break;
+    case 'long': hairBack = path(`M-96 ${hy0 + 150} Q-116 ${hy0 - 70} 0 ${hy0 - 92} Q116 ${hy0 - 70} 96 ${hy0 + 150} Q40 ${hy0 + 170} 0 ${hy0 + 150} Q-40 ${hy0 + 170} -96 ${hy0 + 150}Z`, hc); break;
+    case 'bun': case 'grayBun': hairBack = circle(0, hy0 - 88, 30, hc); break;
+    case 'pigtails': hairBack = ellipse(-92, hy0 + 6, 26, 36, hc, OW, 20) + ellipse(92, hy0 + 6, 26, 36, hc, OW, -20); break;
+  }
+  out += hairBack;
   // legs
   if (o.legs === 'kneel') {
     // front knee down on the floor, back shin folded behind
@@ -125,15 +135,8 @@ function person(o = {}) {
   if (o.hands !== false) out += circle(arms.l[0], arms.l[1], 17, skin, 7) + circle(arms.r[0], arms.r[1], 17, skin, 7);
   // head
   const hy = -250;
-  let hairBack = '', hairFront = '';
-  switch (o.hair || 'short') {
-    case 'bob': hairBack = path(`M-96 ${hy + 96} Q-112 ${hy - 70} 0 ${hy - 92} Q112 ${hy - 70} 96 ${hy + 96} Q60 ${hy + 110} 40 ${hy + 80} L-40 ${hy + 80} Q-60 ${hy + 110} -96 ${hy + 96}Z`, hc); break;
-    case 'long': hairBack = path(`M-96 ${hy + 150} Q-116 ${hy - 70} 0 ${hy - 92} Q116 ${hy - 70} 96 ${hy + 150} Q40 ${hy + 170} 0 ${hy + 150} Q-40 ${hy + 170} -96 ${hy + 150}Z`, hc); break;
-    case 'bun': case 'grayBun': hairBack = circle(0, hy - 88, 30, hc); break;
-    case 'pigtails': hairBack = ellipse(-92, hy + 6, 26, 36, hc, OW, 20) + ellipse(92, hy + 6, 26, 36, hc, OW, -20); break;
-  }
+  let hairFront = '';
   const headR = 80;
-  out += hairBack;
   out += circle(-78, hy + 8, 16, skin) + circle(78, hy + 8, 16, skin);
   out += circle(0, hy, headR, skin);
   switch (o.hair || 'short') {
@@ -242,21 +245,33 @@ function numberBadge(x, y, s, str, color = C.orange) {
   return text(x, y, s, str, color, 20, 260);
 }
 
+// Draws parts as one shape: a wide ink stroke pass underneath, then the
+// same parts filled on top, so shared edges leave no lines inside.
+function silhouette(parts, fill, w = OW) {
+  return parts(INK, w * 2) + parts(fill, 0);
+}
+
 function hand(fingers, o = {}) {
-  // Palm facing the viewer, fingers pointing up.
-  // fingers = [index, middle, ring, pinky, thumb]; true = extended.
+  // Palm facing the viewer, fingers up. Drawn as one silhouette so the
+  // fingers merge into the palm instead of looking like stacked blocks.
   const skin = o.skin || C.skin;
   const F = [[-66, 150], [-14, 176], [38, 158], [88, 116]];
-  let up = '', folded = '';
-  F.forEach(([x, h], k) => {
-    if (fingers[k]) up += path(`M${x - 24} 20 L${x - 24} ${-h + 26} Q${x - 24} ${-h} ${x} ${-h} Q${x + 24} ${-h} ${x + 24} ${-h + 26} L${x + 24} 20Z`, skin);
-    else folded += path(`M${x - 24} 30 L${x - 24} -18 Q${x} -44 ${x + 24} -18 L${x + 24} 30Z`, skin) + line(`M${x - 16} -8 Q${x} -20 ${x + 16} -8`, 5);
-  });
-  const palm = path('M-96 -6 L112 -6 Q126 -6 126 20 L126 132 Q126 210 14 214 Q-96 214 -104 128 L-104 20 Q-104 -6 -96 -6Z', skin);
-  const thumb = fingers[4]
-    ? path('M-92 54 L-176 -36 Q-202 -64 -176 -88 Q-150 -112 -124 -84 L-56 -8Z', skin) + line('M-140 -48 Q-118 -28 -104 -10', 5)
-    : path('M-96 46 Q-160 40 -166 94 Q-170 146 -100 148 Q-86 116 -92 76Z', skin) + line('M-128 66 Q-146 96 -126 126', 5);
-  return folded + palm + up + thumb + line('M-60 150 Q10 170 80 146', 5, 'rgba(43,35,64,0.22)');
+  const parts = (fill, w) => {
+    let out = '';
+    F.forEach(([x, h], k) => {
+      out += fingers[k]
+        ? `<rect x="${x - 25}" y="${-h}" width="50" height="${h + 90}" rx="25" fill="${fill}"${w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round"` : ''}/>`
+        : `<rect x="${x - 25}" y="-30" width="50" height="120" rx="25" fill="${fill}"${w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round"` : ''}/>`;
+    });
+    out += `<rect x="-104" y="-4" width="230" height="216" rx="54" fill="${fill}"${w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round"` : ''}/>`;
+    out += fingers[4]
+      ? `<path d="M-84 52 L-166 -34 Q-190 -60 -164 -84 Q-138 -106 -114 -80 L-40 -2Z" fill="${fill}"${w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"` : ''}/>`
+      : `<path d="M-92 44 Q-158 40 -164 96 Q-168 150 -96 150 L-60 120Z" fill="${fill}"${w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"` : ''}/>`;
+    return out;
+  };
+  let creases = '';
+  F.forEach(([x], k) => { if (!fingers[k]) creases += line(`M${x - 16} 8 Q${x} -6 ${x + 16} 8`, 5, 'rgba(43,35,64,0.45)'); });
+  return silhouette(parts, skin) + creases + line('M-58 150 Q12 168 82 144', 5, 'rgba(43,35,64,0.22)');
 }
 
 // Thumb and finger nearly touching: "just a little".
@@ -304,5 +319,5 @@ function inCircle(content) {
   return `<clipPath id="${id}"><circle cx="400" cy="410" r="330"/></clipPath><g clip-path="url(#${id})">${content}</g><circle cx="400" cy="410" r="330" fill="none"/>`;
 }
 
-module.exports = { hand, pinchHand, inCircle, robot, owl, mushroom, coin, gift, INK, OW, C, BG, S, f, g, at, circle, ellipse, rect, path, line, tube, shine, shadow, text, sparkle, heart, star, motion,
+module.exports = { hand, pinchHand, silhouette, inCircle, robot, owl, mushroom, coin, gift, INK, OW, C, BG, S, f, g, at, circle, ellipse, rect, path, line, tube, shine, shadow, text, sparkle, heart, star, motion,
   backdrop, face, person, kid, girl, mom, grandma, man, draw, catHead, cat, dog, pig, bear, mouse, bird, horse, cloudShape, speech, table, bowl, glass, numberBadge };

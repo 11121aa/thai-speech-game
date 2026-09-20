@@ -42,14 +42,28 @@ const soundWaves = (x, y, s) => g(line('M0 -40 Q30 0 0 40 M40 -80 Q90 0 40 80 M8
 
 W['หยุด'] = (i) => backdrop(i) + shadow(400, 690, 90) + stopSign(400, 360, 1.3) + g(hand([true, true, true, true, true]), at(620, 640, 0.5));
 W['ยาย'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.4, grandma({ arms: { l: [-90, -110], r: [90, -110] } })) + heart(610, 270, 0.9, C.pink);
-W['ใหญ่'] = (i) => backdrop(i) + shadow(340, 700, 230) + g(
-  tube('M-120 30 L-124 170', '#9AA8C9', 54) + tube('M-30 40 L-30 176', '#9AA8C9', 54) + tube('M70 40 L74 174', '#9AA8C9', 54) + tube('M150 30 L154 166', '#9AA8C9', 54) +
-  ellipse(10, -30, 190, 140, '#9AA8C9') + tube('M190 0 Q240 20 220 70', '#9AA8C9', 14) +
-  ellipse(-180, -80, 100, 116, '#8394B8') + circle(-130, -110, 118, '#9AA8C9') +
-  path('M-150 -20 Q-210 40 -196 130 Q-190 190 -140 186 Q-104 180 -116 130 Q-128 60 -110 10Z', '#9AA8C9') +
-  path('M-210 -16 Q-250 10 -240 60', 'none', 9) + path('M-60 -10 L-30 40 L-90 40Z', '#F6F2E6', 6) +
-  g(face(104, { mouth: 'smile', eyes: 'happy' }), at(-134, -120)), at(380, 470)) +
-  draw(650, 700, 0.4, mouse(0, 0, 1)) + sparkle(170, 250, 0.7);
+W['ใหญ่'] = (i) => backdrop(i) + shadow(360, 700, 250) + g(
+  // body + legs first
+  L.silhouette((fill, w) => {
+    const st = w ? ` stroke="${INK}" stroke-width="${w}" stroke-linejoin="round"` : '';
+    return `<ellipse cx="110" cy="-30" rx="170" ry="132" fill="${fill}"${st}/>` +
+      `<rect x="0" y="66" width="78" height="152" rx="36" fill="${fill}"${st}/>` +
+      `<rect x="96" y="72" width="78" height="146" rx="36" fill="${fill}"${st}/>` +
+      `<rect x="186" y="66" width="78" height="152" rx="36" fill="${fill}"${st}/>` +
+      `<rect x="258" y="72" width="74" height="144" rx="34" fill="${fill}"${st}/>` +
+      `<circle cx="-92" cy="-52" r="150" fill="${fill}"${st}/>`;
+  }, '#9AA8C9') +
+  line('M20 206 L58 206 M116 206 L154 206 M206 206 L244 206 M276 206 L312 206', 7, '#7F8CAC') +
+  // ear on the head, then the trunk in front of everything
+  path('M-86 -164 Q-236 -186 -252 -52 Q-264 62 -150 74 Q-104 34 -108 -62Z', '#8394B8') +
+  path('M-114 -132 Q-212 -142 -222 -46 Q-228 30 -148 44', 'none', 5) +
+  tube('M-170 20 Q-214 110 -180 176 Q-150 232 -96 208 Q-56 190 -80 154', '#9AA8C9', 58) +
+  path('M-96 44 L-40 104 L-124 106Z', '#F6F2E6', 6) +
+  `<ellipse cx="-80" cy="-84" rx="15" ry="18" fill="${INK}"/><circle cx="-75" cy="-90" r="6" fill="#fff"/>` +
+  ellipse(-128, -16, 26, 15, C.blush, 0) +
+  line('M-190 70 Q-208 120 -188 160 M-158 96 Q-172 136 -156 168', 5, '#7F8CAC') +
+  tube('M276 -74 Q328 -44 312 12', '#9AA8C9', 12), at(390, 466, 0.88)) +
+  draw(650, 700, 0.4, mouse(0, 0, 1)) + sparkle(200, 250, 0.7);
 W['ยาม'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.35, man({ shirt: '#3C5AA6', pants: '#26335E', arms: { l: [-80, -100], r: [110, -170] }, face: { mouth: 'smile' },
   hat: (hy) => g(path('M-90 0 Q-80 -80 0 -84 Q80 -80 90 0Z', '#26335E') + path('M-96 0 L100 0 L130 24 L-96 20Z', C.black) + circle(0, -40, 18, C.yellow, 6), at(0, hy - 40)),
   torsoExtra: rect(20, -170, 26, 30, 6, C.yellow, 5) })) + g(rect(-20, -60, 40, 90, 16, C.black) + circle(0, -70, 20, C.yellow), at(560, 450)) + star(200, 260, 26);
@@ -66,12 +80,16 @@ W['ยักษ์'] = (i) => backdrop(i) + shadow(400, 712, 180) + g(
   path('M-150 -20 Q-200 -30 -190 20 Q-180 50 -150 40Z M150 -20 Q200 -30 190 20 Q180 50 150 40Z', '#3DBE6E') +
   rect(-120, 130, 240, 140, 40, C.red) + rect(-120, 150, 240, 30, 0, C.yellow, 6), at(400, 470));
 W['ยุง'] = (i) => backdrop(i) + g(
-  ellipse(-30, -110, 96, 44, '#DDF3FF', 6, -22) + ellipse(60, -120, 96, 44, '#DDF3FF', 6, 18) +
-  line('M-40 40 L-110 150 M0 44 L-20 160 M40 36 L110 150', 9) + line('M-70 90 L-120 84 M-4 100 L-44 120 M74 92 L120 76', 7) +
-  ellipse(10, -6, 110, 44, '#5C6080', 9, -12) + line('M-30 -22 L-40 22 M10 -26 L4 26 M50 -22 L46 20', 6, '#43466099') +
-  circle(-110, -40, 44, '#5C6080') + circle(-124, -54, 14, '#fff', 0) + circle(-120, -50, 7, INK, 0) +
-  line('M-150 -20 L-250 40', 8) + line('M-128 -78 L-160 -130 M-100 -80 L-84 -140', 6), at(430, 400, 1.1)) +
-  g(line('M0 0 q22 -22 44 0 q22 22 44 0', 6, C.grayD), at(150, 640)) + sparkle(640, 620, 0.6);
+  // wings hinge on the thorax (just behind the head) and sweep back
+  path('M-40 -30 Q30 -150 130 -120 Q60 -74 -24 -20Z', '#E9F6FF', 7) +
+  path('M-40 -22 Q40 -100 150 -50 Q60 -28 -20 -6Z', '#DDF3FF', 7) +
+  ellipse(60, 30, 130, 46, '#5C6080', 9, 12) + line('M10 16 L2 56 M60 24 L54 66 M110 34 L106 72', 6, '#43466088') +
+  ellipse(-56, -6, 54, 44, '#6B6E8A') +
+  line('M-30 34 L-70 150 M30 40 L20 156 M96 52 L150 150', 9) +
+  line('M-54 100 L-120 120 M22 108 L-32 140 M120 104 L176 122', 7) +
+  circle(-118, -30, 40, '#5C6080') + circle(-132, -44, 13, '#fff', 0) + circle(-128, -40, 6, INK, 0) +
+  line('M-152 -6 L-250 60', 9) + line('M-136 -70 L-166 -126 M-108 -72 L-96 -134', 6), at(430, 400, 1.05)) +
+  g(line('M0 0 q22 -22 44 0 q22 22 44 0', 6, C.grayD), at(150, 650)) + sparkle(640, 620, 0.6);
 W['ยิง'] = (i) => backdrop(i) + g(circle(0, 0, 150, C.red) + circle(0, 0, 110, '#fff') + circle(0, 0, 70, C.red) + circle(0, 0, 32, '#fff'), at(540, 420)) +
   // bow on the left, arrow already flying into the target
   g(path('M0 -170 Q110 0 0 170', 'none', 16) + path('M0 -170 Q110 0 0 170', 'none', 7).replace(`stroke="${INK}"`, `stroke="${C.brownL}"`) + line('M0 -170 L0 170', 5, '#fff'), at(150, 430)) +
