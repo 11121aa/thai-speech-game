@@ -34,7 +34,7 @@ W['หน้า'] = (i) => backdrop(i) + g(
 W['นม'] = (i) => backdrop(i) + shadow(400, 690, 150) + milkCarton(330, 520, 1.3) + glass(560, 560, 0.75, '#fff', { level: -30 }) + sparkle(640, 240, 0.8);
 W['น้อง'] = (i) => backdrop(i) + shadow(400, 712, 140) + draw(400, 712, 1.55, baby({ arms: { l: [-110, -200], r: [110, -200] }, face: { eyes: 'happy', mouth: 'big' },
   headExtra: () => '' })) + heart(230, 260, 0.8, C.pink) + heart(590, 280, 0.7, C.pink);
-W['นิ้ว'] = (i) => backdrop(i) + g(hand([false, false, false, true, false]), at(390, 560, 1.3)) + sparkle(560, 240, 0.9) + motion(500, 290, 0.7, -60);
+W['นิ้ว'] = (i) => backdrop(i) + g(L.hand([true, false, false, false, false]), at(370, 540, 1.15)) + sparkle(600, 250, 0.9) + motion(560, 330, 0.7, -60);
 W['เหนื่อย'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.4, kid({ arms: { l: [-60, -60], r: [60, -60] }, face: { eyes: 'tired', mouth: 'wavy' }, shirt: C.red })) +
   drop(560, 330, 0.28, '#7CC8FF') + drop(250, 310, 0.24, '#7CC8FF') + drop(590, 400, 0.2, '#7CC8FF') + line('M300 200 q20 -20 40 0 q20 20 40 0', 6, C.grayD);
 
@@ -55,12 +55,12 @@ W['น้ำตาล'] = (i) => backdrop(i) + shadow(400, 690, 190) + bowl(400,
   g(rect(-40, -40, 80, 80, 10, '#fff') + line('M-40 -10 L40 -10', 3, C.grayL), at(250, 330, 1, -15)) + g(rect(-40, -40, 80, 80, 10, '#fff'), at(560, 310, 1, 20)) + sparkle(640, 470, 0.6) + sparkle(180, 460, 0.5);
 W['นิทาน'] = (i) => backdrop(i) + shadow(400, 690, 230) + book(400, 520, 1.25) +
   star(290, 290, 36) + star(510, 250, 44, C.pink) + g(path('M0 -60 Q-60 -10 -10 40 Q-60 30 -60 -20 Q-60 -80 0 -60Z', C.yellow, 6), at(400, 330)) + sparkle(620, 360, 0.6) + sparkle(190, 380, 0.6);
-W['นิ้วก้อย'] = (i) => backdrop(i) + g(hand([true, false, false, false, false]), at(430, 560, 1.3)) + sparkle(240, 270, 0.9, C.pink);
-W['นิดหน่อย'] = (i) => backdrop(i) + g(
-  path('M-120 80 Q-140 -40 -40 -60 L60 -70 Q90 -70 90 -44 Q90 -22 60 -20 L-10 -14 Z', C.skin) +
-  path('M-60 -40 L-20 -180 Q-10 -210 18 -200 Q40 -190 34 -164 L10 -60Z', C.skin) +
-  path('M-120 80 Q-120 160 -20 170 Q60 170 90 110 Q110 60 70 40 L-40 50Z', C.skin), at(400, 470, 1.2)) +
-  line('M392 330 L470 330', 5, C.red) + line('M392 316 L392 344 M470 316 L470 344', 5, C.red) + sparkle(600, 260, 0.6);
+W['นิ้วก้อย'] = (i) => backdrop(i) + g(L.hand([false, false, false, true, false]), at(380, 540, 1.15)) + sparkle(210, 270, 0.9, C.pink) + g(path('M0 0 L70 -30', 'none', 8) + path('M70 -30 L42 -34 L58 -12Z', INK, 0), at(520, 300));
+W['นิดหน่อย'] = (i) => backdrop(i) + shadow(300, 690, 110) + shadow(560, 690, 100) +
+  glass(300, 540, 1.05, '#FFB347', { level: 78 }) +
+  g(line('M0 0 L0 82 M-18 0 L18 0 M-18 82 L18 82', 7, C.red), at(206, 544)) +
+  g(circle(0, 0, 18, '#FFB347') + circle(38, 10, 14, '#FFB347') + circle(18, -32, 12, '#FFB347'), at(566, 620)) +
+  sparkle(210, 300, 0.8) + sparkle(620, 320, 0.6);
 W['หน้าหนาว'] = (i) => {
   let s = backdrop(i, { dots: false }) + shadow(400, 712, 150) + draw(400, 712, 1.35, kid({ shirt: C.red, pants: C.blueD, arms: { l: [-40, -150], r: [40, -150] }, face: { mouth: 'o' },
     hat: (hy) => g(path('M-84 10 Q-80 -96 0 -96 Q80 -96 84 10Z', C.teal) + circle(0, -104, 22, '#fff') + rect(-90, -6, 180, 30, 14, '#fff'), at(0, hy - 36)),
@@ -89,16 +89,19 @@ W['น้ำตาลทราย'] = (i) => backdrop(i) + shadow(400, 690, 170)
   at(360, 470)) + g([0, 1, 2, 3, 4, 5, 6, 7].map(k => rect(((k * 37) % 90) - 45, ((k * 53) % 90) - 45, 14, 14, 3, '#fff', 4)).join(''), at(600, 590)) + sparkle(620, 250, 0.7);
 W['น้องน่ารัก'] = (i) => backdrop(i) + shadow(400, 712, 140) + draw(400, 712, 1.5, baby({ shirt: C.pinkL, pants: C.pinkL, arms: { l: [-90, -130], r: [90, -130] }, face: { eyes: 'happy', mouth: 'smile' },
   hat: (hy) => g(heart(0, 0, 0.9, C.pink), at(40, hy - 90)) })) + heart(210, 280, 1, C.red) + heart(610, 250, 1.1, C.pink) + sparkle(640, 470, 0.6);
-W['น้องดื่มนม'] = (i) => backdrop(i) + shadow(400, 712, 140) + draw(400, 712, 1.5, baby({ arms: { l: [-30, -200], r: [40, -200] }, face: { eyes: 'closed', mouth: 'none' } })) +
-  g(rect(-34, -70, 68, 140, 26, '#fff') + rect(-34, -10, 68, 80, 20, '#FFF6D6', 0) + rect(-34, -70, 68, 140, 26, 'none') + rect(-40, -96, 80, 30, 10, C.sky) + path('M-18 -96 Q0 -150 18 -96Z', '#FFD9A0'), at(420, 400, 1, 150)) + heart(610, 260, 0.9, C.pink);
+W['น้องดื่มนม'] = (i) => backdrop(i) + shadow(400, 712, 140) +
+  draw(400, 712, 1.5, baby({ arms: { l: [-96, -150], r: [-40, -210] }, face: { eyes: 'closed', mouth: 'none', look: -1 } })) +
+  g(rect(-34, -70, 68, 150, 26, '#fff') + rect(-34, 0, 68, 80, 22, '#FFF6D6', 0) + rect(-34, -70, 68, 150, 26, 'none') +
+    rect(-40, -98, 80, 30, 10, C.sky) + path('M-16 -98 Q0 -148 16 -98Z', '#FFD9A0'), at(300, 430, 0.85, 34)) + heart(600, 280, 0.9, C.pink);
 W['เล่านิทาน'] = (i) => backdrop(i) + shadow(470, 712, 150) + shadow(230, 712, 100) +
   draw(470, 712, 1.2, mom({ hair: 'long', arms: { l: [-110, -150], r: [60, -150] }, face: { mouth: 'open' } })) +
   g(book(0, 0, 0.42), at(400, 520, 1)) + draw(220, 712, 0.95, kid({ arms: { l: [-60, -110], r: [60, -110] }, face: { look: 1, mouth: 'smile' } })) +
   star(350, 250, 26) + star(420, 200, 20, C.pink) + sparkle(640, 260, 0.6);
-W['ชูนิ้วก้อย'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.35, girl({ arms: { l: [-120, -300], r: [80, -100] }, face: { eyes: 'happy', mouth: 'big' } })) +
-  g(hand([true, false, false, false, false]), at(240, 290, 0.45)) + sparkle(160, 180, 0.6, C.pink);
+W['ชูนิ้วก้อย'] = (i) => backdrop(i) + shadow(400, 712, 150) +
+  draw(400, 712, 1.3, girl({ arms: { l: [-120, -300], r: [80, -100] }, face: { eyes: 'happy', mouth: 'big' }, hands: false })) +
+  g(L.hand([false, false, false, true, false]), at(244, 262, 0.42)) + circle(244, 330, 20, C.skin, 7) + sparkle(160, 200, 0.7, C.pink);
 W['ไปเล่นน้ำ'] = (i) => backdrop(i, { dots: false }) + L.inCircle(g(path('M-330 0 Q-250 -30 -170 0 Q-90 30 -10 0 Q70 -30 150 0 Q230 30 330 0 L330 200 Q300 280 0 300 Q-300 280 -330 200Z', '#5DBDFF'), at(400, 540))) +
-  draw(400, 640, 1.2, kid({ legs: 'none', arms: { l: [-130, -240], r: [130, -240] }, face: { eyes: 'happy', mouth: 'big' }, shirt: C.skin })) +
+  draw(400, 640, 1.2, kid({ legs: 'none', arms: { l: [-130, -240], r: [130, -240] }, face: { eyes: 'happy', mouth: 'big' }, shirt: C.teal })) +
   g(ellipse(0, 0, 150, 50, C.red) + ellipse(0, 0, 90, 24, '#5DBDFF', 6) + path('M-60 -40 L-30 -48 L-30 48 L-60 40Z', '#fff', 0) + path('M60 -40 L30 -48 L30 48 L60 40Z', '#fff', 0) + ellipse(0, 0, 150, 50, 'none'), at(400, 560)) +
   drop(200, 420, 0.3) + drop(610, 400, 0.35) + drop(250, 330, 0.2) + line('M140 560 q30 -20 60 0 M600 560 q30 -20 60 0', 7, '#fff');
 W['น้ำมะนาว'] = (i) => backdrop(i) + shadow(400, 700, 150) + glass(400, 520, 1.3, '#E9F58A', { level: -60, extra: g(rect(-30, -30, 60, 60, 10, '#E8FBFF', 5), at(-20, 0, 1, 20)) + g(rect(-24, -24, 48, 48, 10, '#E8FBFF', 5), at(24, 60, 1, -12)) }) +

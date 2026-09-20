@@ -100,8 +100,9 @@ W['เห็นนกฮูกหาอาหาร'] = (i) => backdrop(i, { dot
   star(200, 200, 14, '#fff', 0) + star(300, 150, 10, '#fff', 0) + line('M200 420 L560 420', 18, C.brownD) + owl(380, 320, 0.7) + draw(560, 640, 0.5, mouse(0, 0, 1)) + line('M430 380 Q520 460 540 560', 6, '#FFE58A');
 W['หมาเห่าโฮ่งโฮ่ง'] = (i) => backdrop(i) + shadow(300, 712, 160) + draw(300, 520, 1.15, dog(0, 0, 1, C.brownL, { bark: true, collar: true })) +
   speech(560, 300, 1.2, text(0, 0, 1, 'โฮ่งโฮ่ง', C.orange, 8, 42));
-W['ฮองเฮาหาฮ่องเต้ในห้อง'] = (i) => backdrop(i) + shadow(400, 712, 150) + door(620, 700, 0.9) +
-  draw(360, 712, 1.3, mom({ hair: 'long', shirt: C.purple, skirt: C.red, arms: { l: [-80, -110], r: [130, -250] }, face: { look: 1, mouth: 'o' }, hat: (hy) => crown(hy) })) + text(620, 250, 1, '?', C.purple, 12, 110);
+W['ฮองเฮาหาฮ่องเต้ในห้อง'] = (i) => backdrop(i) + shadow(330, 712, 150) + door(600, 700, 1.0) +
+  draw(320, 712, 1.3, mom({ hair: 'long', shirt: C.purple, skirt: C.red, arms: { l: [-90, -110], r: [150, -230] }, face: { look: 1, mouth: 'o' }, hat: (hy) => crown(hy) })) +
+  text(560, 300, 1, '?', C.purple, 12, 120) + g(line('M0 0 L70 -20', 'none', 8) + path('M70 -20 L40 -28 L52 -6Z', INK, 0), at(470, 400));
 W['ห้ามหุ่นยนต์เข้าห้อง'] = (i) => backdrop(i) + shadow(400, 700, 230) + door(560, 700, 1.0) + robot(270, 520, 0.7) + noSign(560, 320, 0.8);
 
 // ---- ย
@@ -121,9 +122,10 @@ W['เด็กเล่นหุ่นยนต์ตอนเย็น'] = (i)
   draw(260, 712, 1.1, kid({ arms: { l: [-90, -120], r: [120, -190] }, face: { eyes: 'happy', mouth: 'big' } })) + robot(540, 560, 0.72, { wave: true });
 W['คุณย่ากินลำไยยามเย็น'] = (i) => backdrop(i, { dots: false }) + `<circle cx="400" cy="410" r="330" fill="#FFD7B5"/>` + circle(630, 260, 60, C.orange) + shadow(400, 712, 160) +
   draw(360, 712, 1.3, grandma({ hair: 'grayShort', shirt: C.teal, arms: { l: [-80, -110], r: [40, -205] }, face: { eyes: 'happy', mouth: 'chew' } })) + Y.longan(580, 600, 0.45);
-W['ยักษ์ใหญ่ไล่เหยียบยักษ์เล็ก'] = (i) => backdrop(i) + shadow(400, 712, 260) + giant(280, 470, 0.72, '#3DBE6E', { armR: '230 -60' }) + giant(610, 600, 0.38, '#5AA9FF') + motion(700, 560, 0.5) + motion(450, 600, 0.6);
-
-// ---- ค
+W['ยักษ์ใหญ่ไล่เหยียบยักษ์เล็ก'] = (i) => backdrop(i) + shadow(300, 700, 210) + shadow(620, 700, 90) +
+  giant(300, 470, 0.82, '#3DBE6E', { armR: '250 -120' }) +
+  g(giant(0, 0, 0.34, '#5AA9FF', { armL: '-190 -120', armR: '190 -120' }), at(630, 660)) +
+  motion(700, 520, 0.6) + motion(480, 560, 0.7) + line('M470 300 L560 300', 0);
 W['เขาเคยขายไข่ข้าว'] = (i) => backdrop(i) + shadow(400, 700, 250) + draw(400, 560, 0.95, man({ arms: { l: [-110, -150], r: [110, -150] }, face: { eyes: 'happy', mouth: 'big' }, shirt: C.orange })) +
   K.stall(400, 620, 0.9, K.egg(-120, -80, 0.35) + K.egg(-80, -90, 0.35, '#F3D9B1') + K.riceBowl(100, -80, 0.35, C.blue), false);
 W['พวกเขาซื้อขนมเค้กทุกคน'] = (i) => backdrop(i) + shadow(400, 712, 260) +
