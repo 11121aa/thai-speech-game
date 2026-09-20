@@ -220,7 +220,7 @@ function createPlatformerGame(difficulty) {
       this.load.audio('PixelJump',   'soundeffect/PixelJump.mp3');
       this.load.audio('PixelDamage', 'soundeffect/PixelDamage.mp3');
       this.load.audio('Swoosh',      'soundeffect/swoosh.mp3');
-      this.load.atlas('playerAnim', 'img/player/player-anim.png', 'img/player/player-anim.json');
+      this.load.atlas('playerAnim', 'img/player/player-anim.png?v=2', 'img/player/player-anim.json?v=2');
     },
 
     create: function () {
@@ -264,7 +264,7 @@ function createPlatformerGame(difficulty) {
       };
 
       // [PLAYER] Sprite atlas + animation state machine — hand-drawn stick
-      // figure frames (img/player/player-anim.png). Default is 'run'
+      // frames from tools/player-sprite (img/player/player-anim.png). Default is 'run'
       // (looping); jump plays once then hands off to a held 'airbound'
       // pose; sliding plays a transition once then loops the roll.
       this.anims.create({ key: 'run', frameRate: 12, repeat: -1,
