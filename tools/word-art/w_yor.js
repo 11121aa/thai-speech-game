@@ -42,11 +42,14 @@ const soundWaves = (x, y, s) => g(line('M0 -40 Q30 0 0 40 M40 -80 Q90 0 40 80 M8
 
 W['หยุด'] = (i) => backdrop(i) + shadow(400, 690, 90) + stopSign(400, 360, 1.3) + g(hand([true, true, true, true, true]), at(620, 640, 0.5));
 W['ยาย'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.4, grandma({ arms: { l: [-90, -110], r: [90, -110] } })) + heart(610, 270, 0.9, C.pink);
-W['ใหญ่'] = (i) => backdrop(i) + shadow(360, 700, 220) + g(
-  ellipse(0, 40, 180, 130, '#9AA8C9') + rect(-150, 80, 60, 120, 24, '#9AA8C9') + rect(-50, 90, 60, 110, 24, '#9AA8C9') + rect(60, 90, 60, 110, 24, '#9AA8C9') +
-  ellipse(-180, -60, 90, 110, '#B5C1DD') + circle(-120, -90, 110, '#9AA8C9') + tube('M-200 -40 Q-260 60 -230 140', '#9AA8C9', 46) +
-  g(face(90, { mouth: 'smile' }), at(-110, -100)) + tube('M170 10 Q210 30 200 70', '#9AA8C9', 12), at(380, 470)) +
-  draw(640, 690, 0.45, mouse(0, 0, 1)) + path('M600 420 L660 420 M630 400 L630 440', 'none', 0);
+W['ใหญ่'] = (i) => backdrop(i) + shadow(340, 700, 230) + g(
+  tube('M-120 30 L-124 170', '#9AA8C9', 54) + tube('M-30 40 L-30 176', '#9AA8C9', 54) + tube('M70 40 L74 174', '#9AA8C9', 54) + tube('M150 30 L154 166', '#9AA8C9', 54) +
+  ellipse(10, -30, 190, 140, '#9AA8C9') + tube('M190 0 Q240 20 220 70', '#9AA8C9', 14) +
+  ellipse(-180, -80, 100, 116, '#8394B8') + circle(-130, -110, 118, '#9AA8C9') +
+  path('M-150 -20 Q-210 40 -196 130 Q-190 190 -140 186 Q-104 180 -116 130 Q-128 60 -110 10Z', '#9AA8C9') +
+  path('M-210 -16 Q-250 10 -240 60', 'none', 9) + path('M-60 -10 L-30 40 L-90 40Z', '#F6F2E6', 6) +
+  g(face(104, { mouth: 'smile', eyes: 'happy' }), at(-134, -120)), at(380, 470)) +
+  draw(650, 700, 0.4, mouse(0, 0, 1)) + sparkle(170, 250, 0.7);
 W['ยาม'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.35, man({ shirt: '#3C5AA6', pants: '#26335E', arms: { l: [-80, -100], r: [110, -170] }, face: { mouth: 'smile' },
   hat: (hy) => g(path('M-90 0 Q-80 -80 0 -84 Q80 -80 90 0Z', '#26335E') + path('M-96 0 L100 0 L130 24 L-96 20Z', C.black) + circle(0, -40, 18, C.yellow, 6), at(0, hy - 40)),
   torsoExtra: rect(20, -170, 26, 30, 6, C.yellow, 5) })) + g(rect(-20, -60, 40, 90, 16, C.black) + circle(0, -70, 20, C.yellow), at(560, 450)) + star(200, 260, 26);
@@ -62,10 +65,18 @@ W['ยักษ์'] = (i) => backdrop(i) + shadow(400, 712, 180) + g(
   path('M-70 40 Q0 90 70 40 Q40 80 0 80 Q-40 80 -70 40Z', '#8E2F3C', 7) + path('M-60 42 L-48 80 L-34 50Z M60 42 L48 80 L34 50Z', '#fff', 5) + ellipse(0, 10, 20, 14, '#2E9A58', 6) +
   path('M-150 -20 Q-200 -30 -190 20 Q-180 50 -150 40Z M150 -20 Q200 -30 190 20 Q180 50 150 40Z', '#3DBE6E') +
   rect(-120, 130, 240, 140, 40, C.red) + rect(-120, 150, 240, 30, 0, C.yellow, 6), at(400, 470));
-W['ยุง'] = (i) => backdrop(i) + mosquito(400, 420, 2.2, -10) + g(line('M0 0 q20 -20 40 0 q20 20 40 0', 6, C.grayD), at(150, 630)) + sparkle(620, 640, 0.6);
-W['ยิง'] = (i) => backdrop(i) + g(circle(0, 0, 150, C.red) + circle(0, 0, 110, '#fff') + circle(0, 0, 70, C.red) + circle(0, 0, 32, '#fff'), at(520, 400)) +
-  g(line('M0 0 L-260 60', 12) + line('M0 0 L-260 60', 5, C.brownL) + path('M10 -2 L-30 -18 L-24 10Z', C.grayD, 6) + path('M-260 60 L-300 40 L-290 70 L-310 80 L-270 76Z', C.pink, 5), at(530, 400)) +
-  motion(200, 470, 0.8, 190) + star(640, 230, 30);
+W['ยุง'] = (i) => backdrop(i) + g(
+  ellipse(-30, -110, 96, 44, '#DDF3FF', 6, -22) + ellipse(60, -120, 96, 44, '#DDF3FF', 6, 18) +
+  line('M-40 40 L-110 150 M0 44 L-20 160 M40 36 L110 150', 9) + line('M-70 90 L-120 84 M-4 100 L-44 120 M74 92 L120 76', 7) +
+  ellipse(10, -6, 110, 44, '#5C6080', 9, -12) + line('M-30 -22 L-40 22 M10 -26 L4 26 M50 -22 L46 20', 6, '#43466099') +
+  circle(-110, -40, 44, '#5C6080') + circle(-124, -54, 14, '#fff', 0) + circle(-120, -50, 7, INK, 0) +
+  line('M-150 -20 L-250 40', 8) + line('M-128 -78 L-160 -130 M-100 -80 L-84 -140', 6), at(430, 400, 1.1)) +
+  g(line('M0 0 q22 -22 44 0 q22 22 44 0', 6, C.grayD), at(150, 640)) + sparkle(640, 620, 0.6);
+W['ยิง'] = (i) => backdrop(i) + g(circle(0, 0, 150, C.red) + circle(0, 0, 110, '#fff') + circle(0, 0, 70, C.red) + circle(0, 0, 32, '#fff'), at(540, 420)) +
+  // bow on the left, arrow already flying into the target
+  g(path('M0 -170 Q110 0 0 170', 'none', 16) + path('M0 -170 Q110 0 0 170', 'none', 7).replace(`stroke="${INK}"`, `stroke="${C.brownL}"`) + line('M0 -170 L0 170', 5, '#fff'), at(150, 430)) +
+  g(line('M0 0 L250 0', 12) + line('M0 0 L250 0', 5, C.brownL) + path('M250 0 L206 -20 L212 0 L206 20Z', C.grayD, 5) + path('M0 0 L-40 -24 L-24 0 L-40 24Z', C.pink, 5), at(280, 420)) +
+  motion(230, 300, 0.6, -20) + star(640, 240, 30);
 W['ยิ้ม'] = (i) => backdrop(i) + g(circle(0, 0, 210, C.yellow) + g(face(210, { eyes: 'happy', mouth: 'big' }), at(0, 10)) + shine(-110, -110, 40, 20, -40), at(400, 420)) + sparkle(640, 230, 0.9) + sparkle(170, 620, 0.7);
 W['ยก'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.05, kid({ arms: { l: [-90, -390], r: [90, -390] }, face: { mouth: 'flat', eyes: 'closed' }, shirt: C.red,
   extraFront: rect(-130, -520, 260, 150, 16, C.brownL) + line('M-130 -470 L130 -470', 6) })) + motion(160, 250, 0.7, 180) + motion(640, 250, 0.7);
@@ -85,11 +96,10 @@ W['ยุงเยอะ'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(4
   mosquito(190, 250, 0.7, 10) + mosquito(620, 220, 0.8, -20) + mosquito(650, 450, 0.6, -5) + mosquito(160, 500, 0.55, 20) + mosquito(420, 170, 0.5, 0);
 W['คุณย่า'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.4, grandma({ hair: 'grayShort', shirt: C.teal, skirt: C.brown, arms: { l: [-60, -140], r: [60, -140] },
   extraFront: g(ellipse(0, 0, 50, 40, C.red) + line('M-60 -60 L20 20 M60 -60 L-20 20', 6, C.brownL), at(0, -150)) })) + sparkle(620, 250, 0.7);
-W['ห่วงใย'] = (i) => backdrop(i) + shadow(400, 712, 180) +
-  draw(320, 712, 1.1, kid({ arms: { l: [-60, -150], r: [110, -170] }, face: { eyes: 'happy', mouth: 'smile' } })) +
-  draw(470, 712, 1.35, mom({ hair: 'long', arms: { l: [-190, -180], r: [60, -150] }, face: { eyes: 'happy', mouth: 'smile' } })) + heart(400, 230, 1.4, C.red) + heart(250, 300, 0.6, C.pink);
-
-// ---- W3
+W['ห่วงใย'] = (i) => backdrop(i) + shadow(400, 712, 190) +
+  draw(470, 712, 1.3, mom({ hair: 'bob', arms: { l: [-150, -150], r: [10, -120] }, face: { eyes: 'happy', mouth: 'smile' } })) +
+  draw(300, 712, 0.95, kid({ arms: { l: [-90, -120], r: [100, -140] }, face: { eyes: 'happy', mouth: 'smile' }, shirt: C.yellow })) +
+  heart(390, 250, 1.3, C.red) + heart(230, 300, 0.6, C.pink) + heart(600, 300, 0.5, C.pink);
 W['คุณยายยิ้ม'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(400, 712, 1.45, grandma({ shirt: C.orange, skirt: C.purple, arms: { l: [-110, -170], r: [110, -170] }, face: { eyes: 'happy', mouth: 'big' } })) +
   sparkle(200, 250, 0.9) + sparkle(610, 240, 0.9);
 W['คุณย่ายืน'] = (i) => backdrop(i) + shadow(400, 712, 150) + draw(380, 712, 1.45, grandma({ hair: 'grayShort', shirt: C.teal, skirt: C.brown, arms: { l: [-80, -100], r: [130, -110] }, face: { eyes: 'open', mouth: 'smile' } })) + cane(570, 560);

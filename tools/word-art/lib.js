@@ -99,8 +99,10 @@ function person(o = {}) {
   let out = o.extraBack || '';
   // legs
   if (o.legs === 'kneel') {
-    out += tube('M-22 -95 L-26 -40 L-80 -38', pants, 30) + tube('M22 -95 L26 -40 L-20 -38', pants, 30);
-    out += ellipse(-92, -34, 20, 14, C.black, 6) + ellipse(-32, -34, 20, 14, C.black, 6);
+    // front knee down on the floor, back shin folded behind
+    out += tube('M20 -100 L40 -30 L-40 -16', o.legColor || pants, 32);
+    out += tube('M-16 -100 L-30 -30 L-104 -18', o.legColor || pants, 32);
+    out += ellipse(-116, -14, 24, 14, o.shoes || C.black, 6) + ellipse(-52, -12, 24, 14, o.shoes || C.black, 6);
   } else if (o.legs !== 'none') {
     out += tube('M-22 -95 L-24 -14', o.legColor || pants, 30) + tube('M22 -95 L24 -14', o.legColor || pants, 30);
     out += ellipse(-30, -8, 26, 15, o.shoes || C.black, 6) + ellipse(30, -8, 26, 15, o.shoes || C.black, 6);
@@ -240,17 +242,30 @@ function numberBadge(x, y, s, str, color = C.orange) {
   return text(x, y, s, str, color, 20, 260);
 }
 
-function hand(fingers) {
-  // fingers: array of 5 booleans [pinky, ring, middle, index, thumb] up/down; palm facing viewer
-  const up = (x, h) => path(`M${x - 22} 0 L${x - 22} ${-h} Q${x - 22} ${-h - 24} ${x} ${-h - 24} Q${x + 22} ${-h - 24} ${x + 22} ${-h} L${x + 22} 0Z`, C.skin);
-  const down = (x) => path(`M${x - 22} 0 L${x - 22} -40 Q${x} -58 ${x + 22} -40 L${x + 22} 0Z`, C.skin);
-  let s = '';
-  [[-96, 110], [-48, 150], [0, 170], [48, 150]].forEach(([x, h], k) => { s += fingers[k] ? up(x, h) : down(x); });
-  s += path('M-120 -20 L72 -20 L80 110 Q70 190 -20 190 Q-120 190 -126 100Z', C.skin);
-  s += fingers[4] ? path('M70 60 L150 -30 Q170 -50 186 -32 Q200 -14 184 6 L110 100Z', C.skin) : path('M60 40 Q100 30 104 70 Q90 100 60 90Z', C.skin);
-  return s;
+function hand(fingers, o = {}) {
+  // Palm facing the viewer, fingers pointing up.
+  // fingers = [index, middle, ring, pinky, thumb]; true = extended.
+  const skin = o.skin || C.skin;
+  const F = [[-66, 150], [-14, 176], [38, 158], [88, 116]];
+  let up = '', folded = '';
+  F.forEach(([x, h], k) => {
+    if (fingers[k]) up += path(`M${x - 24} 20 L${x - 24} ${-h + 26} Q${x - 24} ${-h} ${x} ${-h} Q${x + 24} ${-h} ${x + 24} ${-h + 26} L${x + 24} 20Z`, skin);
+    else folded += path(`M${x - 24} 30 L${x - 24} -18 Q${x} -44 ${x + 24} -18 L${x + 24} 30Z`, skin) + line(`M${x - 16} -8 Q${x} -20 ${x + 16} -8`, 5);
+  });
+  const palm = path('M-96 -6 L112 -6 Q126 -6 126 20 L126 132 Q126 210 14 214 Q-96 214 -104 128 L-104 20 Q-104 -6 -96 -6Z', skin);
+  const thumb = fingers[4]
+    ? path('M-92 54 L-176 -36 Q-202 -64 -176 -88 Q-150 -112 -124 -84 L-56 -8Z', skin) + line('M-140 -48 Q-118 -28 -104 -10', 5)
+    : path('M-96 46 Q-160 40 -166 94 Q-170 146 -100 148 Q-86 116 -92 76Z', skin) + line('M-128 66 Q-146 96 -126 126', 5);
+  return folded + palm + up + thumb + line('M-60 150 Q10 170 80 146', 5, 'rgba(43,35,64,0.22)');
 }
 
+// Thumb and finger nearly touching: "just a little".
+function pinchHand(o = {}) {
+  const skin = o.skin || C.skin;
+  return path('M40 150 Q-30 150 -60 96 Q-80 60 -40 40 L60 6 Q100 -8 116 24 Q130 54 96 70 L40 92Z', skin) +
+    path('M96 -76 Q120 -110 150 -92 Q178 -74 160 -42 L110 40 Q92 66 62 50 Q34 32 52 2Z', skin) +
+    line('M92 0 Q104 14 96 34', 5) + line('M70 96 Q84 112 78 130', 5);
+}
 
 function robot(x, y, s, o = {}) {
   const body = o.color || C.sky;
@@ -289,5 +304,5 @@ function inCircle(content) {
   return `<clipPath id="${id}"><circle cx="400" cy="410" r="330"/></clipPath><g clip-path="url(#${id})">${content}</g><circle cx="400" cy="410" r="330" fill="none"/>`;
 }
 
-module.exports = { hand, inCircle, robot, owl, mushroom, coin, gift, INK, OW, C, BG, S, f, g, at, circle, ellipse, rect, path, line, tube, shine, shadow, text, sparkle, heart, star, motion,
+module.exports = { hand, pinchHand, inCircle, robot, owl, mushroom, coin, gift, INK, OW, C, BG, S, f, g, at, circle, ellipse, rect, path, line, tube, shine, shadow, text, sparkle, heart, star, motion,
   backdrop, face, person, kid, girl, mom, grandma, man, draw, catHead, cat, dog, pig, bear, mouse, bird, horse, cloudShape, speech, table, bowl, glass, numberBadge };
