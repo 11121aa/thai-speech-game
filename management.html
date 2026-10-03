@@ -861,7 +861,7 @@ var DRESSED_AX = 190, DRESSED_AY = 280;
 // pinned -- YMax keeps a hat's brim on the hair and a bag's base at the
 // hip whatever shape that particular design is.
 var DRESSED_PIECE_SPECS = {
-  hat:   { x: DRESSED_AX,      y: DRESSED_AY - 200, ox: 0.5, oy: 1, w: 96,  h: 76,  align: 'xMidYMax' },
+  hat:   { x: DRESSED_AX,      y: DRESSED_AY - 188, ox: 0.5, oy: 1, w: 96,  h: 76,  align: 'xMidYMax' },
   shirt: { x: DRESSED_AX,      y: DRESSED_AY - 124, ox: 0.5, oy: 0, w: 130, h: 120, align: 'xMidYMin' },
   // The bust is cropped at chest height, so the bag hangs from its strap
   // at the shoulder here instead of from its base at the hip -- otherwise
@@ -881,11 +881,17 @@ function buildDressedAvatarSVG() {
   var eq = equippedCosmetics || {};
   var parts = [];
   parts.push('<rect x="85" y="-20" width="210" height="210" fill="#FFF7EC"></rect>');
-  // arms (skin)
-  parts.push('<rect x="' + (AX - 58) + '" y="' + (AY - 110) + '" width="18" height="80" rx="9" fill="#F5C9A0"></rect>');
-  parts.push('<rect x="' + (AX + 40) + '" y="' + (AY - 110) + '" width="18" height="80" rx="9" fill="#F5C9A0"></rect>');
+  // arms, torso and neck match drawAvatar()'s, which is sized to the
+  // clothing art: the arms angle out to meet the sleeve cuffs, the torso is
+  // exactly as wide as the shirt body, and the neck closes the gap between
+  // the chin and the collar.
+  parts.push('<path d="M ' + (AX - 38) + ' ' + (AY - 106) + ' L ' + (AX - 60) + ' ' + (AY - 32) +
+    '" stroke="#F5C9A0" stroke-width="13" stroke-linecap="round" fill="none"></path>');
+  parts.push('<path d="M ' + (AX + 38) + ' ' + (AY - 106) + ' L ' + (AX + 60) + ' ' + (AY - 32) +
+    '" stroke="#F5C9A0" stroke-width="13" stroke-linecap="round" fill="none"></path>');
+  parts.push('<rect x="' + (AX - 13) + '" y="' + (AY - 150) + '" width="26" height="36" fill="#EBB98F"></rect>');
   // torso (bare base -- covered by the shirt piece once equipped)
-  parts.push('<rect x="' + (AX - 40) + '" y="' + (AY - 120) + '" width="80" height="90" rx="16" fill="#E5E7EB"></rect>');
+  parts.push('<rect x="' + (AX - 35) + '" y="' + (AY - 120) + '" width="69" height="90" rx="16" fill="#E5E7EB"></rect>');
   if (eq.shirt && equippedAssetById[eq.shirt]) parts.push(dressedPieceImageTag(DRESSED_PIECE_SPECS.shirt, equippedAssetById[eq.shirt]));
   if (eq.bag && equippedAssetById[eq.bag]) parts.push(dressedPieceImageTag(DRESSED_PIECE_SPECS.bag, equippedAssetById[eq.bag]));
   // head (skin)
