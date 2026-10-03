@@ -173,6 +173,14 @@ function createCookingGame(words, callbacks) {
   var FR_SLICES_NEEDED=FR_SLICE_XS.length;
   var FRY_DUR=6500, FRY_GOOD=[0.52,0.76];
   var SALT_TARGET=10, SALT_MAX=18;       // best at SALT_TARGET shakes; past SALT_MAX it's ruined
+  /* Salting is a gesture, not a button: hold the shaker and move it up and
+     down over the fries. One shake is counted per change of direction once
+     the hand has travelled SHAKE_TRAVEL since the last turn -- small enough
+     that a child's wrist flick registers, large enough that holding still
+     with a jittery finger does not. Salt only lands while the shaker is
+     over the carton (SALT_ZONE), which is what makes aiming part of it. */
+  var SHAKE_TRAVEL=22, SALT_ZONE=130;
+  var SHAKER_HOME_X=VW/2+96, SHAKER_HOME_Y=205;
   var FRIES_STEPS=[
     {icon:'🥔',lbl:'1.ปอก', states:[SF.PEEL,SF.PEEL_R]},
     {icon:'🔪',lbl:'2.หั่น', states:[SF.SLICE,SF.SLICE_R]},
@@ -253,6 +261,7 @@ function createCookingGame(words, callbacks) {
       frSlices:[], frSliceSc:[], frDrag:null, frSliceDone:false,
       fryHeld:0, fryHoldAt:0, fryHolding:false, fryDoneAt:0, fryDone:false, fryVal:0, fryTapVal:0,
       saltCount:0, saltRun:false, saltDone:false, saltStart:0, saltPunch:0, saltGrains:[],
+      saltX:SHAKER_HOME_X, saltY:SHAKER_HOME_Y, saltGrab:null, saltMissAt:0,
     };
   }
   resetG();
@@ -1441,6 +1450,26 @@ function createCookingGame(words, callbacks) {
   var SALT_SPOTS=[[-.42,-.30],[.10,-.52],[.44,-.18],[-.18,.10],[.30,.24],[-.50,.30],
                   [.02,-.14],[.52,-.44],[-.30,-.54],[.22,.52],[-.06,.34],[.40,.02],
                   [-.56,-.06],[.16,.08],[-.24,-.16],[.34,-.34],[.06,.20],[-.40,.48]];
+  // Grains thrown by one shake: they fall from the shaker and fade, which
+  // is the feedback that tells you the flick counted.
+  function spawnSaltPuff(x,y){
+    for(var i=0;i<7;i++){
+      G.saltGrains.push({x:x+(Math.random()-0.5)*26,y:y+Math.random()*6,
+                         vx:(Math.random()-0.5)*0.5,vy:0.22+Math.random()*0.26,born:sc.time.now});
+    }
+    if(G.saltGrains.length>90) G.saltGrains.splice(0,G.saltGrains.length-90);
+  }
+  function drawFallingSalt(ts){
+    ctx.save();
+    for(var i=G.saltGrains.length-1;i>=0;i--){
+      var g=G.saltGrains[i], age=ts-g.born;
+      if(age>900){ G.saltGrains.splice(i,1); continue; }
+      ctx.globalAlpha=Math.max(0,1-age/900);
+      ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(g.x+g.vx*age,g.y+g.vy*age,1.9,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
   function drawSaltGrains(cx,cy,n){
     ctx.save();
     ctx.fillStyle='rgba(255,255,255,.95)';
@@ -2621,13 +2650,23 @@ function createCookingGame(words, callbacks) {
   function drawFriesSalt(ts){
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
-    T('เขย่าเกลือให้พอดี — อย่าเค็มเกิน!',VW/2,SH+28,'center');
+    T(G.saltGrab?'ขยับขึ้น-ลงเหนือเฟรนช์ฟรายส์!':'จับขวดเกลือแล้วเขย่าขึ้น-ลง',VW/2,SH+28,'center');
     var punchT=G.saltPunch?(ts-G.saltPunch)/140:1;
     var tiltAng=punchT<1?Math.sin(punchT*Math.PI*3)*0.28:0;
     sFriesCarton(FR_CX,FR_CY+70,'#E8B54B',G.saltCount);
-    // Salt shaker, tipping with each shake.
+    // Where the salt has to be aimed, shown only while the shaker is held
+    // so the screen stays clean until it means something.
+    if(G.saltGrab&&!G.saltDone){
+      ctx.save();
+      ctx.setLineDash([7,7]); ctx.lineWidth=2;
+      ctx.strokeStyle=Math.abs(G.saltX-FR_CX)<=SALT_ZONE?'rgba(46,196,182,.75)':'rgba(255,255,255,.25)';
+      ctx.strokeRect(FR_CX-SALT_ZONE,250,SALT_ZONE*2,250);
+      ctx.restore();
+    }
+    drawFallingSalt(ts);
+    // Salt shaker -- held and waved by the player, tipping as it shakes.
     ctx.save();
-    ctx.translate(FR_CX+96,205); ctx.rotate(-0.5+tiltAng);
+    ctx.translate(G.saltX,G.saltY); ctx.rotate(-0.5+tiltAng);
     fillRR(-17,-34,34,60,8,'#F2F2F2');
     ctx.strokeStyle=C.outline; ctx.lineWidth=2.5; rr(-17,-34,34,60,8); ctx.stroke();
     fillRR(-14,-44,28,14,5,'#9BA3AE');
@@ -2635,6 +2674,11 @@ function createCookingGame(words, callbacks) {
     ctx.fillStyle='#5A6270';
     [[-6,-40],[0,-38],[6,-40]].forEach(function(p){ ctx.beginPath(); ctx.arc(p[0],p[1],1.6,0,Math.PI*2); ctx.fill(); });
     ctx.restore();
+    // A hand to grab, until it has been grabbed once
+    if(!G.saltGrab&&!G.saltDone&&!G.saltCount){
+      var bob=Math.sin(ts/260)*4;
+      ctx.font='26px Prompt'; T('👆',G.saltX+2,G.saltY+44+bob,'center');
+    }
     // "How salty" meter -- the sweet spot sits in the middle, and the bar
     // turns red past SALT_MAX so over-salting is visible before it's final.
     var sPct=Math.min(1,G.saltCount/SALT_MAX);
@@ -2645,8 +2689,7 @@ function createCookingGame(words, callbacks) {
     ctx.font='bold 14px Prompt'; ctx.fillStyle=C.w;
     T('เขย่า '+G.saltCount+' ครั้ง',VW/2,592,'center');
     if(!G.saltDone){
-      drawBtn(VW/2-155,636,140,50,'🧂 เขย่า',C.gold,ts);
-      drawBtn(VW/2+15,636,140,50,'พอแล้ว! ✓',C.acc,ts);
+      drawBtn(VW/2-85,636,170,50,'พอแล้ว! ✓',C.acc,ts);
     }else{
       ctx.fillStyle='rgba(0,0,0,.58)'; ctx.fillRect(0,0,VW,VH);
       ctx.font='bold 30px Prompt'; ctx.fillStyle=C.gold;
@@ -2929,6 +2972,20 @@ function createCookingGame(words, callbacks) {
   }
   // The only step that can be overshot: score falls off on BOTH sides of
   // SALT_TARGET, so stopping is a real decision rather than "tap forever".
+  // One completed up-or-down stroke. Only salts the fries when the shaker
+  // is actually over them; otherwise it just puffs onto the bench, which
+  // is feedback enough without punishing anyone.
+  function shakeOnce(){
+    if(G.saltDone)return;
+    G.saltPunch=sc.time.now;
+    spawnSaltPuff(G.saltX,G.saltY+30);
+    if(Math.abs(G.saltX-FR_CX)>SALT_ZONE){ G.saltMissAt=sc.time.now; return; }
+    G.saltCount++;
+    if(sc.sfxChop)sc.sfxChop.play();
+    // Hard cap: past SALT_MAX the fries are ruined, so the step ends itself
+    // rather than letting the score keep sinking.
+    if(G.saltCount>=SALT_MAX) finishSalt();
+  }
   function finishSalt(){
     if(G.saltDone)return;
     G.saltDone=true;
@@ -2955,7 +3012,8 @@ function createCookingGame(words, callbacks) {
     if(s===SF.PEEL){G.peelTaps=0;G.peelCount=0;G.peelRun=false;G.peelDone=false;G.peelStart=0;G.peelPunch=0;}
     if(s===SF.SLICE){G.frSlices=[];G.frSliceSc=[];G.frDrag=null;G.frSliceDone=false;}
     if(s===SF.FRY)holdReset('fry');
-    if(s===SF.SALT){G.saltCount=0;G.saltDone=false;G.saltPunch=0;}
+    if(s===SF.SALT){G.saltCount=0;G.saltDone=false;G.saltPunch=0;G.saltGrab=null;G.saltGrains=[];
+                    G.saltX=SHAKER_HOME_X;G.saltY=SHAKER_HOME_Y;}
   }
   function getWord(fromSt){
     var idx=DISHES[G.dish].stepIdx[fromSt];
@@ -3365,16 +3423,12 @@ function createCookingGame(words, callbacks) {
       if(G.st===SF.FRY_R){if(hit(x,y,VW/2-100,SH+258,200,54)){pressFx(x,y);showPopup(SF.FRY_R,SF.SALT);}return;}
       if(G.st===SF.SALT){
         if(!G.saltDone){
-          if(hit(x,y,VW/2-155,636,140,50)){
-            pressFx(x,y);
-            G.saltCount++; G.saltPunch=now;
-            this.sfxChop.play();
-            // Hard cap: past SALT_MAX the fries are ruined, so the step
-            // ends itself rather than letting the score keep sinking.
-            if(G.saltCount>=SALT_MAX) finishSalt();
+          // Grab the shaker anywhere in a thumb-sized box around it.
+          if(hit(x,y,G.saltX-46,G.saltY-78,92,116)){
+            G.saltGrab={dir:0,peak:y,offX:G.saltX-x,offY:G.saltY-y};
             return;
           }
-          if(hit(x,y,VW/2+15,636,140,50)){pressFx(x,y);finishSalt();}
+          if(hit(x,y,VW/2-85,636,170,50)){pressFx(x,y);finishSalt();}
           return;
         }
         if(hit(x,y,VW/2-80,412,160,50)){pressFx(x,y);setState(SF.SALT_R);}
@@ -3394,9 +3448,21 @@ function createCookingGame(words, callbacks) {
       if(G.st===SP.SAUCE&&G.sauceRun&&!G.sauceDone)paintSauceAt(x,y);
       if(G.st===SP.CUT&&G.pzDrag){G.pzDrag.cx=x;G.pzDrag.cy=y;}
       if(G.st===SF.SLICE&&G.frDrag){G.frDrag.cx=x;G.frDrag.cy=y;}
+      if(G.st===SF.SALT&&G.saltGrab&&!G.saltDone){
+        var gb=G.saltGrab;
+        G.saltX=Math.max(60,Math.min(VW-60,x+gb.offX));
+        G.saltY=Math.max(150,Math.min(520,y+gb.offY));
+        // A shake is a change of direction after travelling far enough: the
+        // hand reaches a peak, turns round, and once it is SHAKE_TRAVEL back
+        // from that peak the stroke counts and the next one starts.
+        if(gb.dir===0){ if(Math.abs(y-gb.peak)>4){ gb.dir=y>gb.peak?1:-1; gb.peak=y; } }
+        else if((y-gb.peak)*gb.dir>0){ gb.peak=y; }
+        else if(Math.abs(y-gb.peak)>=SHAKE_TRAVEL){ shakeOnce(); gb.dir=-gb.dir; gb.peak=y; }
+      }
     },
 
     onUp:function(x,y,now){
+      if(G.st===SF.SALT&&G.saltGrab){ G.saltGrab=null; }
       // Letting go IS the action: it lifts the food out and locks in the
       // score, exactly as tapping the button used to. Handled here rather
       // than on the button's own rect so a thumb that drifts off the slab
