@@ -45,23 +45,25 @@ function createDressupGame(words, callbacks, closet) {
   var PTS_PER_EQUIP = 20; // points awarded each time a practice popup closes and a piece goes on
   var W = 800, H = 500;   // canvas size in pixels
   // Avatar anchor point (base of the torso). AY needs enough headroom
-  // above it that the hat -- anchored bottom-up at AY-206 with a fixed
-  // display height of 88 (see buildPieceImages' specs.hat below) -- never
-  // extends above y=0 and gets clipped by the canvas's own top edge.
-  // Every hat design gets stretched to that same 88px height regardless
-  // of its own art, so this headroom requirement is universal, not
-  // specific to any one hat. With AY=280 the hat's top sat at y=-14
-  // (clipped ~16% of its height); AY=302 clears it with an 8px margin.
+  // above it that the hat -- anchored bottom-up at AY-200, at most 76 tall
+  // (see buildPieceImages' specs.hat) -- never extends above y=0 and gets
+  // clipped by the canvas's own top edge. AY=302 puts the tallest possible
+  // hat's top at y=26.
   var AX = 190, AY = 302;
 
-  // ── [SLOTS] Outfit pieces + the raster size their SVGs load at
-  // (independent of the on-avatar display size set in buildPieceImages).
+  // ── [SLOTS] Outfit pieces. The art is rasterised at SVG_SCALE x its own
+  // viewBox (see preload) rather than into a per-slot box, because the
+  // designs within one slot are not the same shape as each other -- the
+  // fanny pack's art is 1.49 wide, the tote's 0.55 -- and forcing them all
+  // through one box squashed half the closet. Everything downstream keeps
+  // the art's own proportions; see fitPiece().
+  var SVG_SCALE = 2;
   var SLOTS = [
-    { key: 'hat',   label: 'หมวก',    emoji: '🎩', loadW: 140, loadH: 130 },
-    { key: 'shirt', label: 'เสื้อ',    emoji: '👕', loadW: 160, loadH: 150 },
-    { key: 'pants', label: 'กางเกง',  emoji: '👖', loadW: 140, loadH: 150 },
-    { key: 'shoes', label: 'รองเท้า', emoji: '👟', loadW: 200, loadH: 70  },
-    { key: 'bag',   label: 'กระเป๋า', emoji: '👜', loadW: 110, loadH: 150 }
+    { key: 'hat',   label: 'หมวก',    emoji: '🎩' },
+    { key: 'shirt', label: 'เสื้อ',    emoji: '👕' },
+    { key: 'pants', label: 'กางเกง',  emoji: '👖' },
+    { key: 'shoes', label: 'รองเท้า', emoji: '👟' },
+    { key: 'bag',   label: 'กระเป๋า', emoji: '👜' }
   ];
 
   var RARITY_LABEL = { common: 'ธรรมดา', rare: 'หายาก', epic: 'เอปิก', legendary: 'ในตำนาน' };
@@ -98,7 +100,7 @@ function createDressupGame(words, callbacks, closet) {
     preload: function () {
       SLOTS.forEach(function (slot) {
         (closet[slot.key] || []).forEach(function (item) {
-          this.load.svg(item.id, item.asset_path + '?v=3', { width: slot.loadW, height: slot.loadH });
+          this.load.svg(item.id, item.asset_path + '?v=3', { scale: SVG_SCALE });
         }, this);
       }, this);
       this.load.audio('ds_equip', 'soundeffect/FlipCard.mp3');
@@ -203,42 +205,57 @@ function createDressupGame(words, callbacks, closet) {
     // AX+32..AX+48 (right) -- narrower than the torso's own edges, tucked
     // in specifically so the widened shirt below actually reaches them).
     //
-    // These w/h/x/y values (and drawAvatar()'s arm rects below) were tuned
-    // by actually rendering the real clothing SVGs (img/dressup/*.svg)
-    // composited over this body at these exact numbers -- via a local
-    // resvg + pngjs script, not guessed -- since the original values
-    // (shirt 112x100, bag 52x74 centered beside the torso, arms at
-    // AX-58/+40) left visible bare-skin gaps at the shoulders and a bag
-    // with no visible strap reaching the shoulder, looking like a prop
-    // floating next to the character rather than something worn:
-    //   - shirt widened+heightened (112x100 -> 130x120) to actually reach
-    //     the arms after they were tucked in, matching the source SVG's
-    //     own aspect ratio (~1.08) instead of a squished 1.12
-    //   - bag switched from a small centered box (which cropped out most
-    //     of its own drawn shoulder strap) to a tall top-anchored one
-    //     positioned so the strap's own top point in the source art lands
-    //     right at the shoulder, with the bag body hanging to hip height
-    //   - pants nudged up 6px so the waistband tucks under the taller
-    //     shirt's hem instead of leaving a visible bare-torso seam
+    // The boxes below (and drawAvatar()'s arm rects) were tuned by
+    // compositing the real clothing SVGs (img/dressup/*.svg) over this body
+    // at these exact numbers with a local resvg script, not guessed.
+    //
+    // The thing that actually made clothes not fit was never the numbers:
+    // every design was squashed into one box per slot TWICE -- once when
+    // load.svg rasterised it into the slot's loadW/loadH, again when
+    // setDisplaySize stretched it to the spec. Within a single slot the
+    // designs are not the same shape (the fanny pack's art is 1.49 wide,
+    // the tote's 0.55, hat-3's 1.67, hat-4's 0.80), so any single box
+    // distorted most of the closet, and the bag -- as wide as the whole
+    // torso and anchored off to one side -- read as a prop floating beside
+    // the character. Now the art is rasterised at its own aspect
+    // (SVG_SCALE) and fitPiece() scales it to fit INSIDE the box, so each
+    // design keeps its proportions and only its anchor point is pinned.
     buildPieceImages: function () {
       // Stashed on the scene (this.pieceSpecs) so equipSlot() can re-apply
       // the exact same target size on every equip -- see equipSlot()'s own
       // comment for why that matters (the punch-in animation used to
       // silently discard this size entirely).
+      // w/h are a BOX the art is fitted inside (see fitPiece), not a size
+      // it is stretched to, and each anchor is the point that has to stay
+      // put whatever shape the design is:
+      //   hat   bottom-centre, overlapping the hair so no design floats
+      //   bag   bottom-centre at hip height, so a tall satchel reaches the
+      //         shoulder while a fanny pack sits at the waist
       var specs = this.pieceSpecs = {
         pants: { x: AX,      y: AY - 46,  ox: 0.5, oy: 0,   w: 88,  h: 96 },
-        shoes: { x: AX,      y: AY + 58,  ox: 0.5, oy: 0.5, w: 86,  h: 30 },
+        shoes: { x: AX,      y: AY + 58,  ox: 0.5, oy: 0.5, w: 86,  h: 32 },
         shirt: { x: AX,      y: AY - 124, ox: 0.5, oy: 0,   w: 130, h: 120 },
-        bag:   { x: AX + 40, y: AY - 121, ox: 0.3, oy: 0,   w: 80,  h: 125 },
-        hat:   { x: AX,      y: AY - 206, ox: 0.5, oy: 1,   w: 92,  h: 88 }
+        bag:   { x: AX + 36, y: AY - 32,  ox: 0.5, oy: 1,   w: 54,  h: 84 },
+        hat:   { x: AX,      y: AY - 200, ox: 0.5, oy: 1,   w: 96,  h: 76 }
       };
       SLOTS.forEach(function (slot) {
         var items = closet[slot.key] || [];
         if (!items.length) return;
         var sp = specs[slot.key];
-        this.pieceImgs[slot.key] = this.add.image(sp.x, sp.y, items[0].id)
-          .setOrigin(sp.ox, sp.oy).setDisplaySize(sp.w, sp.h).setVisible(false);
+        var img = this.add.image(sp.x, sp.y, items[0].id).setOrigin(sp.ox, sp.oy).setVisible(false);
+        this.fitPiece(img, sp);
+        this.pieceImgs[slot.key] = img;
       }, this);
+    },
+
+    // Scales a piece to fit INSIDE its spec box without distorting it, and
+    // returns that scale. Fitting rather than stretching is what lets one
+    // box serve every design in a slot whatever shape its art is.
+    fitPiece: function (img, sp) {
+      var src = img.texture.getSourceImage();
+      var k = Math.min(sp.w / src.width, sp.h / src.height);
+      img.setScale(k);
+      return k;
     },
 
     // ── Redraws the plain avatar body. The body itself is always a
@@ -374,7 +391,8 @@ function createDressupGame(words, callbacks, closet) {
           bg.lineStyle(selected ? 3 : 2, selected ? 0x2ec4b6 : 0xe5e7eb);
           bg.strokeRoundedRect(cx - CARD_W / 2, cy - CARD_H / 2, CARD_W, CARD_H, 12);
 
-          var thumb = self.add.image(cx, cy - 26, item.id).setDisplaySize(40, 40);
+          var thumb = self.add.image(cx, cy - 26, item.id);
+          self.fitPiece(thumb, { w: 40, h: 40 });
 
           var name = self.add.text(cx, cy, item.name, {
             fontFamily: 'Prompt, sans-serif', fontSize: '9px', color: '#374151',
@@ -448,11 +466,9 @@ function createDressupGame(words, callbacks, closet) {
       // target scale from pieceSpecs and punching in AS A MULTIPLIER of
       // that (90% -> 100% of the correct size) keeps the same "pop in"
       // feel while landing on the right size every time.
-      var sp = this.pieceSpecs[slotKey];
-      img.setDisplaySize(sp.w, sp.h);
-      var targetScaleX = img.scaleX, targetScaleY = img.scaleY;
-      img.setScale(targetScaleX * 0.9, targetScaleY * 0.9);
-      this.tweens.add({ targets: img, scaleX: targetScaleX, scaleY: targetScaleY, duration: 180, ease: 'Back.Out' });
+      var k = this.fitPiece(img, this.pieceSpecs[slotKey]);
+      img.setScale(k * 0.9);
+      this.tweens.add({ targets: img, scaleX: k, scaleY: k, duration: 180, ease: 'Back.Out' });
       this.sfxEquip.play();
     }
   });
