@@ -3,3 +3,6 @@
 Thumbs.db
 .worktrees/
 .superpowers/
+
+# tool archive, not project data
+.superpowers.zip
