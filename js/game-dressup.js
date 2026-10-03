@@ -45,10 +45,10 @@ function createDressupGame(words, callbacks, closet) {
   var PTS_PER_EQUIP = 20; // points awarded each time a practice popup closes and a piece goes on
   var W = 800, H = 500;   // canvas size in pixels
   // Avatar anchor point (base of the torso). AY needs enough headroom
-  // above it that the hat -- anchored bottom-up at AY-200, at most 76 tall
+  // above it that the hat -- anchored bottom-up at AY-188, at most 76 tall
   // (see buildPieceImages' specs.hat) -- never extends above y=0 and gets
   // clipped by the canvas's own top edge. AY=302 puts the tallest possible
-  // hat's top at y=26.
+  // hat's top at y=38.
   var AX = 190, AY = 302;
 
   // ── [SLOTS] Outfit pieces. The art is rasterised at SVG_SCALE x its own
@@ -199,11 +199,10 @@ function createDressupGame(words, callbacks, closet) {
     // (setVisible(false)) since the avatar starts bare; equipSlot() shows
     // it once the player actually wins that slot's practice popup.
     // Sizes/positions are derived from the plain body's own geometry in
-    // drawAvatar() (legs span AX-38..AX+38 / AY-40..AY+50, feet ellipses
-    // sit at AY+49..AY+67, torso spans AY-120..AY-30, head circle is
-    // centered at AY-175 with radius 40, arms span AX-50..AX-34 (left) /
-    // AX+32..AX+48 (right) -- narrower than the torso's own edges, tucked
-    // in specifically so the widened shirt below actually reaches them).
+    // drawAvatar() (legs span AX-30..AX+30 / AY-40..AY+50, feet ellipses
+    // sit at AY+49..AY+67, torso spans AX-35..AX+34 / AY-120..AY-30, head
+    // circle is centered at AY-175 with radius 40, arms run from the
+    // shoulders at AX-+38/AY-106 out to the wrists at AX-+60/AY-32).
     //
     // The boxes below (and drawAvatar()'s arm rects) were tuned by
     // compositing the real clothing SVGs (img/dressup/*.svg) over this body
@@ -236,7 +235,7 @@ function createDressupGame(words, callbacks, closet) {
         shoes: { x: AX,      y: AY + 58,  ox: 0.5, oy: 0.5, w: 86,  h: 32 },
         shirt: { x: AX,      y: AY - 124, ox: 0.5, oy: 0,   w: 130, h: 120 },
         bag:   { x: AX + 36, y: AY - 32,  ox: 0.5, oy: 1,   w: 54,  h: 84 },
-        hat:   { x: AX,      y: AY - 200, ox: 0.5, oy: 1,   w: 96,  h: 76 }
+        hat:   { x: AX,      y: AY - 188, ox: 0.5, oy: 1,   w: 96,  h: 76 }
       };
       SLOTS.forEach(function (slot) {
         var items = closet[slot.key] || [];
@@ -265,23 +264,38 @@ function createDressupGame(words, callbacks, closet) {
       var g = this.avatarGfx;
       g.clear();
 
+      // The body is sized to the clothing art, not the other way round --
+      // every number below was read off the real SVGs composited at their
+      // specs (a local resvg script that reports the ink's own x-runs per
+      // row), so nothing underneath pokes out from under a garment:
+      //   pants legs sit at AX-30..AX-4 and AX+4..AX+30 -> legs match
+      //   shirt body is AX-35..AX+34 below the sleeves -> torso matches
+      //   shirt cuffs end around y=AY-72, centred AX-50 / AX+49 -> the
+      //     arms run out to meet them instead of hanging straight down
+      //     inboard of the sleeve, which left bare skin beside each cuff
       // legs (bare base -- covered by the pants sprite once equipped)
       g.fillStyle(0xE5E7EB);
-      g.fillRoundedRect(AX - 38, AY - 40, 30, 90, 8);
-      g.fillRoundedRect(AX + 8,  AY - 40, 30, 90, 8);
+      g.fillRoundedRect(AX - 30, AY - 40, 26, 90, 8);
+      g.fillRoundedRect(AX + 4,  AY - 40, 26, 90, 8);
       // feet (bare base -- covered by the shoes sprite once equipped)
       g.fillStyle(0x9CA3AF);
       g.fillEllipse(AX - 23, AY + 58, 34, 18);
       g.fillEllipse(AX + 23, AY + 58, 34, 18);
-      // arms (skin) -- narrower span than the torso's own edges (was
-      // AX-58/+40, 18 wide) so the widened shirt in buildPieceImages()
-      // actually reaches all the way to them instead of leaving a gap
+      // arms (skin) -- angled out along the sleeves, shoulder tucked under
+      // the torso's edge and wrist landing under the cuff opening
+      g.lineStyle(13, 0xF5C9A0);
+      g.beginPath(); g.moveTo(AX - 38, AY - 106); g.lineTo(AX - 60, AY - 32); g.strokePath();
+      g.beginPath(); g.moveTo(AX + 38, AY - 106); g.lineTo(AX + 60, AY - 32); g.strokePath();
       g.fillStyle(0xF5C9A0);
-      g.fillRoundedRect(AX - 50, AY - 110, 16, 80, 9);
-      g.fillRoundedRect(AX + 32, AY - 110, 16, 80, 9);
+      g.fillCircle(AX - 38, AY - 106, 6.5); g.fillCircle(AX - 60, AY - 32, 6.5);
+      g.fillCircle(AX + 38, AY - 106, 6.5); g.fillCircle(AX + 60, AY - 32, 6.5);
+      // neck -- the head's chin sits at AY-135 and the shirt's collar at
+      // AY-121, so without this the head reads as floating above the body
+      g.fillStyle(0xEBB98F);
+      g.fillRect(AX - 13, AY - 150, 26, 36);
       // torso (bare base -- covered by the shirt sprite once equipped)
       g.fillStyle(0xE5E7EB);
-      g.fillRoundedRect(AX - 40, AY - 120, 80, 90, 16);
+      g.fillRoundedRect(AX - 35, AY - 120, 69, 90, 16);
       // head (skin)
       g.fillStyle(0xF5C9A0);
       g.fillCircle(AX, AY - 175, 40);
