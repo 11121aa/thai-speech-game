@@ -51,6 +51,19 @@ function createDressupGame(words, callbacks, closet) {
   // hat's top at y=38.
   var AX = 190, AY = 302;
 
+  // Where the body expects each garment to touch it, and the body parts
+  // that are drawn to meet the garment. js/dressup-fit.js holds the other
+  // half of this: every design's own attachment points, measured off the
+  // art by tools/dressup-fit. Between them, no number here has to be
+  // right for all fifty designs at once -- only for the body.
+  var FIT = (typeof window !== 'undefined' && window.DRESSUP_FIT) || {};
+  var BODY = {
+    hatLine:   AY - 190,   // a hat's lowest ink rests here, on the hairline
+    shoulderY: AY - 120,   // a shirt's highest ink
+    waistY:    AY - 46,    // trousers' highest ink
+    hipY:      AY - 32     // a bag's lowest ink
+  };
+
   // ── [SLOTS] Outfit pieces. The art is rasterised at SVG_SCALE x its own
   // viewBox (see preload) rather than into a per-slot box, because the
   // designs within one slot are not the same shape as each other -- the
@@ -224,26 +237,24 @@ function createDressupGame(words, callbacks, closet) {
       // the exact same target size on every equip -- see equipSlot()'s own
       // comment for why that matters (the punch-in animation used to
       // silently discard this size entirely).
-      // w/h are a BOX the art is fitted inside (see fitPiece), not a size
-      // it is stretched to, and each anchor is the point that has to stay
-      // put whatever shape the design is:
-      //   hat   bottom-centre, overlapping the hair so no design floats
-      //   bag   bottom-centre at hip height, so a tall satchel reaches the
-      //         shoulder while a fanny pack sits at the waist
+      // w/h is the BOX each design is fitted inside (see fitPiece); where
+      // it then sits is decided per design by placePiece() from that
+      // file's own measured ink, not from the box, so a flat cap and a
+      // tall party hat both land on the head.
       var specs = this.pieceSpecs = {
-        pants: { x: AX,      y: AY - 46,  ox: 0.5, oy: 0,   w: 88,  h: 96 },
-        shoes: { x: AX,      y: AY + 58,  ox: 0.5, oy: 0.5, w: 86,  h: 32 },
-        shirt: { x: AX,      y: AY - 124, ox: 0.5, oy: 0,   w: 130, h: 120 },
-        bag:   { x: AX + 36, y: AY - 32,  ox: 0.5, oy: 1,   w: 54,  h: 84 },
-        hat:   { x: AX,      y: AY - 188, ox: 0.5, oy: 1,   w: 96,  h: 76 }
+        pants: { w: 88,  h: 96 },
+        shoes: { w: 86,  h: 32 },
+        shirt: { w: 130, h: 120 },
+        bag:   { w: 54,  h: 84 },
+        hat:   { w: 96,  h: 76 }
       };
       SLOTS.forEach(function (slot) {
         var items = closet[slot.key] || [];
         if (!items.length) return;
-        var sp = specs[slot.key];
-        var img = this.add.image(sp.x, sp.y, items[0].id).setOrigin(sp.ox, sp.oy).setVisible(false);
-        this.fitPiece(img, sp);
+        var img = this.add.image(AX, AY, items[0].id).setOrigin(0.5, 0).setVisible(false);
+        img.slotKey = slot.key;
         this.pieceImgs[slot.key] = img;
+        this.placePiece(slot.key);
       }, this);
     },
 
@@ -257,40 +268,141 @@ function createDressupGame(words, callbacks, closet) {
       return k;
     },
 
-    // ── Redraws the plain avatar body. The body itself is always a
-    // neutral base (bare skin/hair) -- outfit pieces are the illustrated
-    // sprites from buildPieceImages(), shown once equipSlot() runs.
+    // The measurements for whatever is currently worn in a slot (null if
+    // that slot is empty, or the art is newer than the table).
+    fitOf: function (slotKey) {
+      var items = closet[slotKey] || [];
+      var item = items[this.selectedIdx[slotKey]];
+      return (item && FIT[item.asset_path]) || null;
+    },
+
+    // Screen px per viewBox unit for a placed piece, and the mapping from
+    // a point in that art's own coordinates onto the avatar.
+    unitOf: function (img) { return img.scaleX * SVG_SCALE; },
+    artX: function (img, ax) {
+      var f = this.fitOf(img.slotKey);
+      return img.x - img.originX * img.displayWidth + (ax - f.vb[0]) * this.unitOf(img);
+    },
+    artY: function (img, ay) {
+      var f = this.fitOf(img.slotKey);
+      return img.y - img.originY * img.displayHeight + (ay - f.vb[1]) * this.unitOf(img);
+    },
+
+    // Where the shoes' opening goes: the trouser hem when trousers are on,
+    // otherwise the bare ankle.
+    shoeTopY: function () {
+      var p = this.pieceImgs.pants, f = this.fitOf('pants');
+      if (p && p.visible && f) return this.artY(p, f.hemY) - 4;
+      return AY + 46;
+    },
+
+    // Leg centres and width: the trousers' own legs when worn, else the
+    // body's default stance.
+    legAnchors: function () {
+      var p = this.pieceImgs.pants, f = this.fitOf('pants');
+      if (p && p.visible && f && f.leg) {
+        var u = this.unitOf(p);
+        return { cx: [this.artX(p, f.leg[0].cx), this.artX(p, f.leg[1].cx)],
+                 w: f.leg[0].w * u * 0.92, fromPants: true };
+      }
+      return { cx: [AX - 17, AX + 17], w: 22, fromPants: false };
+    },
+
+    // Where each sleeve ends and how wide it is there, so the bare arm can
+    // carry on from exactly that point at exactly that thickness.
+    cuffAnchors: function () {
+      var sh = this.pieceImgs.shirt, f = this.fitOf('shirt');
+      if (sh && sh.visible && f && f.cuff && f.cuff[0] && f.cuff[1]) {
+        var u = this.unitOf(sh);
+        return { p: [[this.artX(sh, f.cuff[0].cx), this.artY(sh, f.cuff[0].cy)],
+                     [this.artX(sh, f.cuff[1].cx), this.artY(sh, f.cuff[1].cy)]],
+                 w: f.cuff[0].w * u, fromShirt: true };
+      }
+      return { p: [[AX - 46, AY - 70], [AX + 46, AY - 70]], w: 15, fromShirt: false };
+    },
+
+    // Puts one slot's art where the body says it belongs. Each slot is
+    // pinned by the feature that has to touch the body, taken from that
+    // design's own ink rather than from the box it was fitted into:
+    //   hat    lowest ink on the hairline
+    //   shirt  highest ink on the shoulder line
+    //   pants  highest ink on the waist
+    //   bag    lowest ink at the hip
+    //   shoes  highest ink at the trouser hem (or the ankle, bare-legged),
+    //          and scaled so the two shoe openings sit under the two
+    //          trouser legs instead of splaying wider than them
+    placePiece: function (slotKey) {
+      var img = this.pieceImgs[slotKey];
+      if (!img) return;
+      var f = this.fitOf(slotKey), sp = this.pieceSpecs[slotKey];
+      var k = this.fitPiece(img, sp);
+      img.setOrigin(0.5, 0);
+      if (!f) { img.setPosition(AX, AY - 120); return; }  // art with no row in the table
+
+      if (slotKey === 'shoes' && f.top) {
+        var legs = this.legAnchors();
+        if (legs.fromPants) {
+          var want = (legs.cx[1] - legs.cx[0]) / (f.top[1].cx - f.top[0].cx) / SVG_SCALE;
+          k = Math.max(k * 0.72, Math.min(k * 1.15, want));
+          img.setScale(k);
+        }
+      }
+      var u = k * SVG_SCALE;
+      var pinY = { hat: f.brimY, shirt: f.ink[1], pants: f.ink[1], bag: f.ink[3], shoes: f.ink[1] }[slotKey];
+      var toY  = { hat: BODY.hatLine, shirt: BODY.shoulderY, pants: BODY.waistY,
+                   bag: BODY.hipY, shoes: this.shoeTopY() }[slotKey];
+      var cx = slotKey === 'bag' ? AX + 36 : AX;
+      // Centre on the INK, not the box -- except the shoes, which centre on
+      // the midpoint of their two openings so each shoe lands under a leg
+      // even when the art itself is not symmetric.
+      var artCx = (f.ink[0] + f.ink[2]) / 2;
+      if (slotKey === 'shoes' && f.top) {
+        artCx = (f.top[0].cx + f.top[1].cx) / 2;
+        var lg = this.legAnchors();
+        cx = (lg.cx[0] + lg.cx[1]) / 2;
+      }
+      img.setPosition(cx - (artCx - (f.vb[0] + f.vb[2] / 2)) * u, toY - (pinY - f.vb[1]) * u);
+    },
+
+    // Redraws the plain body under the clothes. Arms, legs and feet are
+    // drawn to whatever is currently worn (cuffAnchors / legAnchors),
+    // which is the only way one body sits correctly in fifty hand-drawn
+    // garments: one shirt's sleeve ends further out than another's, one
+    // pair of trousers is wider and shorter than the next.
     drawAvatar: function () {
       var g = this.avatarGfx;
       g.clear();
+      var legs = this.legAnchors();
+      var cuffs = this.cuffAnchors();
+      var legBottom = this.shoeTopY() + 6;
+      var shod = this.pieceImgs.shoes && this.pieceImgs.shoes.visible;
 
-      // The body is sized to the clothing art, not the other way round --
-      // every number below was read off the real SVGs composited at their
-      // specs (a local resvg script that reports the ink's own x-runs per
-      // row), so nothing underneath pokes out from under a garment:
-      //   pants legs sit at AX-30..AX-4 and AX+4..AX+30 -> legs match
-      //   shirt body is AX-35..AX+34 below the sleeves -> torso matches
-      //   shirt cuffs end around y=AY-72, centred AX-50 / AX+49 -> the
-      //     arms run out to meet them instead of hanging straight down
-      //     inboard of the sleeve, which left bare skin beside each cuff
-      // legs (bare base -- covered by the pants sprite once equipped)
+      // legs -- centred in the trouser legs and just inside them
       g.fillStyle(0xE5E7EB);
-      g.fillRoundedRect(AX - 30, AY - 40, 26, 90, 8);
-      g.fillRoundedRect(AX + 4,  AY - 40, 26, 90, 8);
-      // feet (bare base -- covered by the shoes sprite once equipped)
-      g.fillStyle(0x9CA3AF);
-      g.fillEllipse(AX - 23, AY + 58, 34, 18);
-      g.fillEllipse(AX + 23, AY + 58, 34, 18);
-      // arms (skin) -- angled out along the sleeves, shoulder tucked under
-      // the torso's edge and wrist landing under the cuff opening
-      g.lineStyle(13, 0xF5C9A0);
-      g.beginPath(); g.moveTo(AX - 38, AY - 106); g.lineTo(AX - 60, AY - 32); g.strokePath();
-      g.beginPath(); g.moveTo(AX + 38, AY - 106); g.lineTo(AX + 60, AY - 32); g.strokePath();
+      legs.cx.forEach(function (cx) {
+        g.fillRoundedRect(cx - legs.w / 2, AY - 44, legs.w, Math.max(20, legBottom - (AY - 44)), 8);
+      });
+      // bare feet, only while no shoes are on
+      if (!shod) {
+        g.fillStyle(0x9CA3AF);
+        legs.cx.forEach(function (cx) { g.fillEllipse(cx, legBottom + 8, legs.w + 12, 18); });
+      }
+      // arms -- shoulder to the sleeve's own cuff, then on to the wrist in
+      // the same direction, drawn at the cuff's own width so the bare arm
+      // continues the sleeve instead of rattling around inside it
       g.fillStyle(0xF5C9A0);
-      g.fillCircle(AX - 38, AY - 106, 6.5); g.fillCircle(AX - 60, AY - 32, 6.5);
-      g.fillCircle(AX + 38, AY - 106, 6.5); g.fillCircle(AX + 60, AY - 32, 6.5);
-      // neck -- the head's chin sits at AY-135 and the shirt's collar at
-      // AY-121, so without this the head reads as floating above the body
+      g.lineStyle(cuffs.w, 0xF5C9A0);
+      [0, 1].forEach(function (i) {
+        var sx = AX + (i ? 33 : -33), sy = AY - 108;
+        var cx = cuffs.p[i][0], cy = cuffs.p[i][1];
+        var dx = cx - sx, dy = cy - sy, len = Math.sqrt(dx * dx + dy * dy) || 1;
+        var wx = cx + dx / len * 26, wy = cy + dy / len * 26;
+        g.beginPath(); g.moveTo(sx, sy); g.lineTo(wx, wy); g.strokePath();
+        g.fillCircle(sx, sy, cuffs.w / 2);
+        g.fillCircle(wx, wy, cuffs.w / 2 + 3);     // hand
+      });
+      // neck -- the chin sits at AY-135 and a collar at AY-121, so without
+      // this the head reads as floating above the body
       g.fillStyle(0xEBB98F);
       g.fillRect(AX - 13, AY - 150, 26, 36);
       // torso (bare base -- covered by the shirt sprite once equipped)
@@ -299,7 +411,7 @@ function createDressupGame(words, callbacks, closet) {
       // head (skin)
       g.fillStyle(0xF5C9A0);
       g.fillCircle(AX, AY - 175, 40);
-      // hair — rounded band across the top of the head
+      // hair -- rounded band across the top of the head
       g.fillStyle(0x4B3621);
       g.fillRoundedRect(AX - 40, AY - 214, 80, 36, { tl: 20, tr: 20, bl: 0, br: 0 });
       // face
@@ -466,21 +578,18 @@ function createDressupGame(words, callbacks, closet) {
       var img = this.pieceImgs[slotKey];
       if (!img) return;
       img.setTexture(item.id).setVisible(true);
-      // Re-apply this slot's real target size (buildPieceImages()'s
-      // pieceSpecs) before punching in, rather than trusting whatever
-      // scale the image happens to be holding right now. The old code did
-      // `img.setScale(0.9)` then tweened straight to the LITERAL values
-      // scaleX:1, scaleY:1 -- i.e. 100% of the raw loaded SVG texture's
-      // own pixel size (each slot's loadW/loadH in SLOTS, e.g. the hat's
-      // 140x130), completely ignoring the carefully-fitted display size
-      // set here. Every single equip silently resized the garment to its
-      // raw source dimensions instead of the size it was actually placed
-      // and tuned for -- the real cause of clothes visibly not fitting
-      // the body, far more than any position tweak. Recomputing the
-      // target scale from pieceSpecs and punching in AS A MULTIPLIER of
-      // that (90% -> 100% of the correct size) keeps the same "pop in"
-      // feel while landing on the right size every time.
-      var k = this.fitPiece(img, this.pieceSpecs[slotKey]);
+      img.slotKey = slotKey;
+      // Re-place from scratch, then punch in as a MULTIPLIER of the scale
+      // that lands on (90% -> 100%). Tweening to the literal scale 1 is
+      // what the original did, which silently resized every garment to its
+      // raw texture size on equip.
+      this.placePiece(slotKey);
+      // Trousers decide where the shoes sit and how wide the legs are, so
+      // re-place the shoes after them; then redraw the body to whatever is
+      // now being worn.
+      if (slotKey === 'pants') this.placePiece('shoes');
+      this.drawAvatar();
+      var k = img.scaleX;
       img.setScale(k * 0.9);
       this.tweens.add({ targets: img, scaleX: k, scaleY: k, duration: 180, ease: 'Back.Out' });
       this.sfxEquip.play();

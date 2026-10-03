@@ -6,3 +6,6 @@ Thumbs.db
 
 # tool archive, not project data
 .superpowers.zip
+
+# tool dependencies
+tools/*/node_modules/

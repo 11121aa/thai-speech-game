@@ -659,6 +659,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=2"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/dressup-fit.js?v=1"></script>
 <script src="js/auth.js?v=2"></script>
 <script src="js/recorder.js?v=9"></script>
 <script src="js/main.js"></script>
@@ -856,23 +857,35 @@ async function loadEquippedCosmetics(profile) {
 // (pants/shoes never show at this icon size, same as a real profile
 // photo wouldn't show your shoes).
 var DRESSED_AX = 190, DRESSED_AY = 280;
-// `align` is the preserveAspectRatio alignment: the art keeps its own
-// proportions inside the box, so the edge named here is the one that stays
-// pinned -- YMax keeps a hat's brim on the hair and a bag's base at the
-// hip whatever shape that particular design is.
+// Each piece is pinned by the feature that has to touch the body, taken
+// from that design's own measured ink in js/dressup-fit.js -- the same
+// table and the same pins the dress-up mini-game uses, so a piece sits the
+// same way on the profile bust as it does in the game. `pin` names which
+// measurement lands on `y`.
 var DRESSED_PIECE_SPECS = {
-  hat:   { x: DRESSED_AX,      y: DRESSED_AY - 188, ox: 0.5, oy: 1, w: 96,  h: 76,  align: 'xMidYMax' },
-  shirt: { x: DRESSED_AX,      y: DRESSED_AY - 124, ox: 0.5, oy: 0, w: 130, h: 120, align: 'xMidYMin' },
-  // The bust is cropped at chest height, so the bag hangs from its strap
-  // at the shoulder here instead of from its base at the hip -- otherwise
-  // the whole bag falls below the crop and only blank space shows.
-  bag:   { x: DRESSED_AX + 36, y: DRESSED_AY - 118, ox: 0.5, oy: 0, w: 54,  h: 84,  align: 'xMidYMin' }
+  hat:   { x: DRESSED_AX,      y: DRESSED_AY - 190, pin: 'brimY', w: 96,  h: 76,  align: 'xMidYMax' },
+  shirt: { x: DRESSED_AX,      y: DRESSED_AY - 120, pin: 'inkTop', w: 130, h: 120, align: 'xMidYMin' },
+  // The bust crops at chest height, so the bag hangs from its strap at the
+  // shoulder here rather than from its base at the hip.
+  bag:   { x: DRESSED_AX + 36, y: DRESSED_AY - 118, pin: 'inkTop', w: 54,  h: 84,  align: 'xMidYMin' }
 };
 
 function dressedPieceImageTag(spec, href) {
-  var x = spec.x - spec.ox * spec.w;
-  var y = spec.y - spec.oy * spec.h;
-  return '<image href="' + href + '" x="' + x + '" y="' + y + '" width="' + spec.w + '" height="' + spec.h +
+  var f = (window.DRESSUP_FIT || {})[String(href).split('?')[0]];
+  if (f) {
+    var k = Math.min(spec.w / f.vb[2], spec.h / f.vb[3]);          // contain, no distortion
+    var w = f.vb[2] * k, h = f.vb[3] * k;
+    var pinY = spec.pin === 'brimY' ? f.brimY : spec.pin === 'inkBot' ? f.ink[3] : f.ink[1];
+    var inkCx = (f.ink[0] + f.ink[2]) / 2;
+    var x = spec.x - (inkCx - (f.vb[0] + f.vb[2] / 2)) * k - w / 2;
+    var y = spec.y - (pinY - f.vb[1]) * k;
+    return '<image href="' + href + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
+      '" preserveAspectRatio="none"></image>';
+  }
+  // art with no row in the table: contain it in the box, pinned by `align`
+  var fx = spec.x - spec.w / 2;
+  var fy = spec.pin === 'brimY' ? spec.y - spec.h : spec.y;
+  return '<image href="' + href + '" x="' + fx + '" y="' + fy + '" width="' + spec.w + '" height="' + spec.h +
     '" preserveAspectRatio="' + (spec.align || 'xMidYMid') + ' meet"></image>';
 }
 
