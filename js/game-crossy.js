@@ -108,8 +108,28 @@ function createCrossyGame(words, callbacks) {
       this.furthestWorldRow = ANCHOR_ROW_SLOT; // lowest worldRow ever reached (monotonic; bounds backward travel)
     },
 
+    preload: function () {
+      this.load.audio('cr_hop',   'soundeffect/Hop.mp3');
+      this.load.audio('cr_honk',  'soundeffect/CarHonk.mp3');
+      this.load.audio('cr_splat', 'soundeffect/Splat.mp3');
+      this.load.audio('cr_goal',  'soundeffect/CongratSFX.mp3');
+    },
+
     create: function () {
       var self = this;
+
+      // This game shipped silent. Every sound here is tied to something the
+      // player did, so none of it fires on its own while a child is just
+      // looking at the screen.
+      this.sfxHop   = this.sound.add('cr_hop',   { volume: 0.4 });
+      this.sfxHonk  = this.sound.add('cr_honk',  { volume: 0.45 });
+      this.sfxSplat = this.sound.add('cr_splat', { volume: 0.6 });
+      this.sfxGoal  = this.sound.add('cr_goal',  { volume: 0.7 });
+      // A fresh AudioContext starts suspended and only a real gesture can
+      // resume it, same as the cooking game.
+      this.input.on('pointerdown', function () {
+        if (self.sound.context && self.sound.context.state !== 'running') self.sound.context.resume();
+      });
 
       this.dynGfx = this.add.graphics().setDepth(1);
       this.bgGfx  = this.add.graphics().setDepth(0);
@@ -295,6 +315,7 @@ function createCrossyGame(words, callbacks) {
 
       this.moving = true;
       var self    = this;
+      if (this.sfxHop) this.sfxHop.play();
 
       // Both the frog's column slide AND the camera's row scroll are
       // driven by this single tween, so they always move in lockstep.
@@ -329,6 +350,7 @@ function createCrossyGame(words, callbacks) {
       if (!this.currentWord) return;
 
       this.isPaused = true;
+      if (this.sfxGoal) this.sfxGoal.play();
       callbacks.onPoints(20);
 
       callbacks.onPractice(this.currentWord, null, function () {
@@ -409,6 +431,8 @@ function createCrossyGame(words, callbacks) {
             if (charLeft < carRight && charRight > carLeft &&
                 charTop  < carBot   && charBot   > carTop) {
               self.invincible = 90; // ~1.5 seconds of invincibility after the hit
+              if (self.sfxHonk) self.sfxHonk.play();
+              if (self.sfxSplat) self.sfxSplat.play();
               if (callbacks.onTime) callbacks.onTime(-5);
               self.showPop(self.charX, ANCHOR_ROW_SLOT * CELL_H + CELL_H / 2 - 30, '-5s 💥');
 

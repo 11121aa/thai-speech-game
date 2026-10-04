@@ -63,40 +63,28 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   // position, wave count, and enemy-HP scaling — later maps are
   // longer/twistier (less open room to place troops) AND scale enemies
   // harder, so difficulty comes from both map geometry and raw numbers.
+  // Roads are authored in GRID CELLS, not pixels: [col, row] waypoints,
+  // every leg axis-aligned. The pixel path the enemies actually walk is
+  // derived from these below, which is what makes "the road is on the
+  // grid" true by construction rather than by eye -- a cell is either a
+  // road cell or a buildable one, with no ragged margin in between where
+  // a tile looks free but isn't. col -1 and col GRID_COLS sit just off
+  // the board: that is where enemies walk in and out.
   var MAPS = [
     {
       name: 'ทุ่งหญ้า', diffLabel: 'ง่าย', wavesTotal: 8, hpScale: 1.0, startGold: 100, startLives: 10,
-      path: [
-        { x: -20, y: 90 }, { x: 170, y: 90 }, { x: 170, y: 270 },
-        { x: 380, y: 270 }, { x: 380, y: 110 }, { x: 580, y: 110 },
-        { x: 580, y: 300 }, { x: 800, y: 300 }
-      ],
-      portal: { x: 10, y: 90 }, base: { x: 780, y: 300 }
+      cells: [[-1,1],[3,1],[3,5],[9,5],[9,1],[14,1],[14,6],[19,6]]
     },
     {
       name: 'ทะเลทราย', diffLabel: 'ปานกลาง', wavesTotal: 10, hpScale: 1.15, startGold: 110, startLives: 9,
-      path: [
-        { x: -20, y: 70 }, { x: 130, y: 70 }, { x: 130, y: 190 },
-        { x: 320, y: 190 }, { x: 320, y: 70 }, { x: 500, y: 70 },
-        { x: 500, y: 310 }, { x: 680, y: 310 }, { x: 680, y: 190 }, { x: 800, y: 190 }
-      ],
-      portal: { x: 10, y: 70 }, base: { x: 780, y: 190 }
+      cells: [[-1,0],[2,0],[2,4],[6,4],[6,0],[10,0],[10,6],[14,6],[14,2],[19,2]]
     },
     {
       name: 'ภูเขาไฟ', diffLabel: 'ยาก', wavesTotal: 12, hpScale: 1.3, startGold: 120, startLives: 8,
-      path: [
-        { x: -20, y: 350 }, { x: 100, y: 350 }, { x: 100, y: 75 },
-        { x: 250, y: 75 }, { x: 250, y: 350 }, { x: 400, y: 350 },
-        { x: 400, y: 75 }, { x: 550, y: 75 }, { x: 550, y: 350 },
-        { x: 700, y: 350 }, { x: 700, y: 190 }, { x: 800, y: 190 }
-      ],
-      portal: { x: 10, y: 350 }, base: { x: 780, y: 190 }
+      cells: [[-1,7],[2,7],[2,1],[5,1],[5,7],[8,7],[8,1],[11,1],[11,7],[15,7],[15,3],[19,3]]
     }
   ];
   var MAP = MAPS[mapIdx] || MAPS[0];
-  var PATH = MAP.path;
-  var PORTAL_X = MAP.portal.x, PORTAL_Y = MAP.portal.y;
-  var BASE_X = MAP.base.x, BASE_Y = MAP.base.y;
   var WAVES_TOTAL = MAP.wavesTotal;
   var HP_SCALE = MAP.hpScale;
   var START_GOLD = MAP.startGold;
@@ -110,7 +98,6 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
     }
     return { segLens: segLens, total: total };
   }
-  var PATH_META = buildPathMeta(PATH);
   function pointAtDistance(d) {
     d = Math.max(0, Math.min(PATH_META.total, d));
     var acc = 0;
@@ -137,22 +124,42 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   var GRID_STEP_X = (GRID_X1 - GRID_X0) / (GRID_COLS - 1);
   var GRID_STEP_Y = (GRID_Y1 - GRID_Y0) / (GRID_ROWS - 1);
   var CELL_BOX_W = GRID_STEP_X - 6, CELL_BOX_H = GRID_STEP_Y - 6; // drawn box size per grid cell (leaves a gap between cells)
-  // Road is drawn 34px wide (17px half-width, see strokePath's lineStyle
-  // below) -- clearance used to be 36, leaving a ~19px dead zone beyond
-  // the road's visible edge where cells looked empty but were blocked.
-  // 32 = road half-width (17) + a freshly-placed tower's base-circle
-  // radius (15, see baseR in drawField) -- the tightest clearance that
-  // still keeps a tier-0 tower's solid disc off the visible road. A
-  // maxed (tier 2, baseR 21) tower can nose a few px into the road edge
-  // after upgrading, same as the existing tier-3 aura ring (radius up to
-  // baseR+9) already does regardless of this constant -- an accepted
-  // cosmetic tradeoff for opening up placement near the path.
-  var ROAD_CLEARANCE = 32; // min distance from road centerline a tower can be placed
-  var PORTAL_CLEARANCE = 42, BASE_CLEARANCE = 48;
 
   function cellCenter(col, row) {
     return { x: GRID_X0 + col * GRID_STEP_X, y: GRID_Y0 + row * GRID_STEP_Y };
   }
+
+  // ── The road, derived from the map's cells ─────────────────────────
+  // PATH is the pixel polyline enemies walk (cell centres), ROAD_CELLS is
+  // the exact set of cells it covers. Both come from the same list, so
+  // they can never drift apart.
+  var PATH = MAP.cells.map(function (c) { return cellCenter(c[0], c[1]); });
+  var ROAD_CELLS = {};
+  var roadKey = function (col, row) { return col + ',' + row; };
+  (function markRoadCells() {
+    for (var i = 0; i < MAP.cells.length - 1; i++) {
+      var a = MAP.cells[i], b = MAP.cells[i + 1];
+      var dc = Math.sign(b[0] - a[0]), dr = Math.sign(b[1] - a[1]);
+      var col = a[0], row = a[1];
+      ROAD_CELLS[roadKey(col, row)] = true;
+      while (col !== b[0] || row !== b[1]) {
+        col += dc; row += dr;
+        ROAD_CELLS[roadKey(col, row)] = true;
+      }
+    }
+  })();
+  function isRoadCell(col, row) { return !!ROAD_CELLS[roadKey(col, row)]; }
+  var PATH_META = buildPathMeta(PATH);
+
+  // Portal and base sit half a cell outside the first and last on-board
+  // road cells, so they read as the road's mouth and its end.
+  var FIRST_CELL = MAP.cells[0], LAST_CELL = MAP.cells[MAP.cells.length - 1];
+  var PORTAL_X = cellCenter(0, FIRST_CELL[1]).x - GRID_STEP_X / 2;
+  var PORTAL_Y = cellCenter(0, FIRST_CELL[1]).y;
+  // Nudged in from the true edge so the base's 44px-wide hut is not
+  // clipped by the right side of the field.
+  var BASE_X = cellCenter(GRID_COLS - 1, LAST_CELL[1]).x + 10;
+  var BASE_Y = cellCenter(GRID_COLS - 1, LAST_CELL[1]).y;
   // Nearest grid cell to a raw pixel tap, or null if the tap isn't
   // actually close enough to any cell's center (dead zone between cells,
   // or outside the grid/field entirely).
@@ -160,8 +167,14 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
     var col = Math.round((px - GRID_X0) / GRID_STEP_X);
     var row = Math.round((py - GRID_Y0) / GRID_STEP_Y);
     if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return null;
+    // Math.round already picked the nearest cell, so every pixel on the
+    // board belongs to exactly one. The old 55%-of-a-step tolerance was
+    // wider than half a cell (22.6 vs 20.6 across, 21.5 vs 19.6 down), so
+    // it never rejected anything inside the grid -- all it did was swallow
+    // taps in the strip between the first/last row and the edge of the
+    // field. Bound by the field instead, which is the real edge.
     var c = cellCenter(col, row);
-    if (Math.abs(px - c.x) > GRID_STEP_X * 0.55 || Math.abs(py - c.y) > GRID_STEP_Y * 0.55) return null;
+    if (py < FIELD_Y0 || py > FIELD_Y1) return null;
     return { col: col, row: row, x: c.x, y: c.y };
   }
   function distToSegment(px, py, ax, ay, bx, by) {
@@ -215,11 +228,14 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
   var UPGRADE_BTN = { x: PANEL_X + 10, y: PANEL_Y + PANEL_H_PINNED - 38, w: PANEL_W - 20, h: 28 };
   var PANEL_NO_BUILD_MARGIN = 20; // extra padding beyond the panel's own rect
 
-  function isCellBuildable(cx, cy) {
-    if (distToPath(cx, cy) < ROAD_CLEARANCE) return false;
-    if (Math.hypot(cx - PORTAL_X, cy - PORTAL_Y) < PORTAL_CLEARANCE) return false;
-    if (Math.hypot(cx - BASE_X, cy - BASE_Y) < BASE_CLEARANCE) return false;
-    if (cx > PANEL_X - PANEL_NO_BUILD_MARGIN && cy < PANEL_Y + PANEL_H_PINNED + PANEL_NO_BUILD_MARGIN) return false;
+  // A cell is buildable unless the road runs through it, or the stats
+  // panel covers it. No distance test and no margin: what you see as road
+  // is exactly what you cannot build on, which is the whole point of
+  // putting the road on the grid.
+  function isCellBuildable(col, row) {
+    if (isRoadCell(col, row)) return false;
+    var c = cellCenter(col, row);
+    if (c.x > PANEL_X - PANEL_NO_BUILD_MARGIN && c.y < PANEL_Y + PANEL_H_PINNED + PANEL_NO_BUILD_MARGIN) return false;
     return true;
   }
 
@@ -423,7 +439,7 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
     },
 
     tryPlaceAt: function (cell, kind) {
-      if (!isCellBuildable(cell.x, cell.y)) { this.badTap('วางตรงนี้ไม่ได้!'); return; }
+      if (!isCellBuildable(cell.col, cell.row)) { this.badTap('วางตรงนี้ไม่ได้!'); return; }
       var def = TROOPS[kind];
       var cost = def.costs[0];
       if (this.gold < cost) { this.badTap('เหรียญไม่พอ! 🪙'); return; }
@@ -720,10 +736,18 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
         g.lineBetween(GRID_X0 - GRID_STEP_X / 2, lineY, GRID_X1 + GRID_STEP_X / 2, lineY);
       }
 
-      // Road
-      g.lineStyle(34, 0xD8C7A6);
-      this.strokePath(g);
-      g.lineStyle(2, 0xC2AC80);
+      // Road, drawn as the cells it owns rather than as a stroked line:
+      // the player can see exactly which tiles are road, and the tiles
+      // they can build on are everything else.
+      g.fillStyle(0xD8C7A6, 1);
+      for (var rc in ROAD_CELLS) {
+        var parts = rc.split(','), rcol = +parts[0], rrow = +parts[1];
+        var rp = cellCenter(rcol, rrow);
+        g.fillRect(rp.x - GRID_STEP_X / 2, rp.y - GRID_STEP_Y / 2, GRID_STEP_X + 1, GRID_STEP_Y + 1);
+      }
+      // Centre line down the middle of those cells, so the direction of
+      // travel still reads at a glance.
+      g.lineStyle(3, 0xC2AC80, 0.9);
       this.strokePath(g);
 
       // Portal + base
@@ -745,7 +769,7 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
           for (var row = 0; row < GRID_ROWS; row++) {
             if (self.towerAt(col, row)) continue;
             var c = cellCenter(col, row);
-            if (!isCellBuildable(c.x, c.y)) continue;
+            if (!isCellBuildable(col, row)) continue;
             var pulse = affordable ? 1.5 * Math.sin(time * 0.006 + col * 0.7 + row) : 0;
             var bw = CELL_BOX_W + pulse * 2, bh = CELL_BOX_H + pulse * 2;
             g.fillStyle(affordable ? 0x2EC4B6 : 0xBBAA88, 0.14);
