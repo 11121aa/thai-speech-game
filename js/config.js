@@ -4,15 +4,14 @@ const APP_CONFIG = {
   SUPABASE_URL: "https://bmufiaydbjiykbuawrwt.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_Xrro3ytNTpRtBGPgIYMucw_N5T111DT",
 
-  // ── FREE_MODE: the ONLY difference between the two versions ──────
-  // false = the normal game: coins are earned and spent in the shop,
-  //         and upgrades/dishes/clothes/RPG gear unlock as they're bought.
-  // true  = everything is already unlocked and the shop is gone.
-  //
-  // This whole branch of the app is one flag on purpose. The `free-all`
-  // git branch differs from `master` by this single line, so any fix
-  // made on one merges into the other without conflicts -- rather than
-  // two copies of the code drifting apart.
+  // ── FREE_MODE: everything unlocked, no shop ──────────────────────
+  // true  = the only version there is now: every upgrade, dish, outfit
+  //         and piece of RPG gear is already owned, and the shop link
+  //         never appears. Coins still pile up from play; they just do
+  //         not gate anything.
+  // false = the old paid-unlock build. Kept working, and kept readable
+  //         at every site below, because turning buying back on should
+  //         be one line rather than an archaeology project.
   //
   // Everything that reads it (each is commented FREE_MODE at its site):
   //   js/auth.js            -- hides the shop link in the nav
@@ -20,7 +19,7 @@ const APP_CONFIG = {
   //   game.html             -- treats the whole upgrade catalog as owned
   //   js/game-dressup.js    -- treats every cosmetic as owned
   //   js/game-rpg.js        -- equips the best weapon/armor/skill
-  FREE_MODE: false
+  FREE_MODE: true
 };
 
 // Convenience reader -- config.js loads before everything else on every

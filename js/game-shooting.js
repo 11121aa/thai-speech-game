@@ -102,6 +102,8 @@ function createShootingGame(words, callbacks) {
       this.reloadUntil = 0;            // timestamp when reload finishes
       this.timeStopUntil  = 0;         // targets frozen (no movement, no expiry) until this timestamp
       this.timeStopReadyAt = 0;        // ability off cooldown once time.now passes this
+      this.timeStopFrom   = 0;         // when the current freeze started, for the effect's timing
+      this.frost          = [];        // ice shards around the edge, generated once per freeze
     },
 
     preload: function () {
@@ -403,6 +405,72 @@ function createShootingGame(words, callbacks) {
       this.timeStopUntil = now + freezeMs;
       this.targets.forEach(function (t) { if (!t.hit && !t.expired) t.born += freezeMs; });
       this.showPop(CANNON_X, CANNON_Y - 60, '⏱ หยุดเวลา!');
+      // The freeze used to be invisible: targets simply stopped, which
+      // reads as the game hanging rather than as a power being used.
+      this.timeStopFrom = now;
+      this.buildFrost();
+    },
+
+    // ── [FREEZE] The look of the time stop ───────────────────────
+    // Ice grows in from the edges of the field, the whole picture goes
+    // cold and blue, and a bar counts the freeze down. Shards are built
+    // once per freeze (not per frame) so they hold still -- a frozen
+    // screen that shimmers would undercut the whole idea.
+    buildFrost: function () {
+      var shards = [];
+      var n = 26;
+      for (var i = 0; i < n; i++) {
+        var edge = i % 4;                       // 0 top, 1 right, 2 bottom, 3 left
+        var t = (Math.floor(i / 4) + (i % 2 ? 0.5 : 0.12)) / Math.ceil(n / 4);
+        var depth = 26 + Math.random() * 52;
+        var halfW = 16 + Math.random() * 26;
+        var x, y, dx, dy, px, py;
+        if (edge === 0)      { x = t * W; y = 0; dx = 0; dy = depth;  px = halfW; py = 0; }
+        else if (edge === 1) { x = W; y = t * H; dx = -depth; dy = 0; px = 0; py = halfW; }
+        else if (edge === 2) { x = t * W; y = H; dx = 0; dy = -depth; px = halfW; py = 0; }
+        else                 { x = 0; y = t * H; dx = depth; dy = 0;  px = 0; py = halfW; }
+        shards.push({ x: x, y: y, dx: dx, dy: dy, px: px, py: py,
+                      a: 0.22 + Math.random() * 0.3, grow: 0.25 + Math.random() * 0.5 });
+      }
+      this.frost = shards;
+    },
+
+    drawFreeze: function (g, time) {
+      var total = this.timeStopUntil - this.timeStopFrom;
+      if (total <= 0) return;
+      var left = this.timeStopUntil - time;
+      var into = time - this.timeStopFrom;
+      // ramp in over 180ms, hold, ramp out over the last 320ms
+      var k = Math.min(1, into / 180) * Math.min(1, Math.max(0, left) / 320);
+      if (k <= 0) return;
+
+      g.fillStyle(0x8FD8FF, 0.16 * k);          // the cold wash over everything
+      g.fillRect(0, 0, W, H);
+      g.fillStyle(0xFFFFFF, 0.10 * k);
+      g.fillRect(0, 0, W, H);
+
+      for (var i = 0; i < this.frost.length; i++) {
+        var f = this.frost[i];
+        var reach = Math.min(1, into / (180 + f.grow * 400)) * k;   // ice creeps inward
+        g.fillStyle(0xE8F7FF, f.a * k);
+        g.fillPoints([
+          { x: f.x - f.px, y: f.y - f.py },
+          { x: f.x + f.px, y: f.y + f.py },
+          { x: f.x + f.dx * reach, y: f.y + f.dy * reach }
+        ], true);
+        g.fillStyle(0xFFFFFF, f.a * 0.5 * k);
+        g.fillPoints([
+          { x: f.x - f.px * 0.45, y: f.y - f.py * 0.45 },
+          { x: f.x + f.px * 0.45, y: f.y + f.py * 0.45 },
+          { x: f.x + f.dx * reach * 0.62, y: f.y + f.dy * reach * 0.62 }
+        ], true);
+      }
+
+      // Countdown bar across the top, so the player can see it running out
+      var bw = 220, bx = W / 2 - bw / 2, by = 16;
+      g.fillStyle(0x0B3A52, 0.45 * k); g.fillRoundedRect(bx - 4, by - 4, bw + 8, 16, 8);
+      g.fillStyle(0xBDEBFF, 0.95 * k);
+      g.fillRoundedRect(bx, by, bw * Math.max(0, left) / total, 8, 4);
     },
 
     // ── Spawn break particles at the hit position ─────────────────
@@ -613,6 +681,9 @@ function createShootingGame(words, callbacks) {
       toRemove.forEach(function (tgt) {
         self.targets = self.targets.filter(function (u) { return u !== tgt; });
       });
+
+      // Drawn last so the ice sits over the targets and the cannon.
+      if (time < this.timeStopUntil) this.drawFreeze(g, time);
     },
 
     // ── [CANNON] Draw the rotating cannon ────────────────────────
