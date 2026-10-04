@@ -191,6 +191,8 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.load.audio('PixelJump',   'soundeffect/PixelJump.mp3');
       this.load.audio('PixelDamage', 'soundeffect/PixelDamage.mp3');
       this.load.audio('Swoosh',      'soundeffect/swoosh.mp3');
+      this.load.audio('CoinPickup',  'soundeffect/CoinPickup.mp3');
+      this.load.audio('LevelUp',     'soundeffect/LevelUp.mp3');
       this.load.atlas('playerAnim', 'img/player/player-anim.png?v=2', 'img/player/player-anim.json?v=2');
     },
 
@@ -340,6 +342,11 @@ function createPlatformerGame(words, callbacks, difficulty) {
       this.sfxJump   = this.sound.add('PixelJump',    { volume: 0.6 });
       this.sfxDamage = this.sound.add('PixelDamage',  { volume: 0.8 });
       this.sfxSwoosh = this.sound.add('Swoosh',       { volume: 0.6 });
+      // A pickup deserves its own ding rather than the same whoosh the
+      // jump uses, and finishing a word bubble -- the one moment the
+      // player earned something by speaking -- was silent.
+      this.sfxPickup = this.sound.add('CoinPickup',   { volume: 0.5 });
+      this.sfxReward = this.sound.add('LevelUp',      { volume: 0.55 });
 
       // ── Swipe coach ────────────────────────────────────────────
       // The controls used to be one 13px line of text that faded after
@@ -671,6 +678,7 @@ function createPlatformerGame(words, callbacks, difficulty) {
           callbacks.onPractice(wi.word, null, function () {
             self.isPaused = false;
             p.invincible = IMMORTAL_FRAMES;
+            if (self.sfxReward) self.sfxReward.play();
             self.showPop(PLAYER_X + PW / 2, p.y - 20, '🛡️ อมตะ!');
           });
         }
@@ -697,7 +705,7 @@ function createPlatformerGame(words, callbacks, difficulty) {
             p.doublePointsUntil = time + DOUBLE_PTS_MS;
             self.showPop(PLAYER_X + PW / 2, p.y - 20, '⭐ คะแนนคูณสอง!');
           }
-          if (self.sfxSwoosh) self.sfxSwoosh.play();
+          if (self.sfxPickup) self.sfxPickup.play();
         }
       });
       this.pickups = this.pickups.filter(function (pk) { return !pk.collected; });

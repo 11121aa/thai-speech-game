@@ -200,7 +200,9 @@ function createRpgGame(words, callbacks) {
     },
 
     preload: function () {
-      this.load.audio('rpg_hit',   'soundeffect/LaserShot.mp3');
+      // Melee auto-attack (see playerAttackTick): a blade, not the laser
+      // this borrowed before.
+      this.load.audio('rpg_hit',   'soundeffect/SwordHit.mp3');
       this.load.audio('rpg_hurt',  'soundeffect/PixelDamage.mp3');
       this.load.audio('rpg_death', 'soundeffect/TargetBreak.mp3');
       this.load.audio('rpg_coin',  'soundeffect/CoinSFX.mp3');

@@ -79,6 +79,7 @@ function createTetrisGame(words, callbacks) {
       this.load.audio('tetRotate','soundeffect/FlipCard.mp3');
       this.load.audio('tetClear', 'soundeffect/TargetBreak.mp3');
       this.load.audio('tetDrop',  'soundeffect/swoosh.mp3');
+      this.load.audio('tetLock',  'soundeffect/BlockPlace.mp3');
       this.load.audio('tetOver',  'soundeffect/PixelDamage.mp3');
     },
 
@@ -89,6 +90,9 @@ function createTetrisGame(words, callbacks) {
       this.sfxRotate = ca.exists('tetRotate') ? this.sound.add('tetRotate', { volume: 0.5  }) : null;
       this.sfxClear  = ca.exists('tetClear')  ? this.sound.add('tetClear',  { volume: 0.6  }) : null;
       this.sfxDrop   = ca.exists('tetDrop')   ? this.sound.add('tetDrop',   { volume: 0.5  }) : null;
+      // Every piece lands; only some clear a line. Without this, most
+      // landings made no sound at all.
+      this.sfxLock   = ca.exists('tetLock')   ? this.sound.add('tetLock',   { volume: 0.45 }) : null;
       this.sfxOver   = ca.exists('tetOver')   ? this.sound.add('tetOver',   { volume: 0.7  }) : null;
 
       this.g = this.add.graphics();
@@ -304,6 +308,7 @@ function createTetrisGame(words, callbacks) {
     // the next piece.
     lockAndProceed: function () {
       var self = this;
+      if (this.sfxLock) this.sfxLock.play();
       this.writeToGrid();
       this.cur = null;
       var fullRows = this.findFullRows();
