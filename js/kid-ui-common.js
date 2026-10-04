@@ -114,7 +114,24 @@ var KidUI = (function () {
   var screenListeners = [];
   function onScreen(fn) { screenListeners.push(fn); }
 
+  // A short tick under the finger on anything tappable. Delegated from
+  // the document so it covers controls that are built later (results,
+  // leaderboards, the practice pop-up) without each one wiring its own.
+  // pointerdown rather than click: the buzz has to land when the finger
+  // goes down, not when it comes back up. Ignored where the device has
+  // no vibrator, which is every desktop.
+  function wirePressFeel() {
+    if (!navigator.vibrate) return;
+    document.addEventListener('pointerdown', function (e) {
+      var t = e.target && e.target.closest &&
+        e.target.closest('button, .btn, [role="button"], a.kb-pill, .kb-candy, .game-mode-card, label.setup-row');
+      if (!t || t.disabled || t.getAttribute('aria-disabled') === 'true') return;
+      try { navigator.vibrate(9); } catch (err) { /* blocked by the browser's engagement rules */ }
+    }, { passive: true });
+  }
+
   function wire() {
+    wirePressFeel();
     document.body.setAttribute('data-screen', 'screenMode');
     if (typeof window.showScreen === 'function') {
       var orig = window.showScreen;

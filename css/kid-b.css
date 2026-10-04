@@ -477,3 +477,46 @@ body.ui-b .pp-body > .pp-side { margin-bottom: auto; }
 .ui-b .kb-lock > [data-ic] { grid-area: auto; }
 .ui-b .kb-lock-ring { display: none; }
 .ui-b .kb-lock[aria-expanded="true"] { background: var(--purple); color: #fff; }
+
+/* ── Press feel ────────────────────────────────────────────────────
+   Every tappable thing answers the finger the same way: it goes down
+   under the press and springs back on release. Three separate problems
+   were making taps feel dead on a tablet:
+     - most controls had no :active state at all, so a tap looked
+       identical to a miss until the screen changed
+     - without touch-action, mobile Safari holds every tap ~300ms to see
+       whether it is a double-tap-to-zoom, which reads as lag
+     - a slow press would start selecting the label text
+   The spring is on the way back only (the ease-out curve overshoots a
+   little), so pressing is instant and releasing has the bounce.
+   --press-feel marks this block for anyone grepping for it. */
+body.ui-b { --press-feel: 1; }
+.ui-b button, .ui-b .btn, .ui-b [role="button"], .ui-b a.kb-pill, .ui-b .kb-candy,
+.ui-b .kb-pill, .ui-b .kb-lock, .ui-b .game-mode-card, .ui-b .pp-btn, .ui-b .mic-btn,
+.ui-b .lg-submit, .ui-b label.setup-row, .ui-b .setup-row .btn {
+  touch-action: manipulation;          /* no 300ms double-tap-zoom wait */
+  -webkit-user-select: none; user-select: none;
+  transition: transform .11s cubic-bezier(.2, .9, .3, 1.5), box-shadow .11s ease, filter .11s ease;
+}
+/* Anything with a chunky bottom shadow sinks onto it. The ones that
+   already had this rule keep their own numbers; this only reaches the
+   controls that had nothing. */
+.ui-b .kb-pill:active, .ui-b a.kb-pill:active, .ui-b .kb-lock:active {
+  transform: translateY(4px); box-shadow: 0 1px 0 transparent;
+}
+/* Flat controls have no shadow to collapse, so they squash instead. A
+   whole setup row is not a button and does not squash -- only the
+   controls inside it do. */
+.ui-b .btn:active:not([disabled]), .ui-b .setup-row .btn:active:not([disabled]) {
+  transform: scale(.965); filter: brightness(.97);
+}
+/* A disabled button should not pretend to react. */
+.ui-b button[disabled], .ui-b .btn[disabled], .ui-b .pp-btn[disabled] {
+  transition: none; transform: none !important; filter: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-b button, .ui-b .btn, .ui-b [role="button"], .ui-b .kb-candy, .ui-b .kb-pill,
+  .ui-b .kb-lock, .ui-b .game-mode-card, .ui-b .pp-btn, .ui-b .mic-btn, .ui-b .lg-submit {
+    transition: none;
+  }
+}
