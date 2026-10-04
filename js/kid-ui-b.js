@@ -109,12 +109,49 @@
     // so the dock link back to it says "return", not "parents".
     if (s && Auth.getRole) Auth.getRole(s.user.id).then(function (role) {
       if (role !== 'specialist') return;
+      markFromManage();
       var a = document.querySelector('#navSelf a');
       if (!a) return;
       a.innerHTML = '<span data-ic="back"></span>กลับ';
       U.paint(a);
     }).catch(function () {});
   }).catch(function () {});
+
+  // ── Getting back to the workspace ─────────────────────────────
+  // The dock is deliberately hidden while a game is running (and on the
+  // results screen) so the play area stays clean -- but the dock is also
+  // where the link back to management.html lives, so a therapist who
+  // started a game had no way back to their own pages short of the
+  // browser's back button. This pill is the way back, and it stays put
+  // through the whole visit, in-game included.
+  //
+  // Who sees it: anyone who arrived from management.html (that page tags
+  // its links with ?from=manage, and the referrer is checked too), plus
+  // anyone the role table calls a specialist. Remembered for the tab, so
+  // it survives moving between screens and reloads. A child logging in
+  // normally never triggers any of those, and never sees it.
+  function fromManage() {
+    try { return sessionStorage.getItem('kidFromManage') === '1'; } catch (e) { return false; }
+  }
+  function markFromManage() {
+    try { sessionStorage.setItem('kidFromManage', '1'); } catch (e) {}
+    showManageBack();
+  }
+  function showManageBack() {
+    if (document.getElementById('kbManageBack')) return;
+    var a = document.createElement('a');
+    a.id = 'kbManageBack';
+    a.className = 'kb-manage-back';
+    a.href = 'management.html';
+    a.innerHTML = '<span data-ic="back"></span>หน้าจัดการ';
+    document.body.appendChild(a);
+    U.paint(a);
+  }
+  (function wireManageBack() {
+    if (/[?&]from=manage\b/.test(location.search) ||
+        (document.referrer && document.referrer.indexOf('management.html') >= 0)) markFromManage();
+    else if (fromManage()) showManageBack();
+  })();
 
   drawArt(document);
   U.wire();

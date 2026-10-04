@@ -520,3 +520,27 @@ body.ui-b { --press-feel: 1; }
     transition: none;
   }
 }
+
+/* ── Back to the therapist's workspace ─────────────────────────────
+   Added by kid-ui-b.js only for someone who came from management.html
+   (or whom the role table calls a specialist). Sits opposite the dock
+   and, unlike the dock, stays visible while a game is running -- that
+   is the whole point of it: the dock's link home is hidden exactly when
+   a therapist is most likely to want it. Bottom-right on a phone (the
+   dock is bottom-left); lifted clear of the dock on a tablet, where the
+   dock moves to the right. */
+.ui-b .kb-manage-back {
+  position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 1001; display: inline-flex; align-items: center; gap: 6px;
+  background: var(--purple); color: #fff; text-decoration: none;
+  border-radius: 999px; padding: 10px 16px; font-size: 15px; font-weight: 500;
+  box-shadow: 0 5px 0 var(--purple-d);
+  touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  transition: transform .11s cubic-bezier(.2, .9, .3, 1.5), box-shadow .11s ease;
+}
+.ui-b .kb-manage-back:active { transform: translateY(4px); box-shadow: 0 1px 0 transparent; }
+.ui-b .kb-manage-back .ic { width: 20px; height: 20px; color: #fff; }
+.ui-b .kb-manage-back .ic-f { fill: #fff; opacity: .25; }
+@media (min-width: 760px) {
+  .ui-b .kb-manage-back { right: 28px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+}
