@@ -108,6 +108,7 @@ function createShootingGame(words, callbacks) {
 
     preload: function () {
       this.load.audio('CannonFire',  'soundeffect/CannonFire.mp3');
+      this.load.audio('IceFreeze',   'soundeffect/IceFreeze.mp3');
       this.load.audio('CongratSFX',  'soundeffect/CongratSFX.mp3');
       this.load.audio('TargetBreak', 'soundeffect/TargetBreak.mp3');
     },
@@ -116,6 +117,9 @@ function createShootingGame(words, callbacks) {
       var self = this;
 
       this.sfxCannon  = this.sound.add('CannonFire',  { volume: 0.6 });
+      // The time stop had no sound at all, so the one spectacular thing
+      // the player can trigger landed in silence.
+      this.sfxFreeze  = this.sound.add('IceFreeze',   { volume: 0.55 });
       this.sfxCongrat = this.sound.add('CongratSFX',  { volume: 0.8 });
       this.sfxBreak   = this.sound.add('TargetBreak', { volume: 0.75 });
 
@@ -405,6 +409,7 @@ function createShootingGame(words, callbacks) {
       this.timeStopUntil = now + freezeMs;
       this.targets.forEach(function (t) { if (!t.hit && !t.expired) t.born += freezeMs; });
       this.showPop(CANNON_X, CANNON_Y - 60, '⏱ หยุดเวลา!');
+      if (this.sfxFreeze) { this.sfxFreeze.stop(); this.sfxFreeze.play(); }
       // The freeze used to be invisible: targets simply stopped, which
       // reads as the game hanging rather than as a power being used.
       this.timeStopFrom = now;

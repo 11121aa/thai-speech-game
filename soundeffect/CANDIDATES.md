@@ -8,20 +8,34 @@ the mp3 into `soundeffect/` and wire it up (see the bottom of this file).
 Licence: Pixabay's Content License — free for commercial use, no attribution
 required. You may not redistribute the sounds on their own, which we aren't.
 
-## What each game already has
+## Done so far
 
-| Game | Has | Missing |
+| Sound | File | Where it plays |
 |---|---|---|
-| ข้ามถนน (crossy) | **nothing** | hop, car horn, squash, coin, safe-arrival |
-| ขับเครื่องบิน (airplane) | coin, explosion | engine loop, whoosh past, near-miss |
-| วิ่งเก็บเหรียญ (platformer) | jump, damage, swoosh | coin pickup, power-up, landing |
-| ทำอาหาร (cooking) | chop, cut, toast-slice, click, correct, congrats, land | **salt shake**, sizzle, timer ding, pour, plate |
-| แต่งตัวตุ๊กตา (dressup) | click, coin, flip | fabric swish, zipper, sparkle on equip |
-| จับคู่ภาพ / ไพ่คำศัพท์ | flip, correct, wrong | cheer on finishing |
-| ยิงเป้า (shooting) | cannon, target break, congrats | balloon pop, bow release |
-| ป้องกันฐาน (tower defense) | laser, target break, coin, damage, wrong, congrats, swoosh | tower placed, wave incoming |
-| เตตริส (tetris) | click, flip, damage, target break, swoosh | line clear, piece lock |
-| ผจญภัยดันเจี้ยน (rpg) | laser, damage, target break, coin, congrats, swoosh | sword hit, chest open, level up |
+| Salt shaker | `SaltShake.mp3` | cooking — each shake of the fries, cut at 320ms |
+| Hop | `Hop.mp3` | crossy road — every move |
+| Car honk + splat | `CarHonk.mp3`, `Splat.mp3` | crossy road — clipped by a car |
+| Ice | `IceFreeze.mp3` | shooting — the time stop, which was silent |
+| Coin pickup | `CoinPickup.mp3` | platformer — items (was the jump's whoosh) |
+| Level up | `LevelUp.mp3` | platformer — invincibility after a word bubble, was silent |
+| Sword | `SwordHit.mp3` | rpg — melee auto-attack (was a laser) |
+| Block | `BlockPlace.mp3` | tetris — a piece landing without clearing a line, was silent |
+
+Deliberately **not** downloaded: the frying sizzle (28s), kitchen timer (24s),
+fabric swish (21s), plane flyby (15s) and kids cheering (31s). Every clip
+loads on game start, so a 20-30s file costs every player the download for
+one moment of sound. If you want any of them, they need trimming to a
+second or two first — tell me and I'll do that rather than ship them whole.
+
+## Still silent / still generic
+
+| Game | Gap |
+|---|---|
+| ขับเครื่องบิน (airplane) | no engine, no whoosh — the two candidates are both too long untrimmed |
+| ทำอาหาร (cooking) | frying hold, oven timer, pouring, plating |
+| แต่งตัวตุ๊กตา (dressup) | wearing a piece still uses the card-flip sound |
+| ป้องกันฐาน (tower defense) | placing a tower only plays the coin; no wave-incoming cue |
+| ผจญภัยดันเจี้ยน (rpg) | no chest/reward sound; level-up borrows congrats |
 
 ## Candidates
 
