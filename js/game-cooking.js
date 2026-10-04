@@ -2981,7 +2981,13 @@ function createCookingGame(words, callbacks) {
     spawnSaltPuff(G.saltX,G.saltY+30);
     if(Math.abs(G.saltX-FR_CX)>SALT_ZONE){ G.saltMissAt=sc.time.now; return; }
     G.saltCount++;
-    if(sc.sfxChop)sc.sfxChop.play();
+    // The clip is a 3s rattle; one flick should be a short burst of it, so
+    // it restarts past the run-up and is cut off again before it drones on.
+    if(sc.sfxSalt){
+      sc.sfxSalt.stop(); sc.sfxSalt.play({seek:0.12});
+      if(sc._saltStop) sc._saltStop.remove(false);
+      sc._saltStop = sc.time.delayedCall(320,function(){ if(sc.sfxSalt)sc.sfxSalt.stop(); });
+    }
     // Hard cap: past SALT_MAX the fries are ruined, so the step ends itself
     // rather than letting the score keep sinking.
     if(G.saltCount>=SALT_MAX) finishSalt();
@@ -3040,6 +3046,7 @@ function createCookingGame(words, callbacks) {
       this.load.audio('ck_click',    'soundeffect/Click.mp3');
       this.load.audio('ck_congrats', 'soundeffect/CongratSFX.mp3');
       this.load.audio('ck_land',     'soundeffect/FlipCard.mp3');
+      this.load.audio('ck_salt',     'soundeffect/SaltShake.mp3');
       this.load.image('ck_bg', 'img/cooking/bg.jpg?v=2');
     },
 
@@ -3054,6 +3061,10 @@ function createCookingGame(words, callbacks) {
       this.sfxClick    =this.sound.add('ck_click',    {volume:0.5});
       this.sfxCongrats =this.sound.add('ck_congrats', {volume:0.8});
       this.sfxLand     =this.sound.add('ck_land',     {volume:0.55});
+      // Real shaker, rather than the knife chop the shake borrowed at first.
+      // Seeked past the clip's own run-up so a flick sounds immediate, and
+      // stopped before it rattles on into the next one.
+      this.sfxSalt     =this.sound.add('ck_salt',     {volume:0.55});
       resetG();
       this.input.on('pointerdown', function(ptr){
         // Each CookingGame.start() spins up a brand-new AudioContext, which
