@@ -208,7 +208,7 @@ function createCookingGame(words, callbacks) {
   // directly) so update() knows when the current screen was entered --
   // that's what drives the pop-in transition below, and the animated
   // score counters (see animateScore).
-  function setState(s){ cookSizzle(false); G.st=s; G.stAt=sc?sc.time.now:0; }
+  function setState(s){ cookSizzle(false); doughQuiet(); G.st=s; G.stAt=sc?sc.time.now:0; }
   function resetG(){
     G={
       st:S.SEL, stAt:0, dish:null,
@@ -233,7 +233,7 @@ function createCookingGame(words, callbacks) {
       bigFx:null, shakeUntil:0, shakeMag:0, comboCount:0,
 
       // ── Pizza ──
-      doughDragging:false, doughR:0, doughFinal:0, doughDone:false,
+      doughDragging:false, doughR:0, doughFinal:0, doughDone:false, doughSoundAt:0,
       sauceRun:false, sauceStart:0, sauceDone:false, sauceCv:null, sauceMc:null, sauceLast:null, sauceCover:0,
       cheeseTaps:0, cheeseCount:0, cheeseRun:false, cheeseDone:false, cheeseStart:0,
       chAnim:0, chAnimStart:0, chFlakes:[],
@@ -447,6 +447,21 @@ function createCookingGame(words, callbacks) {
     else sc.sfxSizzle.stop();
   }
   function cookDing(){ if(sc&&sc.sfxDing){ sc.sfxDing.stop(); sc.sfxDing.play(); } }
+  // Rolling out the pizza base. The sample is one 1.7s pass of a rolling
+  // pin, replayed each time the dough has grown another DOUGH_STEP px --
+  // so pulling steadily gives a run of rolls, a quick yank gives a couple
+  // in a row, and holding still is silent. (A looped sample whose volume
+  // followed the drag speed would be smoother, but Phaser's live gain
+  // changes could not be verified in this environment, and a sound I
+  // cannot test is worse than a simpler one I can.)
+  var DOUGH_STEP=16;
+  function doughStretch(r){
+    if(!sc||!sc.sfxDough)return;
+    if(Math.abs(r-G.doughSoundAt)<DOUGH_STEP)return;
+    G.doughSoundAt=r;
+    sc.sfxDough.stop(); sc.sfxDough.play();
+  }
+  function doughQuiet(){ if(sc&&sc.sfxDough)sc.sfxDough.stop(); }
   function holdPress(p,ts){if(!G[p+'Holding']){G[p+'Holding']=true;G[p+'HoldAt']=ts;cookSizzle(true);}}
   // Banks the time held so far and returns the frac to score, or -1 when
   // there was no hold to end.
@@ -3064,6 +3079,7 @@ function createCookingGame(words, callbacks) {
       this.load.audio('ck_salt',     'soundeffect/SaltShake.mp3');
       this.load.audio('ck_sizzle',   'soundeffect/Sizzle.mp3');
       this.load.audio('ck_ding',     'soundeffect/CookDing.mp3');
+      this.load.audio('ck_dough',    'soundeffect/DoughStretch.mp3');
       this.load.image('ck_bg', 'img/cooking/bg.jpg?v=2');
     },
 
@@ -3088,6 +3104,7 @@ function createCookingGame(words, callbacks) {
       // a normal cook never even reaches the loop seam).
       this.sfxSizzle   =this.sound.add('ck_sizzle',   {volume:0.4,loop:true});
       this.sfxDing     =this.sound.add('ck_ding',     {volume:0.6});
+      this.sfxDough    =this.sound.add('ck_dough',    {volume:0.5});
       resetG();
       this.input.on('pointerdown', function(ptr){
         // Each CookingGame.start() spins up a brand-new AudioContext, which
@@ -3260,7 +3277,7 @@ function createCookingGame(words, callbacks) {
 
       // ── Pizza ──
       if(G.st===SP.DOUGH){
-        if(!G.doughDone){ G.doughDragging=true; G.doughR=Math.hypot(x-PZ_CX,y-PZ_CY); }
+        if(!G.doughDone){ G.doughDragging=true; G.doughR=Math.hypot(x-PZ_CX,y-PZ_CY); G.doughSoundAt=-999; doughStretch(G.doughR); }
         else if(hit(x,y,VW/2-85,PZ_CY+G.doughFinal+78,170,52)){pressFx(x,y);setState(SP.DOUGH_R);}
         return;
       }
@@ -3478,7 +3495,10 @@ function createCookingGame(words, callbacks) {
 
     onMove:function(x,y){
       if(G.st===S.BUN&&G.cutting)G.pts.push({x:x,y:y});
-      if(G.st===SP.DOUGH&&G.doughDragging)G.doughR=Math.hypot(x-PZ_CX,y-PZ_CY);
+      if(G.st===SP.DOUGH&&G.doughDragging){
+        G.doughR=Math.hypot(x-PZ_CX,y-PZ_CY);
+        doughStretch(G.doughR);
+      }
       if(G.st===SP.SAUCE&&G.sauceRun&&!G.sauceDone)paintSauceAt(x,y);
       if(G.st===SP.CUT&&G.pzDrag){G.pzDrag.cx=x;G.pzDrag.cy=y;}
       if(G.st===SF.SLICE&&G.frDrag){G.frDrag.cx=x;G.frDrag.cy=y;}
@@ -3528,7 +3548,7 @@ function createCookingGame(words, callbacks) {
         commitFrySlice(fd.x,fd.y,x,y);
         return;
       }
-      if(G.st===SP.DOUGH&&G.doughDragging){G.doughDragging=false;finishDough();return;}
+      if(G.st===SP.DOUGH&&G.doughDragging){G.doughDragging=false;doughQuiet();finishDough();return;}
       if(!(G.st===S.BUN&&G.cutting))return;
       this.sfxBread.stop();
       var raw=G.pts.slice(); G.cutting=false;

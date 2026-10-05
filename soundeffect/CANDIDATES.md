@@ -23,6 +23,11 @@ required. You may not redistribute the sounds on their own, which we aren't.
 | Whoosh | `PlaneWhoosh.mp3` | airplane — banking between lanes, the only thing the player does |
 | Skillet | `Sizzle.mp3` | cooking — looped under every hold-cook (bake, toast, grill, fry) |
 | Ding | `CookDing.mp3` | cooking — the moment a cook finishes |
+| Rolling pin | `DoughStretch.mp3` | cooking — stretching the pizza base, one roll per 16px of growth |
+
+**ffmpeg is available on this machine**, so a long recording is no longer a
+reason to reject a clip -- the dough roll came from a 21s/423KB file cut down
+to 1.7s/21KB. The rejects below could be trimmed the same way if you want them.
 
 Deliberately **not** downloaded: a 28s frying recording, kitchen timer (24s),
 fabric swish (21s), plane flyby (15s) and kids cheering (31s). (A shorter
@@ -36,7 +41,7 @@ second or two first — tell me and I'll do that rather than ship them whole.
 | Game | Gap |
 |---|---|
 | ขับเครื่องบิน (airplane) | lane changes now whoosh; still no engine loop (every candidate is 15s+ untrimmed) |
-| ทำอาหาร (cooking) | pouring and plating (the hold now sizzles and finishes with a ding) |
+| ทำอาหาร (cooking) | pouring, plating, spreading sauce, cutting the pizza |
 | แต่งตัวตุ๊กตา (dressup) | wearing a piece still uses the card-flip sound |
 | ป้องกันฐาน (tower defense) | placing a tower only plays the coin; no wave-incoming cue |
 | ผจญภัยดันเจี้ยน (rpg) | no chest/reward sound; level-up borrows congrats |
