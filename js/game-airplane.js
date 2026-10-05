@@ -115,6 +115,7 @@ function createAirplaneGame(words, callbacks) {
     preload: function () {
       this.load.audio('CoinSFX', 'soundeffect/CoinSFX.mp3');
       this.load.audio('ExplosionSFX', 'soundeffect/ExplosionSFX.mp3');
+      this.load.audio('PlaneWhoosh',  'soundeffect/PlaneWhoosh.mp3');
     },
 
     create: function () {
@@ -127,6 +128,10 @@ function createAirplaneGame(words, callbacks) {
       var ca = this.cache.audio;
       this.sfxCoin = ca.exists('CoinSFX')      ? this.sound.add('CoinSFX',      { volume: 0.6  }) : null;
       this.sfxHit  = ca.exists('ExplosionSFX') ? this.sound.add('ExplosionSFX', { volume: 0.65 }) : null;
+      // Banking between lanes is the only thing the player actually does
+      // in this game, and it made no sound. Kept quiet and very short
+      // (0.6s) because it fires on every lane change.
+      this.sfxWhoosh = ca.exists('PlaneWhoosh') ? this.sound.add('PlaneWhoosh', { volume: 0.35 }) : null;
 
       // Cloud layer — seen from above, so puffs drift slowly downward
       // (parallax with the main scroll) plus a little sideways for feel.
@@ -180,20 +185,32 @@ function createAirplaneGame(words, callbacks) {
         }
         return best;
       }
+      // Every route into a lane change goes through moveToLane() so the
+      // whoosh plays once per actual change. A drag across the screen
+      // fires pointermove dozens of times for one lane change; playing on
+      // the event rather than on the change would machine-gun it.
       this.input.on('pointerdown', function (ptr) {
         if (self.dead || self.isPaused) return;
-        self.laneIdx = nearestLane(ptr.x);
+        self.moveToLane(nearestLane(ptr.x));
       });
       this.input.on('pointermove', function (ptr) {
         if (self.dead || self.isPaused || !ptr.isDown) return;
-        self.laneIdx = nearestLane(ptr.x);
+        self.moveToLane(nearestLane(ptr.x));
       });
       // Optional keyboard support (desktop testing/accessibility)
       this.input.keyboard && this.input.keyboard.on('keydown', function (e) {
         if (self.dead || self.isPaused) return;
-        if (e.key === 'ArrowLeft')  self.laneIdx = Math.max(0, self.laneIdx - 1);
-        if (e.key === 'ArrowRight') self.laneIdx = Math.min(LANE_COUNT - 1, self.laneIdx + 1);
+        if (e.key === 'ArrowLeft')  self.moveToLane(Math.max(0, self.laneIdx - 1));
+        if (e.key === 'ArrowRight') self.moveToLane(Math.min(LANE_COUNT - 1, self.laneIdx + 1));
       });
+    },
+
+    // Changes lane and sounds the bank. No-op when it is already there,
+    // which is what keeps a drag from retriggering the sound.
+    moveToLane: function (idx) {
+      if (idx === this.laneIdx) return;
+      this.laneIdx = idx;
+      if (this.sfxWhoosh) { this.sfxWhoosh.stop(); this.sfxWhoosh.play(); }
     },
 
     // ── [SKY] Static background — a top-down view over open ocean, so
