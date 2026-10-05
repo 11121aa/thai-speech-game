@@ -20,6 +20,7 @@ required. You may not redistribute the sounds on their own, which we aren't.
 | Level up | `LevelUp.mp3` | platformer — invincibility after a word bubble, was silent |
 | Sword | `SwordHit.mp3` | rpg — melee auto-attack (was a laser) |
 | Block | `BlockPlace.mp3` | tetris — a piece landing without clearing a line, was silent |
+| Whoosh | `PlaneWhoosh.mp3` | airplane — banking between lanes, the only thing the player does |
 
 Deliberately **not** downloaded: the frying sizzle (28s), kitchen timer (24s),
 fabric swish (21s), plane flyby (15s) and kids cheering (31s). Every clip
@@ -31,7 +32,7 @@ second or two first — tell me and I'll do that rather than ship them whole.
 
 | Game | Gap |
 |---|---|
-| ขับเครื่องบิน (airplane) | no engine, no whoosh — the two candidates are both too long untrimmed |
+| ขับเครื่องบิน (airplane) | lane changes now whoosh; still no engine loop (every candidate is 15s+ untrimmed) |
 | ทำอาหาร (cooking) | frying hold, oven timer, pouring, plating |
 | แต่งตัวตุ๊กตา (dressup) | wearing a piece still uses the card-flip sound |
 | ป้องกันฐาน (tower defense) | placing a tower only plays the coin; no wave-incoming cue |
