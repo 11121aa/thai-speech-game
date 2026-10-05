@@ -203,6 +203,12 @@ function createAirplaneGame(words, callbacks) {
         if (e.key === 'ArrowLeft')  self.moveToLane(Math.max(0, self.laneIdx - 1));
         if (e.key === 'ArrowRight') self.moveToLane(Math.min(LANE_COUNT - 1, self.laneIdx + 1));
       });
+    
+      // The control preview: the scene renders one frame, freezes,
+      // and an animated hand shows what to do with it. The first
+      // touch anywhere dismisses it and the game begins -- so the
+      // first round is never spent working out the controls.
+      if (window.GestureHint) GestureHint.gate(this, 'airplane');
     },
 
     // Changes lane and sounds the bank. No-op when it is already there,

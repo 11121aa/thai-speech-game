@@ -31,18 +31,37 @@
 function createMatchingGame(words, callbacks) {
 
   // ── [TUNE] Numbers you can change ────────────────────────────
-  var MAX_PAIRS = 8;     // maximum number of word pairs on the grid (≤ words.length)
+  // How many pairs to deal. Chosen on the setup screen (จำนวนคู่) and
+  // passed in; 8 is what the game always used before it was an option.
+  // Clamped to the word list, since a pair needs a word to put on it.
+  var MAX_PAIRS = 8;
+  var asked = (callbacks && callbacks.pairs) || window.MATCHING_PAIRS || MAX_PAIRS;
+  var PAIRS  = Math.max(2, Math.min(parseInt(asked, 10) || MAX_PAIRS, 10, words.length));
   var W = 800, H = 500;  // canvas size in pixels
 
   // ── [LAYOUT] Card grid dimensions ────────────────────────────
-  var COLS   = 4;    // how many cards per row
-  var CARD_W = 170;  // card width in pixels  — POLISH: wider = easier to read
-  var CARD_H = 105;  // card height in pixels — POLISH: taller = more room for emoji
+  // Everything below is derived from PAIRS, because the grid is no
+  // longer always 4x4: 3 pairs on a 4-wide grid would deal a row of
+  // four and a row of two, which reads as a mistake to a child. One
+  // column count per card count, each chosen so every row is full
+  // (or, at 7 pairs, as close as 14 cards allow).
+  var COLS_FOR = { 2:2, 3:3, 4:4, 5:5, 6:4, 7:4, 8:4, 9:5, 10:5 };
+  var CARDS  = PAIRS * 2;
+  var COLS   = COLS_FOR[PAIRS] || 4;
+  var ROWS_N = Math.ceil(CARDS / COLS);
   var PAD    = 12;   // gap between cards in pixels
 
-  // Calculate the left offset so the entire grid is centred horizontally
-  var OFFSET_X = (W - COLS * (CARD_W + PAD) + PAD) / 2;
-  var OFFSET_Y = 24; // top margin before the first row of cards
+  // Grow the cards to fill the canvas when there are few of them, but
+  // never past the sizes the 4x4 grid used -- bigger than that and the
+  // emoji/picture inside stops looking deliberate.
+  var CARD_W = Math.min(170, Math.floor((W - 40 - PAD * (COLS - 1)) / COLS));
+  var CARD_H = Math.min(105, Math.floor((H - 48 - PAD * (ROWS_N - 1)) / ROWS_N),
+                        Math.round(CARD_W * 0.62));
+
+  // Centre the whole grid, both ways -- with a variable row count there
+  // is no longer a fixed top margin that happens to look right.
+  var OFFSET_X = Math.round((W - (COLS * (CARD_W + PAD) - PAD)) / 2);
+  var OFFSET_Y = Math.round(Math.max(18, (H - (ROWS_N * (CARD_H + PAD) - PAD)) / 2));
 
   // ── Scene class ───────────────────────────────────────────────
   var MatchScene = new Phaser.Class({
@@ -74,7 +93,7 @@ function createMatchingGame(words, callbacks) {
       // illustration manifest (keyed by word text, for older words that
       // predate the upload feature). Words with neither keep the emoji
       // fallback (checked via texture-existence in create()).
-      var n = Math.min(MAX_PAIRS, words.length);
+      var n = PAIRS;
       words.slice(0, n).forEach(function (w) {
         if (w.image_url) {
           this.load.image('img_' + w.id, w.image_url);
@@ -90,8 +109,8 @@ function createMatchingGame(words, callbacks) {
       var self = this;
 
       // ── Build the deck: cap the word list and create pairs ───────
-      var n    = Math.min(MAX_PAIRS, words.length); // use at most MAX_PAIRS words
-      var pool = words.slice(0, n);                  // take the first n words
+      var n    = PAIRS;              // how many pairs this round deals
+      var pool = words.slice(0, n);  // take the first n words
       this.totalPairs = pool.length;
 
       // For each word, create TWO identical picture cards -- a real
@@ -131,6 +150,17 @@ function createMatchingGame(words, callbacks) {
       // A Container is a Phaser group that can be scaled/moved as one unit.
       // By setting the container's position to the card centre, tweening
       // container.scaleX 1→0→1 creates a realistic flip animation around the centre axis.
+      // Shown the first time this device ever opens the game, and never
+      // again: one round teaches the rule. The hand is pinned to the
+      // first card so "แตะการ์ด" points at an actual card.
+      if (window.GestureHint) {
+        GestureHint.gate(this, 'matching', { rows: [{
+          motion: 'tap',
+          at: [OFFSET_X + CARD_W / 2, OFFSET_Y + CARD_H / 2],
+          label: 'แตะการ์ด 2 ใบ ให้เจอรูปเดียวกัน'
+        }] });
+      }
+
       deck.forEach(function (cardData, i) {
         var col = i % COLS;                          // which column (0 to COLS-1)
         var row = Math.floor(i / COLS);              // which row (0, 1, 2, ...)
@@ -168,7 +198,9 @@ function createMatchingGame(words, callbacks) {
             isBig ? wEmoji : cardData.w.word,
             {
               fontFamily: 'Prompt, sans-serif',
-              fontSize:   isBig ? '34px' : '17px', // bigger font for emoji cards
+              // Scales with the card: at 10 pairs the cards are shorter,
+              // and a fixed 34px emoji overflowed them.
+              fontSize:   isBig ? Math.round(CARD_H * 0.33) + 'px' : '17px',
               fontStyle:  'bold',
               color:      '#2b2438'
             }

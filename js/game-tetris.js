@@ -192,6 +192,12 @@ function createTetrisGame(words, callbacks) {
 
       this.nextKey = this.drawFromBag();
       this.spawnPiece();
+    
+      // The control preview: the scene renders one frame, freezes,
+      // and an animated hand shows what to do with it. The first
+      // touch anywhere dismisses it and the game begins -- so the
+      // first round is never spent working out the controls.
+      if (window.GestureHint) GestureHint.gate(this, 'tetris');
     },
 
     // ── Bag randomizer: shuffles the 7 piece keys, hands them out one at a
