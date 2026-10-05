@@ -254,7 +254,11 @@ const Recorder = (function () {
     // person might use -- the review screen's discard-and-hold-again flow
     // is the actual safety net for whatever a fixed threshold misses.
     const SILENCE_GAP_MS = silenceGapMs || 90;  // gap length that closes out one segment and allows the next to start
-    const MAX_HOLD_MS    = 15000; // safety cap regardless of input, in case a hold is never released
+    // Safety cap in case a recording is never stopped. 15s was too tight
+    // for how this is actually used: an adult says the word, the child
+    // thinks about it, then says it slowly -- that alone can pass 15s, and
+    // the cut landed mid-child, leaving only the adult's voice to save.
+    const MAX_HOLD_MS    = 30000;
     const PROCESSOR_BUFFER_SIZE = 4096;
 
     navigator.mediaDevices
