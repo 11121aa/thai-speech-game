@@ -208,7 +208,7 @@ function createCookingGame(words, callbacks) {
   // directly) so update() knows when the current screen was entered --
   // that's what drives the pop-in transition below, and the animated
   // score counters (see animateScore).
-  function setState(s){ G.st=s; G.stAt=sc?sc.time.now:0; }
+  function setState(s){ cookSizzle(false); G.st=s; G.stAt=sc?sc.time.now:0; }
   function resetG(){
     G={
       st:S.SEL, stAt:0, dish:null,
@@ -437,12 +437,23 @@ function createCookingGame(words, callbacks) {
   }
   function holdFrac(p,dur,ts){return Math.min(1,holdTick(p,ts)/dur);}
   function holding(p){return !!G[p+'Holding'];}
-  function holdPress(p,ts){if(!G[p+'Holding']){G[p+'Holding']=true;G[p+'HoldAt']=ts;}}
+  // The pan/oven loop, tied to the hold rather than to any one dish --
+  // every cook (bake, toast, grill, fry) goes through holdPress/holdLift,
+  // so this covers all four and can never be left running by a dish that
+  // forgot to stop it.
+  function cookSizzle(on){
+    if(!sc||!sc.sfxSizzle)return;
+    if(on){ if(!sc.sfxSizzle.isPlaying) sc.sfxSizzle.play(); }
+    else sc.sfxSizzle.stop();
+  }
+  function cookDing(){ if(sc&&sc.sfxDing){ sc.sfxDing.stop(); sc.sfxDing.play(); } }
+  function holdPress(p,ts){if(!G[p+'Holding']){G[p+'Holding']=true;G[p+'HoldAt']=ts;cookSizzle(true);}}
   // Banks the time held so far and returns the frac to score, or -1 when
   // there was no hold to end.
   function holdLift(p,dur,ts){
     if(!G[p+'Holding'])return -1;
     var held=holdTick(p,ts); G[p+'Holding']=false; G[p+'HoldAt']=0;
+    cookSizzle(false);
     return Math.min(1,held/dur);
   }
   function holdReset(p){G[p+'Held']=0;G[p+'HoldAt']=0;G[p+'Holding']=false;G[p+'DoneAt']=0;G[p+'Done']=false;G[p+'Val']=0;}
@@ -2836,6 +2847,7 @@ function createCookingGame(words, callbacks) {
   // functions per dish (not one generic helper) since each writes to a
   // different score key and duration/window constant.
   function finishBake(frac){
+    cookSizzle(false); cookDing();
     if(G.bakeDone)return;
     G.bakeDone=true; G.bakeTapVal=frac;
     var mid=(BAKE_GOOD[0]+BAKE_GOOD[1])/2, half=(BAKE_GOOD[1]-BAKE_GOOD[0])/2;
@@ -2852,6 +2864,7 @@ function createCookingGame(words, callbacks) {
     G.scores.egg=score; G.total+=score; animateScore('egg',score); gradeScore(score);
   }
   function finishToast(frac){
+    cookSizzle(false); cookDing();
     if(G.toastDone)return;
     G.toastDone=true; G.toastTapVal=frac;
     var mid=(TOAST_GOOD[0]+TOAST_GOOD[1])/2, half=(TOAST_GOOD[1]-TOAST_GOOD[0])/2;
@@ -2908,6 +2921,7 @@ function createCookingGame(words, callbacks) {
     G.pattyFinalPct=pct;
   }
   function finishGrill(frac){
+    cookSizzle(false); cookDing();
     if(G.grillDone)return;
     G.grillDone=true; G.grillTapVal=frac;
     var mid=(GRILL_GOOD[0]+GRILL_GOOD[1])/2, half=(GRILL_GOOD[1]-GRILL_GOOD[0])/2;
@@ -2962,6 +2976,7 @@ function createCookingGame(words, callbacks) {
     G.scores.slice=score; G.total+=score; animateScore('slice',score); gradeScore(score);
   }
   function finishFry(frac){
+    cookSizzle(false); cookDing();
     if(G.fryDone)return;
     G.fryDone=true; G.fryTapVal=frac;
     var mid=(FRY_GOOD[0]+FRY_GOOD[1])/2, half=(FRY_GOOD[1]-FRY_GOOD[0])/2;
@@ -3047,6 +3062,8 @@ function createCookingGame(words, callbacks) {
       this.load.audio('ck_congrats', 'soundeffect/CongratSFX.mp3');
       this.load.audio('ck_land',     'soundeffect/FlipCard.mp3');
       this.load.audio('ck_salt',     'soundeffect/SaltShake.mp3');
+      this.load.audio('ck_sizzle',   'soundeffect/Sizzle.mp3');
+      this.load.audio('ck_ding',     'soundeffect/CookDing.mp3');
       this.load.image('ck_bg', 'img/cooking/bg.jpg?v=2');
     },
 
@@ -3065,6 +3082,12 @@ function createCookingGame(words, callbacks) {
       // Seeked past the clip's own run-up so a flick sounds immediate, and
       // stopped before it rattles on into the next one.
       this.sfxSalt     =this.sound.add('ck_salt',     {volume:0.55});
+      // Cooking is the one thing in this game you do by waiting, and it
+      // was silent: the bar filled and nothing happened in your ears.
+      // Looped under the hold, cut the moment you lift (7.7s of pan, so
+      // a normal cook never even reaches the loop seam).
+      this.sfxSizzle   =this.sound.add('ck_sizzle',   {volume:0.4,loop:true});
+      this.sfxDing     =this.sound.add('ck_ding',     {volume:0.6});
       resetG();
       this.input.on('pointerdown', function(ptr){
         // Each CookingGame.start() spins up a brand-new AudioContext, which

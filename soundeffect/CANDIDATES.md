@@ -21,9 +21,12 @@ required. You may not redistribute the sounds on their own, which we aren't.
 | Sword | `SwordHit.mp3` | rpg — melee auto-attack (was a laser) |
 | Block | `BlockPlace.mp3` | tetris — a piece landing without clearing a line, was silent |
 | Whoosh | `PlaneWhoosh.mp3` | airplane — banking between lanes, the only thing the player does |
+| Skillet | `Sizzle.mp3` | cooking — looped under every hold-cook (bake, toast, grill, fry) |
+| Ding | `CookDing.mp3` | cooking — the moment a cook finishes |
 
-Deliberately **not** downloaded: the frying sizzle (28s), kitchen timer (24s),
-fabric swish (21s), plane flyby (15s) and kids cheering (31s). Every clip
+Deliberately **not** downloaded: a 28s frying recording, kitchen timer (24s),
+fabric swish (21s), plane flyby (15s) and kids cheering (31s). (A shorter
+7.7s skillet sizzle was found later and is in use.) Every clip
 loads on game start, so a 20-30s file costs every player the download for
 one moment of sound. If you want any of them, they need trimming to a
 second or two first — tell me and I'll do that rather than ship them whole.
@@ -33,7 +36,7 @@ second or two first — tell me and I'll do that rather than ship them whole.
 | Game | Gap |
 |---|---|
 | ขับเครื่องบิน (airplane) | lane changes now whoosh; still no engine loop (every candidate is 15s+ untrimmed) |
-| ทำอาหาร (cooking) | frying hold, oven timer, pouring, plating |
+| ทำอาหาร (cooking) | pouring and plating (the hold now sizzles and finishes with a ding) |
 | แต่งตัวตุ๊กตา (dressup) | wearing a piece still uses the card-flip sound |
 | ป้องกันฐาน (tower defense) | placing a tower only plays the coin; no wave-incoming cue |
 | ผจญภัยดันเจี้ยน (rpg) | no chest/reward sound; level-up borrows congrats |
