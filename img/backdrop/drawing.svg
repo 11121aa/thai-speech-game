@@ -1,0 +1,33 @@
+<svg viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <!-- Hover backdrop for the game-select screen. Deliberately low
+       detail and low contrast: it sits behind the whole page at partial
+       opacity, so it has to read as atmosphere at a glance and never
+       compete with the cards or text on top of it. -->
+  <rect width="1200" height="700" fill="#2b2438"/>
+
+  <!-- squared paper, the surface the game is drawn on -->
+  <g opacity="0.08" stroke="#ffffff" stroke-width="2">
+    <path d="M120 0V700M240 0V700M360 0V700M480 0V700M600 0V700M720 0V700M840 0V700M960 0V700M1080 0V700"/>
+    <path d="M0 100H1200M0 200H1200M0 300H1200M0 400H1200M0 500H1200M0 600H1200"/>
+  </g>
+
+  <!-- half-traced shapes: the dashed guide, and the solid line a
+       finger has already laid over part of it -->
+  <g fill="none" stroke-linecap="round">
+    <circle cx="330" cy="330" r="150" stroke="#b9a68c" stroke-width="10"
+            stroke-dasharray="14 20" opacity="0.5"/>
+    <path d="M330 180a150 150 0 0 1 128 228" stroke="#2EC4B6" stroke-width="16" opacity="0.9"/>
+    <circle cx="458" cy="408" r="13" fill="#ffffff" stroke="#2EC4B6" stroke-width="6" opacity="0.95"/>
+
+    <path d="M700 250l64 128 142 20-103 100 24 141-127-67-127 67 24-141-103-100 142-20z"
+          stroke="#b9a68c" stroke-width="10" stroke-dasharray="14 20" opacity="0.4"/>
+    <path d="M700 250l64 128 142 20-103 100" stroke="#F0A500" stroke-width="16" opacity="0.8"/>
+  </g>
+
+  <!-- a few crayon marks, far enough out to stay behind the cards -->
+  <g opacity="0.25" stroke-linecap="round" fill="none">
+    <path d="M980 120c40 30 20 70 60 100" stroke="#E53935" stroke-width="12"/>
+    <path d="M1060 520c-40 20-30 70-80 90" stroke="#8A5CF6" stroke-width="12"/>
+    <path d="M120 600c50-30 90 10 140-20" stroke="#27AE60" stroke-width="12"/>
+  </g>
+</svg>

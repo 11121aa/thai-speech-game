@@ -475,6 +475,16 @@ function createCookingGame(words, callbacks) {
   // Deliberately oversized and low on the screen: a thumb rests here for
   // seconds at a time, so it is a slab rather than a tap target. It sinks
   // in and glows while held so it is obvious the food is cooking *now*.
+  // The gesture hint for the current step: an animated hand showing
+  // what to do, over the thing to do it to. Shows for a few seconds
+  // each time a step begins (G.stAt) and then fades, so a child who
+  // already knows the step is not nagged -- and a child who does not
+  // never has to guess what "แตะสับ" means.
+  function stepHint(motion,x,y,ts){
+    if(!window.GestureHint||!GestureHint.draw2d)return;
+    GestureHint.draw2d(ctx,motion,x,y,ts,ts-(G.stAt||0));
+  }
+
   function drawHoldBtn(y,txt,held,ts){
     var x=VW/2-HOLD_W/2, dy=held?4:0;
     var s=held?1:1+0.02*Math.sin(ts*0.005);
@@ -1594,6 +1604,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
     T('ลากตัดขนมปังตามแนวนอน เปิดออกเป็น 2 ฝา',VW/2,SH+28,'center');
+    stepHint('slideRight',BCX,390,ts);
     if(G.split){
       drawBunPiece(G.topPiece,0,-10); drawBunPiece(G.botPiece,0,10);
       ctx.font='bold 26px Prompt'; ctx.fillStyle=C.gold;
@@ -1624,6 +1635,7 @@ function createCookingGame(words, callbacks) {
     var isTom=G.ing==='tom';
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะสับ'+(isTom?'มะเขือเทศ':'กะหล่ำปลี')+'!',VW/2,SH+30,'center');
+    stepHint('tapRepeat',VW/2,400,ts);
     var elapsed=G.chopRun?Math.min(CHOP_DUR,ts-G.chopStart):0;
     var pct=Math.max(0,1-elapsed/CHOP_DUR);
     if(G.chopRun&&!G.chopDone&&elapsed>=CHOP_DUR) finishChop();
@@ -1673,6 +1685,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
     T('แตะตอนมีดผ่านรอยตัด! (2 ครั้ง)',VW/2,SH+26,'center');
+    stepHint('tap',VW/2,400,ts);
     if(G.cuts<2){G.kY+=G.kDir*G.kSpd; if(G.kY>SAU_BOT-12)G.kDir=-1; if(G.kY<STOP+12)G.kDir=1;}
     sSausageFull(G.cuts);
     if(G.cuts<2){
@@ -1732,6 +1745,7 @@ function createCookingGame(words, callbacks) {
     if(G.cIdx<G.cList.length){
       ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
       T('แตะเพื่อวาง'+(ING_LABELS[cur]||cur)+'!',VW/2,SH+26,'center');
+    stepHint('tap',VW/2,400,ts);
       G.sX+=G.sDir*G.sSpd; if(G.sX>VW-45)G.sDir=-1; if(G.sX<45)G.sDir=1;
     }
     if(!drawAssemblyBunPiece(G.botPiece,VW/2,CMB_BBY+23,222,46)) sBunBot(VW/2,CMB_BBY,222,46);
@@ -1826,6 +1840,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
     T('ลากออกจากตรงกลางเพื่อยืดแป้ง!',VW/2,SH+28,'center');
+    stepHint('pullOut',PZ_CX,PZ_CY,ts);
     if(!G.doughDone){
       var r=Math.max(PZ_R_MIN,G.doughR);
       sDoughRaw(PZ_CX,PZ_CY,r);
@@ -1873,6 +1888,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('ลากนิ้วป้ายซอสให้ทั่วแป้ง!',VW/2,SH+28,'center');
+    stepHint('loop',PZ_CX,PZ_CY,ts);
     var elapsed=G.sauceRun?Math.min(SAUCE_DUR,ts-G.sauceStart):0;
     var pct=Math.max(0,1-elapsed/SAUCE_DUR);
     if(G.sauceRun&&!G.sauceDone&&elapsed>=SAUCE_DUR) finishSauce();
@@ -1895,6 +1911,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะโรยชีสให้ทั่ว!',VW/2,SH+30,'center');
+    stepHint('tapRepeat',PZ_CX,PZ_CY,ts);
     var elapsed=G.cheeseRun?Math.min(CHOP_DUR,ts-G.cheeseStart):0;
     var pct=Math.max(0,1-elapsed/CHOP_DUR);
     if(G.cheeseRun&&!G.cheeseDone&&elapsed>=CHOP_DUR) finishCheese();
@@ -2056,6 +2073,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะค้างเพื่ออบ แล้วปล่อยตอนสุกกำลังดี!',VW/2,SH+28,'center');
+    stepHint('hold',VW/2,BAKE_BTN_Y+HOLD_H/2,ts);
     var frac=G.bakeDone?G.bakeTapVal:holdFrac('bake',BAKE_DUR,ts);
     G.bakeVal=frac;
     if(!G.bakeDone&&frac>=1) finishBake(1);
@@ -2109,6 +2127,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะเคาะไข่กับขอบชามให้แตก!',VW/2,SH+30,'center');
+    stepHint('tapRepeat',VW/2,400,ts);
     var elapsed=G.eggRun?Math.min(EGG_DUR,ts-G.eggStart):0;
     var pct=Math.max(0,1-elapsed/EGG_DUR);
     if(G.eggRun&&!G.eggDone&&elapsed>=EGG_DUR) finishEgg();
@@ -2146,6 +2165,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.8)';
     T('แตะตอนที่ปลายพลิกผ่านจุดหมาย! (2 ครั้ง)',VW/2,SH+26,'center');
+    stepHint('tap',VW/2,400,ts);
     if(G.baconCuts<2){G.baconY+=G.baconDir*G.baconSpd; if(G.baconY>BC_BOT-12)G.baconDir=-1; if(G.baconY<BC_TOP+12)G.baconDir=1;}
     sBaconFull(G.baconCuts);
     if(G.baconCuts<2){
@@ -2192,6 +2212,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะค้างเพื่อปิ้ง แล้วปล่อยตอนเหลืองทอง!',VW/2,SH+28,'center');
+    stepHint('hold',VW/2,TOAST_BTN_Y+HOLD_H/2,ts);
     var frac=G.toastDone?G.toastTapVal:holdFrac('toast',TOAST_DUR,ts);
     G.toastVal=frac;
     if(!G.toastDone&&frac>=1) finishToast(1);
@@ -2219,6 +2240,7 @@ function createCookingGame(words, callbacks) {
     if(G.plateIdx<PLATE_LIST.length){
       ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
       T('แตะเพื่อจัดวาง'+(PLATE_LABELS[cur]||cur)+'!',VW/2,SH+26,'center');
+    stepHint('tap',VW/2,400,ts);
       G.plateX+=G.plateDir*G.plateSpd; if(G.plateX>VW-45)G.plateDir=-1; if(G.plateX<45)G.plateDir=1;
     }
     ctx.save();
@@ -2333,6 +2355,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('ลากผ่านกลางพิซซ่าเพื่อตัดเป็นชิ้น!',VW/2,SH+28,'center');
+    stepHint('slideRight',PZ_CX,PZ_CY,ts);
     drawPizzaSlices(PZ_CX,PZ_CY,PZ_DISPLAY_R,G.pzCuts,4);
     // Remaining guide lines, so it's always obvious where to cut next.
     if(!G.pzCutDone){
@@ -2376,6 +2399,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะกดเนื้อให้แบนเป็นแผ่น!',VW/2,SH+30,'center');
+    stepHint('tapRepeat',VW/2,400,ts);
     var elapsed=G.pattyRun?Math.min(PATTY_DUR,ts-G.pattyStart):0;
     var pct=Math.max(0,1-elapsed/PATTY_DUR);
     if(G.pattyRun&&!G.pattyDone&&elapsed>=PATTY_DUR) finishPatty();
@@ -2406,6 +2430,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะค้างเพื่อย่าง แล้วปล่อยตอนสุกกำลังดี!',VW/2,SH+28,'center');
+    stepHint('hold',VW/2,GRILL_BTN_Y+HOLD_H/2,ts);
     var frac=G.grillDone?G.grillTapVal:holdFrac('grill',GRILL_DUR,ts);
     G.grillVal=frac;
     if(!G.grillDone&&frac>=1) finishGrill(1);
@@ -2456,6 +2481,7 @@ function createCookingGame(words, callbacks) {
     if(G.bgVegIdx<BG_VEG_LIST.length){
       ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
       T('แตะเพื่อวาง'+(BG_VEG_LABELS[cur]||cur)+'!',VW/2,SH+26,'center');
+    stepHint('tap',VW/2,400,ts);
       G.bgVegX+=G.bgVegDir*G.bgVegSpd; if(G.bgVegX>VW-45)G.bgVegDir=-1; if(G.bgVegX<45)G.bgVegDir=1;
     }
     sBunBot(VW/2,BG_STACK_BY,180,44);
@@ -2485,6 +2511,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะเพื่อวางฝาบนให้ตรงกลาง!',VW/2,SH+26,'center');
+    stepHint('tap',VW/2,400,ts);
     // Sweeps the same span, at the same speed, from the same height as the
     // lettuce and tomato before it. It used to travel a narrower arc at a
     // different pace and drop from higher up, which made the last piece of
@@ -2538,6 +2565,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะเพื่อปอกเปลือกมันฝรั่ง!',VW/2,SH+30,'center');
+    stepHint('tapRepeat',VW/2,400,ts);
     var elapsed=G.peelRun?Math.min(PEEL_DUR,ts-G.peelStart):0;
     var pct=Math.max(0,1-elapsed/PEEL_DUR);
     if(G.peelRun&&!G.peelDone&&elapsed>=PEEL_DUR) finishPeel();
@@ -2566,6 +2594,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('ลากลงตามเส้นเพื่อหั่นเป็นแท่ง!',VW/2,SH+28,'center');
+    stepHint('slideDown',VW/2,400,ts);
     var used={};
     G.frSlices.forEach(function(s){ used[s.guide]=true; });
     // The peeled potato, now shown as a squared-off block ready to cut.
@@ -2623,6 +2652,7 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T('แตะค้างเพื่อทอด แล้วปล่อยตอนเหลืองกรอบ!',VW/2,SH+28,'center');
+    stepHint('hold',VW/2,FRY_BTN_Y+HOLD_H/2,ts);
     var frac=G.fryDone?G.fryTapVal:holdFrac('fry',FRY_DUR,ts);
     G.fryVal=frac;
     if(!G.fryDone&&frac>=1) finishFry(1);
@@ -2677,6 +2707,12 @@ function createCookingGame(words, callbacks) {
     drawBg(); drawStepBar(ts);
     ctx.font='15px Prompt'; ctx.fillStyle='rgba(255,255,255,.85)';
     T(G.saltGrab?'ขยับขึ้น-ลงเหนือเฟรนช์ฟรายส์!':'จับขวดเกลือแล้วเขย่าขึ้น-ลง',VW/2,SH+28,'center');
+    // Two gestures, in the order they are needed: grab the shaker,
+    // then shake it over the carton.
+    if(!G.saltDone){
+      if(G.saltGrab) stepHint('shake',G.saltX,G.saltY+56,ts);
+      else           stepHint('tap',SHAKER_HOME_X,SHAKER_HOME_Y,ts);
+    }
     var punchT=G.saltPunch?(ts-G.saltPunch)/140:1;
     var tiltAng=punchT<1?Math.sin(punchT*Math.PI*3)*0.28:0;
     sFriesCarton(FR_CX,FR_CY+70,'#E8B54B',G.saltCount);

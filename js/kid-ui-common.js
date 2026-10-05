@@ -12,6 +12,7 @@ var KidUI = (function () {
     flashcard:    { icon: 'flashcard', name: 'ไพ่คำศัพท์',    ga: '#E2F4F4', gb: '#15878A' },
     dressup:      { icon: 'dress',     name: 'แต่งตัวตุ๊กตา', ga: '#FCE7F6', gb: '#B83CA0' },
     towerdefense: { icon: 'bow',       name: 'ป้องกันฐาน',    ga: '#ECEBDF', gb: '#6F6A2E' },
+    drawing:      { icon: 'pencil',    name: 'ลากเส้นวาดรูป', ga: '#FFF0DC', gb: '#C96A1B' },
     tetris:       { icon: 'blocks',    name: 'เตตริส',        ga: '#E4E8FF', gb: '#4257D6' },
     rpg:          { icon: 'star',      name: 'ผจญภัยดันเจี้ยน', ga: '#ECE6F5', gb: '#5B3F8C' }
   };

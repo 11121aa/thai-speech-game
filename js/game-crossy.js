@@ -236,6 +236,12 @@ function createCrossyGame(words, callbacks) {
           onComplete: function () { hint.destroy(); }
         });
       });
+    
+      // The control preview: the scene renders one frame, freezes,
+      // and an animated hand shows what to do with it. The first
+      // touch anywhere dismisses it and the game begins -- so the
+      // first round is never spent working out the controls.
+      if (window.GestureHint) GestureHint.gate(this, 'crossy');
     },
 
     // ── [ROWS] Get (or lazily create) the row at worldRow ──────────

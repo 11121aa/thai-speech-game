@@ -219,6 +219,12 @@ function createShootingGame(words, callbacks) {
       delays.forEach(function (ms) {
         self.time.delayedCall(ms, function () { self.spawnTarget(); });
       });
+    
+      // The control preview: the scene renders one frame, freezes,
+      // and an animated hand shows what to do with it. The first
+      // touch anywhere dismisses it and the game begins -- so the
+      // first round is never spent working out the controls.
+      if (window.GestureHint) GestureHint.gate(this, 'shooting');
     },
 
     // ── [SKY] Static background ─────────────────────────────────────

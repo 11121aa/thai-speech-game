@@ -94,9 +94,9 @@
           <span class="mode-icon" data-ic="dress"></span>
           <span class="mode-text"><span class="mode-title">แต่งตัวตุ๊กตา</span><span class="mode-desc">พูดถูกได้ชุดใหม่</span></span>
         </button>
-        <button type="button" class="game-mode-card kb-island" id="cardTowerdefense" style="--ga:#ECEBDF;--gb:#6F6A2E">
-          <span class="mode-icon" data-ic="bow"></span>
-          <span class="mode-text"><span class="mode-title">ป้องกันฐาน</span><span class="mode-desc">วางทหารกันเส้นทาง</span></span>
+        <button type="button" class="game-mode-card kb-island" id="cardDrawing" style="--ga:#FFF0DC;--gb:#C96A1B">
+          <span class="mode-icon" data-ic="pencil"></span>
+          <span class="mode-text"><span class="mode-title">ลากเส้นวาดรูป</span><span class="mode-desc">ลากนิ้วตามเส้นรอบรูป</span></span>
         </button>
         <button type="button" class="game-mode-card kb-island" id="cardTetris" style="--ga:#E4E8FF;--gb:#4257D6">
           <span class="mode-icon" data-ic="blocks"></span>
@@ -163,6 +163,7 @@
       <div id="dressupGame" class="game-canvas-wrap" style="display:none;"></div>
       <!-- Tower Defense — Phaser canvas (troop palette + everything else is drawn in-canvas, no DOM controls) -->
       <div id="towerdefenseGame" class="game-canvas-wrap" style="display:none;"></div>
+      <div id="drawingGame" class="game-canvas-wrap" style="display:none;"></div>
       <!-- Crossy Road: canvas only -- press and drag a finger to hop
            continuously (see js/game-crossy.js). The 4-way button cluster
            was removed: it sat on top of the road and the drag control
@@ -292,6 +293,16 @@
         <button class="pf-diff-btn diff-btn" data-pfdiff="ยาก">เร็ว</button>
       </div>
     </div>
+        <div id="mtPairRow" class="setup-row" style="display:none;">
+      <label>จำนวนคู่</label>
+      <div class="diff-btns">
+        <button class="mt-pair-btn diff-btn" data-mtpairs="3">3 คู่</button>
+        <button class="mt-pair-btn diff-btn" data-mtpairs="4">4 คู่</button>
+        <button class="mt-pair-btn diff-btn" data-mtpairs="6">6 คู่</button>
+        <button class="mt-pair-btn diff-btn active" data-mtpairs="8">8 คู่</button>
+        <button class="mt-pair-btn diff-btn" data-mtpairs="10">10 คู่</button>
+      </div>
+    </div>
         <div id="tdMapRow" class="setup-row" style="display:none;">
       <label>แผนที่</label>
       <div class="diff-btns">
@@ -404,22 +415,24 @@
      ?v= is a cache-buster: bump it whenever a game-*.js file changes so
      Safari (which caches far more aggressively than Chrome) is forced to
      fetch the new version instead of silently serving a stale copy. -->
-<script src="js/game-shooting.js?v=11"></script>
-<script src="js/game-airplane.js?v=18"></script>
-<script src="js/game-platformer.js?v=39"></script>
-<script src="js/game-matching.js?v=8"></script>
+<script src="js/gesture-hint.js?v=1"></script>
+<script src="js/game-shooting.js?v=12"></script>
+<script src="js/game-airplane.js?v=19"></script>
+<script src="js/game-platformer.js?v=40"></script>
+<script src="js/game-matching.js?v=9"></script>
 <script src="js/game-flashcard.js?v=6"></script>
-<script src="js/game-crossy.js?v=10"></script>
-<script src="js/game-cooking.js?v=29"></script>
+<script src="js/game-crossy.js?v=11"></script>
+<script src="js/game-cooking.js?v=30"></script>
 <script src="js/dressup-fit.js?v=1"></script>
 <script src="js/game-dressup.js?v=18"></script>
 <script src="js/game-towerdefense.js?v=14"></script>
-<script src="js/game-tetris.js?v=7"></script>
-<script src="js/game-rpg.js?v=10"></script>
+<script src="js/game-drawing.js?v=1"></script>
+<script src="js/game-tetris.js?v=8"></script>
+<script src="js/game-rpg.js?v=11"></script>
 <script src="js/config.js?v=3-free"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js?v=2"></script>
-<script src="js/kid-icons.js?v=1"></script>
+<script src="js/kid-icons.js?v=2"></script>
 <script src="js/words-api.js?v=2"></script>
 <script src="js/speech.js"></script>
 <script src="js/media-permission.js?v=1"></script>
@@ -444,7 +457,7 @@ var G = {
    inside those containers to avoid doubling up). A single preloaded
    Audio element is reused (instead of `new Audio()` per click) so
    playback starts instantly instead of re-fetching/decoding every time. */
-var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame, #towerdefenseGame, #tetrisGame, #rpgGame';
+var GAME_CONTAINER_SELECTOR = '#matchingGame, #shootingGame, #airplaneGame, #platformerGame, #flashcardGame, #crossyGame, #cookingGame, #dressupGame, #towerdefenseGame, #drawingGame, #tetrisGame, #rpgGame';
 var clickAudio = new Audio('soundeffect/Click.mp3');
 clickAudio.preload = 'auto';
 document.addEventListener('click', function (e) {
@@ -549,6 +562,7 @@ var BACKDROPS = {
   cardCooking:      'img/cooking/bg.jpg',
   cardDressup:      'img/backdrop/dressup.svg',
   cardTowerdefense: 'img/backdrop/towerdefense.svg',
+  cardDrawing:      'img/backdrop/drawing.svg',
   cardTetris:       'img/backdrop/tetris.svg',
   cardRpg:          'img/backdrop/rpg.svg'
 };
@@ -822,7 +836,7 @@ function finishGame(matchElapsedMs) {
     scoreToSave = G.pts;
   }
 
-  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', cooking:'ทำอาหาร 🌭', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹', tetris:'เตตริส 🧩', rpg:'ผจญภัยดันเจี้ยน ⚔️' };
+  var GAME_NAMES = { matching:'จับคู่ภาพ 🃏', shooting:'ยิงเป้า 🎯', airplane:'ขับเครื่องบิน ✈️', flashcard:'ไพ่คำศัพท์ 🎴', platformer:'วิ่งเก็บเหรียญ 🍄', crossy:'ข้ามถนน 🚗', cooking:'ทำอาหาร 🌭', dressup:'แต่งตัวตุ๊กตา 👗', towerdefense:'ป้องกันฐาน 🏹', drawing:'ลากเส้นวาดรูป ✏️', tetris:'เตตริส 🧩', rpg:'ผจญภัยดันเจี้ยน ⚔️' };
   document.getElementById('finishLeaderGame').textContent = GAME_NAMES[G.mode] || G.mode;
   document.getElementById('finishLeaderRows').innerHTML = '<div class="muted-note">กำลังโหลด...</div>';
 
@@ -1024,7 +1038,7 @@ function openSetupWith(mode, sound, level) {
 function startHomework() { openSetup(lastPlayedGame()); }
 
 /* ── Leaderboard helpers ── */
-var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', cooking:'ทำอาหาร', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน', tetris:'เตตริส', rpg:'ผจญภัยดันเจี้ยน' };
+var GAME_NAMES_LB = { matching:'จับคู่ภาพ', shooting:'ยิงเป้า', airplane:'ขับเครื่องบิน', flashcard:'ไพ่คำศัพท์', platformer:'วิ่งเก็บเหรียญ', crossy:'ข้ามถนน', cooking:'ทำอาหาร', dressup:'แต่งตัวตุ๊กตา', towerdefense:'ป้องกันฐาน', drawing:'ลากเส้นวาดรูป', tetris:'เตตริส', rpg:'ผจญภัยดันเจี้ยน' };
 
 async function saveGameScore(gameKey, score) {
   try {
@@ -1113,6 +1127,7 @@ var TUTORIAL_INFO = {
   crossy:       { img: 'img/tutorial/crossy.svg', desc: 'พาตัวละครข้ามถนน หลบรถที่วิ่งไปมา ถึงจุดหมายเพื่อฝึกออกเสียงคำ' },
   cooking:      { img: 'img/tutorial/cooking.svg', desc: 'หั่น สับ ประกอบวัตถุดิบทำอาหารตามขั้นตอน ฝึกออกเสียงคำศัพท์ระหว่างทำ' },
   dressup:      { img: 'img/tutorial/dressup.svg', desc: 'เลือกของแต่งตัวจากตู้เสื้อผ้า ฝึกออกเสียงคำให้ถูกต้องก่อนจึงจะใส่ได้' },
+  drawing: { img: 'img/tutorial/drawing.svg', desc: 'ลากนิ้วตามเส้นประรอบรูป เริ่มจากจุดสีเขียว ลากให้ครบรอบแล้วรูปจะมีสี จากนั้นฝึกพูดคำของรูปนั้น' },
   towerdefense: { img: 'img/tutorial/towerdefense.svg', desc: 'วางทหารป้องกันเส้นทางไม่ให้ศัตรูเดินถึงฐาน แตะการ์ดทหารแล้วแตะช่องว่างเพื่อวาง แตะทหารที่วางแล้วเพื่อดูสถานะและอัพเกรด' },
   tetris:       { img: 'img/tutorial/tetris.svg', desc: 'บังคับบล็อกที่ตกลงมาให้เรียงเต็มแถว แถวที่เต็มจะหายไปและได้คะแนน ฝึกออกเสียงคำทุก 1,000 คะแนน' },
   rpg:          { img: 'img/tutorial/rpg.svg', desc: 'สำรวจดันเจี้ยนสุ่มใหม่ทุกครั้ง เดินเข้าหาศัตรูเพื่อสู้อัตโนมัติ แตะแท่นเรืองแสงเพื่อฝึกพูด แล้วปราบบอสตอนจบดันเจี้ยน' }
@@ -1120,7 +1135,7 @@ var TUTORIAL_INFO = {
 
 function openSetup(mode) {
   _setupMode = mode;
-  var names = { shooting: 'ยิงเป้า', cooking: 'ทำอาหาร', airplane: 'ขับเครื่องบิน', matching: 'จับคู่ภาพ', platformer: 'วิ่งเก็บเหรียญ', crossy: 'ข้ามถนน', flashcard: 'ไพ่คำศัพท์', dressup: 'แต่งตัวตุ๊กตา', towerdefense: 'ป้องกันฐาน', tetris: 'เตตริส', rpg: 'ผจญภัยดันเจี้ยน' };
+  var names = { shooting: 'ยิงเป้า', cooking: 'ทำอาหาร', airplane: 'ขับเครื่องบิน', matching: 'จับคู่ภาพ', platformer: 'วิ่งเก็บเหรียญ', crossy: 'ข้ามถนน', flashcard: 'ไพ่คำศัพท์', dressup: 'แต่งตัวตุ๊กตา', towerdefense: 'ป้องกันฐาน', drawing: 'ลากเส้นวาดรูป', tetris: 'เตตริส', rpg: 'ผจญภัยดันเจี้ยน' };
   document.getElementById('setupModeName').textContent = names[mode] || mode;
   var tut = TUTORIAL_INFO[mode];
   document.getElementById('tutorialImg').src = tut ? tut.img : '';
@@ -1150,6 +1165,15 @@ function openSetup(mode) {
   // Platformer speed selector — only shown for the platformer mode, reset to ธรรมดา (normal)
   document.getElementById('pfDiffRow').style.display = (mode === 'platformer') ? 'block' : 'none';
   document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-pfdiff') === (prefs.pf || 'ธรรมดา')); });
+  // Matching pair count — only shown for that mode, set to whatever was
+  // picked last time (8 if this device has never chosen).
+  document.getElementById('mtPairRow').style.display = (mode === 'matching') ? 'block' : 'none';
+  var savedPairs = '8';
+  try { savedPairs = localStorage.getItem('mt_pairs') || '8'; } catch (e) {}
+  var pairBtn = document.querySelector('.mt-pair-btn[data-mtpairs="' + savedPairs + '"]')
+             || document.querySelector('.mt-pair-btn[data-mtpairs="8"]');
+  document.querySelectorAll('.mt-pair-btn').forEach(function (b) { b.classList.remove('active'); });
+  if (pairBtn) pairBtn.classList.add('active');
   // Tower defense map selector — only shown for that mode, reset to map 0 (easiest)
   document.getElementById('tdMapRow').style.display = (mode === 'towerdefense') ? 'block' : 'none';
   document.querySelectorAll('.td-map-btn').forEach(function (b) { b.classList.toggle('active', String(b.getAttribute('data-tdmap')) === String(prefs.td || 0)); });
@@ -1224,6 +1248,14 @@ function isHardMode() {
 function getPfDifficulty() {
   var btn = document.querySelector('.pf-diff-btn.active');
   return btn ? btn.getAttribute('data-pfdiff') : 'ธรรมดา';
+}
+
+// How many pairs the matching grid deals. Remembered between sessions:
+// a therapist who works with one child keeps picking the same number,
+// and the default (8) is a lot of cards for a four-year-old.
+function getMtPairs() {
+  var btn = document.querySelector('.mt-pair-btn.active');
+  return btn ? parseInt(btn.getAttribute('data-mtpairs'), 10) : 8;
 }
 
 function getTdMapIdx() {
@@ -1484,12 +1516,13 @@ async function launchGame(reuse) {
     cooking:    'ทำอาหาร 🌭',
     dressup:    'แต่งตัวตุ๊กตา 👗',
     towerdefense: 'ป้องกันฐาน 🏹',
+    drawing:      'ลากเส้นวาดรูป ✏️',
     tetris:     'เตตริส 🧩',
     rpg:        'ผจญภัยดันเจี้ยน ⚔️'
   };
   document.getElementById('hudModeName').textContent = window.KidUI && KidUI.GAMES[G.mode] ? KidUI.GAMES[G.mode].name : (names[G.mode] || G.mode);
 
-  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame','towerdefenseGame','tetrisGame','rpgGame'].forEach(function (id) {
+  ['matchingGame','shootingGame','airplaneGame','flashcardGame','platformerGame','crossyGame','cookingGame','dressupGame','towerdefenseGame','drawingGame','tetrisGame','rpgGame'].forEach(function (id) {
     document.getElementById(id).style.display = 'none';
   });
   showScreen('screenGame');
@@ -1519,11 +1552,13 @@ async function launchGame(reuse) {
     if (timerPill) timerPill.style.visibility = '';
     clearInterval(G.timerHandle);
     document.getElementById('hudTimer').textContent = '0';
-  } else if (G.mode === 'platformer' || G.mode === 'towerdefense' || G.mode === 'tetris' || G.mode === 'rpg') {
+  } else if (G.mode === 'platformer' || G.mode === 'towerdefense' || G.mode === 'tetris' || G.mode === 'rpg' || G.mode === 'drawing') {
     // No countdown — platformer ends on death, tower defense ends on
     // win/lose, tetris ends when the stack tops out, rpg ends when the
-    // boss is defeated or the player dies (all handled inside the game
-    // itself via onFinish)
+    // boss is defeated or the player dies, drawing ends when every
+    // picture has been traced (all handled inside the game itself via
+    // onFinish). Tracing in particular must not be timed: a child who
+    // is being careful would be punished for it.
     if (timerPill) timerPill.style.visibility = 'hidden';
     clearInterval(G.timerHandle);
     G.timeLeft = 9999;
@@ -1538,6 +1573,9 @@ async function launchGame(reuse) {
 
   if (G.mode === 'matching') {
     document.getElementById('matchingGame').style.display = 'block';
+    // The grid is built from this, clamped inside the game to the number
+    // of words actually available.
+    window.MATCHING_PAIRS = getMtPairs();
     MatchingGame.start(pool, GAME_CBS);   // Phaser game
   } else if (G.mode === 'shooting') {
     document.getElementById('shootingGame').style.display = 'block';
@@ -1565,6 +1603,9 @@ async function launchGame(reuse) {
   } else if (G.mode === 'dressup') {
     document.getElementById('dressupGame').style.display = 'block';
     DressupGame.start(pool, GAME_CBS);    // Phaser game (dress-up avatar)
+  } else if (G.mode === 'drawing') {
+    document.getElementById('drawingGame').style.display = 'block';
+    DrawingGame.start(pool, GAME_CBS);
   } else if (G.mode === 'towerdefense') {
     document.getElementById('towerdefenseGame').style.display = 'block';
     window.__tdLoadout = { hasBarrack: hasUpgrade('td_barrack') };
@@ -1610,7 +1651,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('cardCrossy').addEventListener('click', function () { openSetup('crossy'); });
   document.getElementById('cardCooking').addEventListener('click', function () { openSetup('cooking'); });
   document.getElementById('cardDressup').addEventListener('click', function () { openSetup('dressup'); });
-  document.getElementById('cardTowerdefense').addEventListener('click', function () { openSetup('towerdefense'); });
+  // Tower defense is archived: its card is off the menu, so this guard
+  // keeps the listener from throwing on a card that no longer exists.
+  var tdCard = document.getElementById('cardTowerdefense');
+  if (tdCard) tdCard.addEventListener('click', function () { openSetup('towerdefense'); });
+  document.getElementById('cardDrawing').addEventListener('click', function () { openSetup('drawing'); });
   document.getElementById('cardTetris').addEventListener('click', function () { openSetup('tetris'); });
   // ARCHIVED (see #cardRpg above) -- the card is hidden, so this can only
   // fire if something unhides it; left wired so un-archiving is a one-line
@@ -1639,6 +1684,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.pf-diff-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.mt-pair-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.mt-pair-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      // Remembered so the next round opens on the same number.
+      try { localStorage.setItem('mt_pairs', btn.getAttribute('data-mtpairs')); } catch (e) {}
     });
   });
 
@@ -1673,7 +1727,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btnQuitGame').addEventListener('click', function () {
     G.paused = true; clearInterval(G.timerHandle);
     restoreTimerPill();
-    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop(); DressupGame.stop(); TowerDefenseGame.stop(); TetrisGame.stop(); RpgGame.stop();
+    MatchingGame.stop(); ShootingGame.stop(); AirplaneGame.stop(); FlashcardGame.stop(); PlatformerGame.stop(); CrossyGame.stop(); CookingGame.stop(); DressupGame.stop(); TowerDefenseGame.stop(); DrawingGame.stop(); TetrisGame.stop(); RpgGame.stop();
     showScreen('screenMode');
   });
   document.getElementById('btnReturnMode').addEventListener('click', function () { showScreen('screenMode'); });
@@ -1687,7 +1741,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 });
 </script>
-<script src="js/kid-ui-common.js?v=2"></script>
+<script src="js/kid-ui-common.js?v=3"></script>
 <script src="js/kid-art-b.js?v=1"></script>
 <script src="js/kid-ui-b.js?v=4"></script>
 </body>
