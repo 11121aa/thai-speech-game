@@ -282,10 +282,13 @@ function createTowerDefenseGame(words, callbacks, mapIdx) {
       costs: [90, 130, 190],
       tiers: [
         // spawnMs is milliseconds internally; the info panel divides by
-        // 1000 so the player only ever reads seconds (20/15/12 วิ).
-        { spawnMs: 20000, allyHp: 40, allySpd: 70 },
-        { spawnMs: 15000, allyHp: 55, allySpd: 75 },
-        { spawnMs: 12000, allyHp: 75, allySpd: 80 }
+        // 1000 so the player only ever reads seconds (10/7.5/6 วิ).
+        // Halved from 20/15/12: a barrack that took twenty seconds to
+        // field its first soldier was dearer than an archer AND slower
+        // to do anything, so it never felt worth the gold.
+        { spawnMs: 10000, allyHp: 40, allySpd: 70 },
+        { spawnMs: 7500,  allyHp: 55, allySpd: 75 },
+        { spawnMs: 6000,  allyHp: 75, allySpd: 80 }
       ]
     }
   };
