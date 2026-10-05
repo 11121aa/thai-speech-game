@@ -617,9 +617,14 @@ const PracticePanel = (function () {
           }
         }, 1000);
         try {
-          // Only one repetition is expected here -- take the first
-          // detected segment even if the child spoke more than once.
-          const wavBlobs = Recorder.sliceSamplesToWavSegments(samples, sampleRate, [segments[0]]);
+          // Take the LAST utterance, not the first. In a real session an
+          // adult models the word and the child repeats it back, so one
+          // recording routinely holds two voices -- and the child's is
+          // always the later one, because the adult taps stop as soon as
+          // the child has spoken. Taking segments[0] saved the adult
+          // every single time and silently discarded the child's attempt.
+          const spoken = segments[segments.length - 1];
+          const wavBlobs = Recorder.sliceSamplesToWavSegments(samples, sampleRate, [spoken]);
           const blob = wavBlobs[0];
           const session = await Auth.getSession();
           const extra = {};
@@ -629,6 +634,13 @@ const PracticePanel = (function () {
             Object.keys(extra).length ? extra : undefined);
           lastPracticeId = result.id;
           showPlayback(blob);
+          // Say so when more than one voice was in the take, so an adult
+          // who modelled the word can see which one was kept rather than
+          // wondering whether the child's attempt registered.
+          if (segments.length > 1) {
+            el("ppRecordHint").textContent =
+              "ได้ยิน " + segments.length + " ครั้ง — เก็บครั้งสุดท้ายไว้";
+          }
         } catch (err) {
           console.error("[single-rep] recording failed:", err);
           showError("เกิดข้อผิดพลาดในการบันทึกเสียง กรุณาลองใหม่");
