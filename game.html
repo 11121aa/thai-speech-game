@@ -165,13 +165,20 @@
         </div>
       </div>
       <div id="airplaneGame" class="game-canvas-wrap" style="display:none;"></div>
-      <!-- Platformer: canvas only -- swipe up to jump, down to slide.
-           The on-screen buttons were removed once the swipe controls
-           landed: they covered part of the play area and kids were using
-           the gestures anyway. -->
+      <!-- Platformer: buttons AND swipes. The buttons were dropped once
+           the swipes landed, but swipe-down is a single instant gesture
+           -- it can only fake a held slide with a fixed timer, and on a
+           phone that timer runs out under a long low ceiling. A held
+           button lasts exactly as long as the finger is on it, which is
+           the only way to slide for as long as the obstacle needs. The
+           swipes still work; these sit on top of them. -->
       <div id="platformerGame" style="display:none;">
         <div class="platformer-wrap">
           <div id="platformerCanvas" class="game-canvas-wrap"></div>
+          <div class="platformer-btns">
+            <button class="pf-btn" id="pfBtnSlide">↙<br><small>สไลด์</small></button>
+            <button class="pf-btn" id="pfBtnJump">↑<br><small>กระโดด</small></button>
+          </div>
         </div>
       </div>
       <!-- Flashcard Game — Phaser renders here -->
@@ -441,10 +448,10 @@
      ?v= is a cache-buster: bump it whenever a game-*.js file changes so
      Safari (which caches far more aggressively than Chrome) is forced to
      fetch the new version instead of silently serving a stale copy. -->
-<script src="js/gesture-hint.js?v=1"></script>
+<script src="js/gesture-hint.js?v=2"></script>
 <script src="js/game-shooting.js?v=12"></script>
 <script src="js/game-airplane.js?v=19"></script>
-<script src="js/game-platformer.js?v=40"></script>
+<script src="js/game-platformer.js?v=41"></script>
 <script src="js/game-matching.js?v=9"></script>
 <script src="js/game-flashcard.js?v=6"></script>
 <script src="js/game-crossy.js?v=11"></script>

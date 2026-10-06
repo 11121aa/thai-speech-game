@@ -286,7 +286,10 @@ var GestureHint = (function () {
     platformer: {
       title: 'วิ่งเก็บเหรียญ',
       rows: [{ motion: 'slideUp', at: [200, 250], label: 'ปัดขึ้น = กระโดด' },
-              { motion: 'slideDown', label: 'ปัดลง = ลอดต่ำ' }]
+              { motion: 'slideDown', label: 'ปัดลง = ลอดต่ำ' },
+              // A swipe down can only hold the slide for a fixed moment;
+              // the button holds it for as long as the finger does.
+              { motion: 'hold', label: 'หรือกดปุ่ม ↙ ค้างไว้ = ลอดต่ำนาน' }]
     },
     tetris: {
       title: 'เตตริส',
